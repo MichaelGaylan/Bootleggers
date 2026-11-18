@@ -15,7 +15,7 @@
 // (signed by the Host) travels with every code that Manager signs ("chain").
 
 import { ROOT_KEYS, INVITE_HOURS, INACTIVITY_DAYS, ACCESS_URL } from './config.js';
-import { sign, verify, exportPublic, shortCode, randomId, textToB64u, b64uToText, sealTo, openFrom, b64uEnc, b64uDec, newTeamKeyBytes } from './crypto.js';
+import { sign, verify, exportPublic, shortCode, randomId, textToB64u, b64uToText, sealTo, openFrom, b64uEnc, b64uDec, newTeamKeyBytes, newBackupKey, exportPrivate, importKeyPair, passwordSeal, passwordOpen } from './crypto.js';
 import * as store from './store.js';
 
 const LAST_USED = 'blg.lastUsed';
@@ -109,6 +109,7 @@ export const issuedInvites = () => store.all('invite:');
 // Reads a request; returns what the Manager must confirm before approving.
 export async function readRequest(code) {
   const p = await check(code, 'req');
+  if (p.restore) return readRestore(p);
   const inv = await store.get(`invite:${p.iid}`);
   if (!inv) throw new Error('This request is for an invite sent from another phone. Only the manager who sent the invite can approve it.');
   if (inv.status === 'approved') throw new Error(`The invite for ${inv.name} was already used. Each invite works once.`);
@@ -116,16 +117,87 @@ export async function readRequest(code) {
   return { invite: inv, dev: p.dev, ek: p.ek, deviceCode: await deviceCode(p.dev) };
 }
 
-export async function approve(profile, request) {
+export async function approve(profile, request, role) {
   const { invite, dev } = request;
-  const payload = { iid: invite.iid, name: invite.name, role: invite.role, dev, iat: Date.now(), by: await myPublicKey() };
+  if (request.restore) {
+    if (!ROLES[role] || role === 'owner') throw new Error('Choose a role.');
+    if (role === 'manager' && !can(profile, 'invite.manager')) throw new Error('Only the Host can approve a manager.');
+  }
+  const payload = { iid: invite.iid, name: invite.name, role: request.restore ? role : invite.role, dev, iat: Date.now(), by: await myPublicKey() };
   if (profile.activation) payload.chain = profile.activation;
   // Hand over the team key for shared data, sealed so only the new phone can open it.
   const tk = await teamKeyBytes();
   if (tk && request.ek) payload.tk = await sealTo(request.ek, tk);
   const code = await signToken('act', payload);
-  await store.put(`invite:${invite.iid}`, { ...invite, status: 'approved', approved: Date.now(), deviceCode: request.deviceCode });
+  await store.put(`invite:${invite.iid}`, { ...invite, role: payload.role, status: 'approved', approved: Date.now(), deviceCode: request.deviceCode });
   return code;
+}
+
+// ----- Staff restore (RRA-036) -----
+// A phone that lost its access asks again without an invite. Any manager or
+// the Host checks the device code with the person and approves it once.
+
+async function readRestore(p) {
+  const done = await store.get(`invite:${p.iid}`);
+  if (done?.status === 'approved') throw new Error(`The request from ${p.name} was already approved. Each request works once.`);
+  const exp = p.iat + INVITE_HOURS * 3600000;
+  if (Date.now() > exp) throw new Error(`The request from ${p.name} has expired. Ask them to send a new one.`);
+  const invite = { iid: p.iid, name: p.name, role: null, iat: p.iat, exp, restore: true };
+  return { invite, dev: p.dev, ek: p.ek, restore: true, deviceCode: await deviceCode(p.dev) };
+}
+
+export async function requestRestore(name) {
+  const dev = await myPublicKey();
+  const ek = await exportPublic((await store.ecdhKey()).publicKey);
+  const iid = `r-${randomId(9)}`;
+  const req = await signToken('req', { iid, name, dev, ek, restore: true, iat: Date.now(), by: dev });
+  const pending = { iid, name, role: null, restore: true, request: req, deviceCode: await deviceCode(dev) };
+  await store.put('pending', pending);
+  return pending;
+}
+
+// ----- Host backup (RRA-035) -----
+// The Host's own key never leaves the phone. A backup holds a second Host
+// key instead: made for the backup, signed by this Host phone, and sealed
+// with a password. Restoring it on any phone makes that phone a Host again,
+// with no new app release. Each backup has an id that can be revoked like an invite.
+
+const BACKUP_RE = /BLGBAK1\.([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/;
+
+export async function createHostBackup(profile, password) {
+  if (profile?.role !== 'owner') throw new Error('Only the Host can make a Host backup.');
+  const pair = await newBackupKey();
+  const pub = await exportPublic(pair.publicKey);
+  const bid = `host-${randomId(6)}`;
+  const payload = { iid: bid, name: profile.name, role: 'owner', dev: pub, iat: Date.now(), by: await myPublicKey(), backup: true };
+  if (profile.activation) payload.chain = profile.activation;
+  const act = await signToken('act', payload);
+  const tk = await store.get('teamkey');
+  const sealed = await passwordSeal(password, { v: 1, act, priv: await exportPrivate(pair.privateKey), pub, tk: tk || null, name: profile.name });
+  await store.put(`backup:${bid}`, { bid, at: Date.now() });
+  return { bid, text: `BLGBAK1.${sealed}` };
+}
+
+export const hostBackups = () => store.all('backup:');
+
+export const isBackupText = (text) => BACKUP_RE.test(String(text || ''));
+
+export async function restoreHostBackup(text, password) {
+  const m = String(text || '').match(BACKUP_RE);
+  if (!m) throw new Error("That doesn't look like a Host backup.");
+  let b;
+  try { b = await passwordOpen(password, m[1]); }
+  catch { throw new Error('Wrong password, or the backup is damaged.'); }
+  const p = await check(b.act, 'act');
+  if (p.role !== 'owner' || p.dev !== b.pub) throw new Error('This backup is not a Host backup.');
+  await store.setDeviceKey(await importKeyPair(b.priv, b.pub));
+  if (b.tk) await store.put('teamkey', b.tk);
+  await store.del('pending');
+  await store.del('owner-setup');
+  const profile = { name: p.name, role: 'owner', iid: p.iid, activation: parse(b.act).raw, since: Date.now(), restored: true };
+  await store.put('profile', profile);
+  touch();
+  return profile;
 }
 
 // ----- Team key (shared data, RRA-031) -----

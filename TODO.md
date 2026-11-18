@@ -10,13 +10,15 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
-- [ ] RRA-035 · Host backup code: save a password-protected backup of the Host key once, and restore it on a new install or new phone without a new app release · Safety · M
-- [ ] RRA-036 · Staff restore: a phone that lost its access asks again, and the Host or a manager re-approves it with one tap instead of a new invite · Access · M
-- [ ] RRA-037 · Warning in the app and in About: always open from the home screen icon, never in Safari, and don't remove the icon (it erases access on this phone) · UX · S
+- [ ] RRA-039 · Managers can pick Staff or Chef when sending an invite (today a manager's invites are always Staff; only the Host picks the role) · Access · S
 
 ## 🟡 Hold
 
 ## 🟣 Done
+### 0.3.0 · build 2026.11.18-7
+- [x] RRA-035 · Host backup code: save a password-protected backup of the Host key once, and restore it on a new install or new phone without a new app release · Safety · M
+- [x] RRA-036 · Staff restore: a phone that lost its access asks again, and the Host or a manager re-approves it with one tap instead of a new invite · Access · M
+- [x] RRA-037 · Warning in the app and in About: always open from the home screen icon, never in Safari, and don't remove the icon (it erases access on this phone) · UX · S
 ### 0.2.4 · build 2026.11.18-6
 - [x] RRA-038 · New Host key added (the old one was lost on the phone) · Safety · S
 ### 0.2.3 · build 2026.11.18-5

@@ -2,10 +2,18 @@
 // Bump VERSION and BUILD on every release, and add one line to WHATS_NEW.
 
 export const APP_NAME = 'Bootleggers Kitchen';
-export const VERSION = '0.2.4';
-export const BUILD = '2026.11.18-6';
+export const VERSION = '0.3.0';
+export const BUILD = '2026.11.18-7';
 
 export const WHATS_NEW = [
+  {
+    version: '0.3.0', build: '2026.11.18-7', date: '2026-11-18',
+    lines: [
+      'Host backup: save a password-protected backup once, and restore Host on any phone without a new key (More → Host backup).',
+      'Lost access? Tap "Ask to get back in" and a manager or the Host lets you back in, with no new invite.',
+      'A reminder to always open the app from its home screen icon, so your access stays saved.',
+    ],
+  },
   {
     version: '0.2.4', build: '2026.11.18-6', date: '2026-11-18',
     lines: ['New Host key for the Host phone, so it opens as Host again.'],

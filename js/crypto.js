@@ -108,3 +108,41 @@ export async function openFrom(privateKey, box) {
 
 export const newTeamKeyBytes = () => crypto.getRandomValues(new Uint8Array(32));
 export const importTeamKey = (bytes) => crypto.subtle.importKey('raw', bytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+
+// ----- Host backup (RRA-035) -----
+// A backup key is made extractable once, so it can be written into a
+// password-protected backup. On restore it is imported non-extractable again.
+
+export function newBackupKey() {
+  return crypto.subtle.generateKey(EC, true, ['sign', 'verify']);
+}
+
+export async function exportPrivate(priv) {
+  return b64uEnc(await crypto.subtle.exportKey('pkcs8', priv));
+}
+
+export async function importKeyPair(privB64, pubB64) {
+  const privateKey = await crypto.subtle.importKey('pkcs8', b64uDec(privB64), EC, false, ['sign']);
+  const publicKey = await crypto.subtle.importKey('raw', b64uDec(pubB64), EC, true, ['verify']);
+  return { privateKey, publicKey };
+}
+
+const PBKDF2_ROUNDS = 310000;
+
+async function passwordKey(password, salt) {
+  const base = await crypto.subtle.importKey('raw', te.encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: PBKDF2_ROUNDS }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+
+export async function passwordSeal(password, value) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await passwordKey(password, salt), te.encode(JSON.stringify(value)));
+  return `${b64uEnc(salt)}.${b64uEnc(iv)}.${b64uEnc(ct)}`;
+}
+
+export async function passwordOpen(password, text) {
+  const [salt, iv, ct] = text.split('.').map(b64uDec);
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, await passwordKey(password, salt), ct);
+  return JSON.parse(td.decode(pt));
+}

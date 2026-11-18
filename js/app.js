@@ -153,6 +153,7 @@ function moreView() {
     <div class="group">
       ${canSee('settings') || isHost() ? '<a class="row" href="#/settings"><span class="grow">Settings</span></a>' : ''}
       ${access.can(profile, 'invite') ? '<a class="row" href="#/team"><span class="grow">Invite and approve phones</span></a>' : ''}
+      ${isHost() ? `<a class="row" href="#/backup"><span class="grow">Host backup</span>${LS.get('backupAt', 0) ? '' : '<span class="chip warn">Not made yet</span>'}</a>` : ''}
     </div>
     <div class="group">
       <a class="row" href="#/about"><span class="grow">About and how-to</span></a>
@@ -166,12 +167,96 @@ function moreView() {
     <p class="muted small center">${esc(APP_NAME)} ${VERSION} · build ${BUILD}</p>`;
   $('#show-notice').onclick = () => sheet({ title: 'Notices of use', left: null, right: 'Done', body: NOTICE_HTML });
   $('#leave').onclick = async () => {
-    const ok = await sheet({ title: 'Remove access?', right: 'Remove', body: `<p>This deletes the app's data from this phone, including recipes saved here. You'll need a new invite to use it again.</p>${profile.role === 'owner' ? '<p class="hint">This is the Host phone. Removing access deletes the Host key, and a new key has to be added to the app.</p>' : ''}` });
+    const ok = await sheet({ title: 'Remove access?', right: 'Remove', body: `<p>This deletes the app's data from this phone, including recipes saved here. You'll need a new invite to use it again.</p>${profile.role === 'owner' ? '<p class="hint">This is the Host phone. Removing access deletes the Host key. You can get back in only with a Host backup, or by adding a new key to the app.</p>' : ''}` });
     if (!ok) return;
     await access.wipeAccess();
     localStorage.removeItem('blg.expiredNotice');
     location.hash = ''; location.reload();
   };
+}
+
+// ------------------------------------------- keep access (RRA-037)
+
+const KEEP_TIP = `always open Bootleggers from its icon on your home screen${isIOS ? ', not from Safari' : ''}. Your access is saved inside that app on this phone. Removing the icon${isIOS ? ' or opening the site in Safari' : ''} starts with no access.`;
+
+async function homeTip() {
+  if (LS.get('homeTip', 0)) return;
+  const host = isHost();
+  const go = await sheet({
+    title: 'Keep your access', left: null, right: host ? 'Later' : 'Got it',
+    body: `<p>Please ${KEEP_TIP}</p>
+      ${isIOS && !standalone ? '<p class="hint small">You are in Safari now. Tap Share, then <b>Add to Home Screen</b>, and use that icon from now on.</p>' : ''}
+      ${host ? `<p><b>Host:</b> make a Host backup now. If this phone loses the app, the backup gets you back in without a new key.</p>
+        <button class="btn block" id="mk" type="button">Make a Host backup</button>` : ''}`,
+    onMount: ({ close, el }) => { $('#mk', el)?.addEventListener('click', () => close('backup')); },
+  });
+  LS.set('homeTip', 1);
+  if (go === 'backup') location.hash = '#/backup';
+}
+
+// ------------------------------------------------ Host backup (RRA-035)
+
+async function backupView() {
+  if (!isHost()) { location.hash = '#/more'; return; }
+  setChrome({ tab: 'more', back: true });
+  setTitle('Host backup');
+  const list = (await access.hostBackups()).sort((a, b) => b.at - a.at);
+  view.innerHTML = `
+    <p class="small">A Host backup lets you get back in as Host on a new phone, or after the app was removed, without adding a new key to the app.</p>
+    <div class="card">
+      <label class="field" style="margin-top:0"><span>Backup password</span><input type="password" id="b-pw" autocomplete="new-password"></label>
+      <label class="field"><span>Password again</span><input type="password" id="b-pw2" autocomplete="new-password"></label>
+      <p class="muted small">At least 10 characters. Write it down somewhere safe. Without it the backup can't be opened, and nobody can reset it.</p>
+      <button class="btn block" id="b-make" type="button">Make backup</button>
+      <p id="b-err" class="small" style="color:var(--danger)"></p>
+    </div>
+    <div class="hint small">Keep the backup somewhere only you can reach, such as Notes, your password app or an email to yourself. Anyone with the backup <b>and</b> the password can act as Host.</div>
+    <div class="section-label">Backups made on this phone</div>
+    <div class="group">${list.length ? list.map((b) => `<div class="row"><span class="grow"><span class="title">${fmtDate(b.at)}</span><span class="sub">id ${esc(b.bid)}</span></span></div>`).join('') : '<div class="row muted">None yet.</div>'}</div>
+    <p class="muted small">If a backup is lost or shared by mistake, send its id to the app's developer so it can be added to the revoked list.</p>`;
+  $('#b-make').onclick = async () => {
+    const pw = $('#b-pw').value;
+    if (pw.length < 10) { $('#b-err').textContent = 'Use at least 10 characters.'; return; }
+    if (pw !== $('#b-pw2').value) { $('#b-err').textContent = "The two passwords don't match."; return; }
+    const btn = $('#b-make'); btn.disabled = true; btn.textContent = 'Making backup…';
+    let res;
+    try { res = await access.createHostBackup(profile, pw); }
+    catch (e) { $('#b-err').textContent = e.message; btn.disabled = false; btn.textContent = 'Make backup'; return; }
+    LS.set('backupAt', Date.now());
+    const text = `Bootleggers Kitchen Host backup (${res.bid}, ${new Date().toLocaleDateString()}). To restore: open the app from the home screen, tap "Restore from a Host backup", paste this and enter the password.\n${res.text}`;
+    await sheet({
+      title: 'Backup ready', left: null, right: 'Done',
+      body: `<p>Save this backup now. It is not kept anywhere else.</p>
+        <button class="btn block" id="s" type="button">Save or send backup</button>
+        <button class="btn plain block" id="c" type="button" style="margin-top:6px">Copy backup</button>`,
+      onMount: ({ el }) => {
+        $('#s', el).onclick = () => share('Bootleggers Kitchen Host backup', text);
+        $('#c', el).onclick = () => copy(text, 'Backup copied');
+      },
+    });
+    backupView();
+  };
+}
+
+async function restoreSheet(prefill) {
+  return sheet({
+    title: 'Restore Host', right: 'Restore',
+    body: `<p class="small">Paste your Host backup and enter its password.</p>
+      <textarea id="r-text" placeholder="Paste the Host backup" style="min-height:70px">${esc(prefill || '')}</textarea>
+      <button class="btn tonal small" id="r-paste" type="button" style="margin-top:6px">Paste</button>
+      <label class="field"><span>Backup password</span><input type="password" id="r-pw" autocomplete="current-password"></label>
+      <p id="r-err" class="small" style="color:var(--danger)"></p>`,
+    onMount: (api) => {
+      $('#r-paste', api.el).onclick = () => pasteInto($('#r-text', api.el));
+      api.onRight = async () => {
+        $('#r-err', api.el).textContent = 'Checking…';
+        try {
+          const p = await access.restoreHostBackup($('#r-text', api.el).value, $('#r-pw', api.el).value);
+          api.close(p);
+        } catch (e) { $('#r-err', api.el).textContent = e.message; }
+      };
+    },
+  });
 }
 
 // ---------------------------------------------------- About (RRA-012)
@@ -195,6 +280,8 @@ function aboutView() {
       <p><b>More:</b> schedule, events, costs and waste, Settings, and this page.</p>
       <p><b>Access:</b> the app opens only on the phone a manager approved. It locks itself after ${INACTIVITY_DAYS} days without use.</p>
       <p><b>Install it:</b> on iPhone, tap Share, then Add to Home Screen. On Android, tap the menu, then Install app.</p>
+      <p><b>Keep your access:</b> ${KEEP_TIP}</p>
+      <p><b>Lost access?</b> On the Invite only screen, tap <b>Ask to get back in</b> and send the request to a manager. The Host can restore from a Host backup instead.</p>
     </div>
     <div class="group">
       <a class="row" href="#/whatsnew"><span class="grow">What's new</span></a>
@@ -328,16 +415,25 @@ async function teamView(incoming) {
     let req;
     try { req = await access.readRequest($('#a-code').value); }
     catch (e) { toast(e.message); return; }
+    const known = req.restore ? (await staffList()).find((x) => x.name.trim().toLowerCase() === req.invite.name.trim().toLowerCase()) : null;
+    const roles = ['staff', 'chef', ...(access.can(profile, 'invite.manager') ? ['manager'] : [])];
+    const def = roles.includes(known?.role) ? known.role : 'staff';
     const ok = await sheet({
-      title: 'Approve phone', right: 'Approve',
-      body: `<p><b>${esc(req.invite.name)}</b> · ${esc(access.ROLES[req.invite.role])}</p>
+      title: req.restore ? 'Let them back in' : 'Approve phone', right: 'Approve',
+      body: `${req.restore
+        ? `<p><b>${esc(req.invite.name)}</b> lost access on their phone and is asking to get back in.</p>
+          <label class="field"><span>Role</span><select id="r-role">${roles.map((r) => `<option value="${r}"${r === def ? ' selected' : ''}>${esc(access.ROLES[r])}</option>`).join('')}</select></label>
+          ${known ? '' : '<p class="hint small">No one with this name is on the staff list. Make sure you know who this is.</p>'}`
+        : `<p><b>${esc(req.invite.name)}</b> · ${esc(access.ROLES[req.invite.role])}</p>`}
         <p>Ask them to read the code on their phone. It must match:</p>
         <div class="code-big">${esc(req.deviceCode)}</div>
         <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="match" style="width:22px;height:22px"> The code on their phone matches</label>`,
-      onMount: (api) => { api.onRight = () => { if ($('#match', api.el).checked) api.close(true); else toast('Check the code with them first'); }; },
+      onMount: (api) => { api.onRight = () => { if ($('#match', api.el).checked) api.close($('#r-role', api.el)?.value || true); else toast('Check the code with them first'); }; },
     });
     if (!ok) return;
-    const code = await access.approve(profile, req);
+    let code;
+    try { code = await access.approve(profile, req, typeof ok === 'string' ? ok : undefined); }
+    catch (e) { toast(e.message); return; }
     const text = `Bootleggers Kitchen activation for ${req.invite.name}. Copy this whole message, then open the app and tap Paste:\n${code}`;
     await sheet({
       title: 'Approved', left: null, right: 'Done',
@@ -384,7 +480,7 @@ async function lockedView(incoming) {
   if (pending) {
     view.innerHTML = `
       <h2>Almost there, ${esc(pending.name)}</h2>
-      <p><b>Step 1.</b> Send your request to the manager who invited you.</p>
+      <p><b>Step 1.</b> Send your request to ${pending.restore ? 'a manager or the Host' : 'the manager who invited you'}.</p>
       <button class="btn block" id="send" type="button">Send request</button>
       <p style="margin-top:18px"><b>Step 2.</b> Your manager will ask for this code. Read it to them:</p>
       <div class="code-big">${esc(pending.deviceCode)}</div>
@@ -395,7 +491,7 @@ async function lockedView(incoming) {
         <button class="btn" id="go" type="button">Open the app</button>
       </div>
       <p id="err" class="small" style="color:var(--danger)"></p>
-      <button class="btn plain block" id="restart" type="button">Use a different invite</button>`;
+      <button class="btn plain block" id="restart" type="button">${pending.restore ? 'Start again' : 'Use a different invite'}</button>`;
     const req = `Bootleggers Kitchen request from ${pending.name}. Paste this in the app under More → Invite and approve staff:\n${pending.request}`;
     $('#send').onclick = () => share('Bootleggers Kitchen request', req);
     $('#paste').onclick = () => pasteInto($('#code'));
@@ -419,14 +515,31 @@ async function lockedView(incoming) {
       <button class="btn" id="go" type="button">Continue</button>
     </div>
     <p id="err" class="small" style="color:var(--danger)"></p>
-    <div class="card" style="margin-top:28px"><b>Host setup</b><p class="small muted">${ROOT_KEYS.length
+    ${ROOT_KEYS.length ? `<div class="card" style="margin-top:28px"><b>Had the app before?</b><p class="small muted">If this phone lost its access (for example, the app was removed), ask to get back in. A manager or the Host approves it, with no new invite.</p>
+      <label class="field"><span>Your name</span><input type="text" id="rs-name" placeholder="As the team knows you" autocomplete="name"></label>
+      <button class="btn tonal block" id="rs-go" type="button">Ask to get back in</button></div>` : ''}
+    <div class="card" style="margin-top:16px"><b>Host setup</b><p class="small muted">${ROOT_KEYS.length
       ? `For the Host only. If the Host phone lost its key (for example, the app was removed and added again), make a new Host key here and send it in. It does nothing until it is added to the app.`
       : `No Host key is set yet. If you are the Host (the app's administrator), set it up on your own phone${isIOS ? ', from the home screen app' : ''}.`}</p>
-      <button class="btn tonal block" id="owner" type="button">I'm the Host: set up this phone</button></div>`;
+      ${ROOT_KEYS.length ? '<button class="btn block" id="restore" type="button">Restore from a Host backup</button>' : ''}
+      <button class="btn tonal block" id="owner" type="button" style="margin-top:8px">I'm the Host: set up this phone</button></div>`;
+  $('#rs-go')?.addEventListener('click', async () => {
+    const n = $('#rs-name').value.trim();
+    if (!n) { $('#rs-name').focus(); return; }
+    await access.requestRestore(n);
+    lockedView();
+  });
+  const doRestore = async (prefill) => {
+    const p = await restoreSheet(prefill);
+    if (!p) return;
+    profile = p; localStorage.removeItem('blg.expiredNotice'); toast('Welcome back, Host'); boot();
+  };
+  $('#restore')?.addEventListener('click', () => doRestore());
   $('#copy-in')?.addEventListener('click', () => copy(incoming, 'Code copied'));
   $('#paste').onclick = () => pasteInto($('#code'));
   $('#go').onclick = async () => {
     const raw = $('#code').value;
+    if (access.isBackupText(raw)) { doRestore(raw); return; }
     const t = access.parse(raw);
     try {
       if (t?.kind === 'act') throw new Error('This is an activation. Open your invite first.');
@@ -479,6 +592,7 @@ const routes = {
   whatsnew: () => whatsNewView(),
   report: () => reportView(),
   team: (arg) => teamView(arg),
+  backup: () => backupView(),
 };
 
 // Redraw the current screen when shared data arrives from another phone,
@@ -537,6 +651,7 @@ async function boot() {
     data.onChange(() => updateBadge());
   }
   await noticeGate();
+  await homeTip();
   if (incoming && access.parse(incoming)?.kind === 'req') { location.hash = '#/team'; return teamView(incoming); }
   if (!location.hash || location.hash === '#') location.hash = '#/recipes'; else route();
   loadNotices();
