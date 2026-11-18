@@ -1,0 +1,12 @@
+{
+  "_how": "Messages to everyone (RRA-015). Add a new entry at the top with a new id. The app shows it once as a popup and keeps it in Notices.",
+  "messages": [
+    {
+      "id": "2026-11-18-welcome",
+      "date": "2026-11-18",
+      "title": "Welcome to Bootleggers Kitchen",
+      "body": "This is where notices from management will show up. House recipes and the starter stock list are in the tabs below.",
+      "from": "Management"
+    }
+  ]
+}
