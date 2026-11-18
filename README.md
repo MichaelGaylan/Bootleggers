@@ -6,17 +6,19 @@ No build step: it is plain HTML, CSS and JavaScript modules, served as static fi
 
 ## Layout
 - `index.html`, `css/app.css`: the app and its iOS/Android look (light and dark)
-- `js/config.js`: version, build, Owner keys, expiry days, Report a problem key
+- `js/config.js`: version, build, Host keys, expiry days, Report a problem key
 - `js/access.js`: invite, approval and activation codes; inactivity expiry
 - `js/crypto.js`, `js/store.js`: device keys and encrypted on-phone storage
 - `js/starter-stock.js`: the preinstalled starter stock list (draft)
+- `js/ui.js`, `js/data.js`, `js/perms.js`: shared helpers, team data collections (sync hook), roles and permissions
+- `js/recipes.js`, `js/prep.js`, `js/stock.js`, `js/board.js`, `js/schedule.js`, `js/events.js`, `js/costs.js`, `js/settings.js`: the screens
 - `data/notifications.json`: notices sent to everyone
 - `data/access.json`: revoked invite ids
 - `sw.js`, `manifest.webmanifest`: offline support and home-screen install
 - `TODO.md`: the build lists
 
 ## Releasing
-Bump `VERSION` and `BUILD` in `js/config.js`, add a line to `WHATS_NEW`, and bump `CACHE` in `sw.js`. Phones then show "An update is ready" and replay the startup screen with what's new.
+Bump `VERSION` and `BUILD` in `js/config.js`, add a line to `WHATS_NEW`, and bump `CACHE` in `sw.js` (add any new file to its list). Phones then show "An update is ready" and replay the startup screen with what's new.
 
 ## Run locally
 `python3 -m http.server` in this folder, then open http://localhost:8000.

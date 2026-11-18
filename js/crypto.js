@@ -75,3 +75,36 @@ export async function unseal(key, rec) {
   const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: rec.iv }, key, rec.ct);
   return JSON.parse(td.decode(pt));
 }
+
+// ----- Team key hand-over (shared data, RRA-031) -----
+// Each phone has an ECDH key. A manager seals the team's data key to the new
+// phone's ECDH public key, so only that phone can open it, even if the
+// activation text is forwarded or intercepted.
+
+const DH = { name: 'ECDH', namedCurve: 'P-256' };
+
+export function newEcdhKey() {
+  return crypto.subtle.generateKey(DH, false, ['deriveKey']);
+}
+
+async function sharedKey(privateKey, publicB64) {
+  const pub = await crypto.subtle.importKey('raw', b64uDec(publicB64), DH, false, []);
+  return crypto.subtle.deriveKey({ name: 'ECDH', public: pub }, privateKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+
+// Returns { epk, iv, ct } that only the holder of recipientB64's private key can open.
+export async function sealTo(recipientB64, bytes) {
+  const eph = await crypto.subtle.generateKey(DH, true, ['deriveKey']);
+  const k = await sharedKey(eph.privateKey, recipientB64);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, bytes);
+  return { epk: await exportPublic(eph.publicKey), iv: b64uEnc(iv), ct: b64uEnc(ct) };
+}
+
+export async function openFrom(privateKey, box) {
+  const k = await sharedKey(privateKey, box.epk);
+  return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64uDec(box.iv) }, k, b64uDec(box.ct)));
+}
+
+export const newTeamKeyBytes = () => crypto.getRandomValues(new Uint8Array(32));
+export const importTeamKey = (bytes) => crypto.subtle.importKey('raw', bytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
