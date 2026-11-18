@@ -14,6 +14,8 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 ## 🟡 Hold
 
 ## 🟣 Done
+### 0.2.2 · build 2026.11.18-4
+- [x] RRA-033 · Host phone stuck on Host setup after 0.2.1: the update stored the old config from the browser cache. Fixed, and updates now install by themselves · Bug · S
 ### 0.2.1 · build 2026.11.18-3
 - [x] RRA-027 · Host key added to the app (Host phone set up) · Safety · S
 ### No release (Gaylan's step)

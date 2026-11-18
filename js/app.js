@@ -547,14 +547,16 @@ document.addEventListener('visibilitychange', () => {
 // Offline support and update prompt.
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').then((reg) => {
+    // An update left waiting by an older version: let it take over now.
+    if (reg.waiting && navigator.serviceWorker.controller) reg.waiting.postMessage('skipWaiting');
     reg.addEventListener('updatefound', () => {
       const nw = reg.installing;
       nw?.addEventListener('statechange', () => {
-        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-          toast('An update is ready', { label: 'Update', run: () => nw.postMessage('skipWaiting') });
-        }
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) nw.postMessage('skipWaiting');
       });
     });
+    // Look for a new version whenever the app comes back to the front.
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
   }).catch(() => {});
   // Reload only when an update takes over, not on the very first install.
   const hadController = !!navigator.serviceWorker.controller;

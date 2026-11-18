@@ -1,6 +1,6 @@
 // Bootleggers Kitchen service worker: works offline, updates on request.
 // Bump CACHE with every release (it follows the app version).
-const CACHE = 'blg-0.2.1-2026.11.18-3';
+const CACHE = 'blg-0.2.2-2026.11.18-4';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'js/app.js', 'js/config.js', 'js/access.js', 'js/crypto.js', 'js/store.js', 'js/starter-stock.js',
@@ -9,8 +9,16 @@ const SHELL = [
   'assets/bootleggers-logo.png', 'assets/app-icon-192.png', 'assets/app-icon-512.png', 'assets/app-icon-180.png', 'assets/favicon-32.png',
 ];
 
+// A new version takes over as soon as it has downloaded; the page reloads
+// itself when that happens. (Waiting for every window to close never
+// happens reliably for home-screen apps on iPhone.)
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));
+  // cache: 'reload' skips the browser's own short-term cache, which could
+  // otherwise hand back the previous version's files (GitHub Pages lets
+  // browsers keep files for 10 minutes).
+  e.waitUntil(caches.open(CACHE)
+    .then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -23,9 +31,9 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   if (url.pathname.endsWith('.mp4')) return; // video needs range requests; let the network handle it
-  if (url.pathname.includes('/data/')) {
+  if (url.pathname.includes('/data/') || url.pathname.endsWith('/js/config.js')) {
     // Notices and revocations: always try the network first.
-    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    e.respondWith(fetch(e.request, { cache: 'no-store' }).catch(() => caches.match(e.request, { ignoreSearch: true })));
     return;
   }
   e.respondWith(caches.match(e.request, { ignoreSearch: true }).then((hit) => hit || fetch(e.request)));
