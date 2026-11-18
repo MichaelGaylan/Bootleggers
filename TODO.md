@@ -10,6 +10,9 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
+- [ ] RRA-035 · Host backup code: save a password-protected backup of the Host key once, and restore it on a new install or new phone without a new app release · Safety · M
+- [ ] RRA-036 · Staff restore: a phone that lost its access asks again, and the Host or a manager re-approves it with one tap instead of a new invite · Access · M
+- [ ] RRA-037 · Warning in the app and in About: always open from the home screen icon, never in Safari, and don't remove the icon (it erases access on this phone) · UX · S
 
 ## 🟡 Hold
 
