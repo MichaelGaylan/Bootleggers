@@ -14,6 +14,8 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 ## 🟡 Hold
 
 ## 🟣 Done
+### 0.2.3 · build 2026.11.18-5
+- [x] RRA-034 · Host phone opened to Invite only with no way to make invites (the phone's saved Host key was gone). The Invite only screen now always offers Host setup, so a new Host key can be made and added · Bug · S
 ### 0.2.2 · build 2026.11.18-4
 - [x] RRA-033 · Host phone stuck on Host setup after 0.2.1: the update stored the old config from the browser cache. Fixed, and updates now install by themselves · Bug · S
 ### 0.2.1 · build 2026.11.18-3
