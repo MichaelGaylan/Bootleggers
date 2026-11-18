@@ -1,7 +1,7 @@
 // Invite-only access (RRA-018) and expiry (RRA-019). No server is needed.
 //
 // Every code is "BLG1.<kind>.<payload>.<signature>":
-//   inv  invite      signed by a Manager or Owner device, valid for INVITE_HOURS
+//   inv  invite      signed by a Manager or Host device, valid for INVITE_HOURS
 //   req  request     signed by the new phone's own device key
 //   act  activation  signed by the Manager, names the new phone's device key
 //
@@ -11,8 +11,8 @@
 // once, and an activation only works on the phone whose key it names, so a
 // forwarded invite or activation does not open the app anywhere else.
 //
-// Trust: an Owner key is listed in config ROOT_KEYS. A Manager's activation
-// (signed by the Owner) travels with every code that Manager signs ("chain").
+// Trust: an Host key is listed in config ROOT_KEYS. A Manager's activation
+// (signed by the Host) travels with every code that Manager signs ("chain").
 
 import { ROOT_KEYS, INVITE_HOURS, INACTIVITY_DAYS, ACCESS_URL } from './config.js';
 import { sign, verify, exportPublic, shortCode, randomId, textToB64u, b64uToText } from './crypto.js';
@@ -21,7 +21,8 @@ import * as store from './store.js';
 const LAST_USED = 'blg.lastUsed';
 const DAY = 86400000;
 
-export const ROLES = { owner: 'Owner', manager: 'Manager', staff: 'Staff' };
+// The internal key stays 'owner' so existing codes keep working; people see "Host".
+export const ROLES = { owner: 'Host', manager: 'Manager', chef: 'Chef', staff: 'Staff' };
 const CAN_INVITE = ['owner', 'manager'];
 
 // Hook for RRA-002 (roles and permissions). Everyone can do everything that
@@ -65,7 +66,7 @@ export async function loadRevocations() {
   return revoked;
 }
 
-// Checks the signature and that the signer traces back to an Owner key.
+// Checks the signature and that the signer traces back to an Host key.
 // Returns the payload or throws an Error with a plain-language message.
 export async function check(code, kind) {
   const t = typeof code === 'string' ? parse(code) : code;
@@ -149,7 +150,7 @@ export async function activate(code) {
   return profile;
 }
 
-// Owner bootstrap: the first Owner key is created on the Owner's phone, then
+// Host bootstrap: the first Host key is created on the Host's phone, then
 // added to ROOT_KEYS in config.js and published.
 export async function ownerSetup(name) {
   const pub = await myPublicKey();
@@ -164,14 +165,14 @@ export async function currentProfile() {
   const pub = await myPublicKey();
   if (ROOT_KEYS.includes(pub)) {
     const setup = await store.get('owner-setup');
-    return { name: setup?.name || 'Owner', role: 'owner', since: setup?.at || Date.now() };
+    return { name: setup?.name || 'Host', role: 'owner', since: setup?.at || Date.now() };
   }
   const profile = await store.get('profile');
   if (!profile) return null;
   try {
     await check(profile.activation, 'act');
   } catch {
-    return null; // revoked, or the Owner key that signed it was replaced
+    return null; // revoked, or the Host key that signed it was replaced
   }
   return profile;
 }

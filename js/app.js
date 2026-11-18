@@ -6,104 +6,25 @@ import {
 } from './config.js';
 import * as access from './access.js';
 import * as store from './store.js';
-import { randomId } from './crypto.js';
-import { STARTER_STOCK, STOCK_STATUS } from './starter-stock.js';
+import * as data from './data.js';
+import { canSee, isHost } from './perms.js';
+import { recipesView, recipeView, printView } from './recipes.js';
+import { stockView, neededView, ordersView, vendorsView } from './stock.js';
+import { boardView, unreadPosts } from './board.js';
+import { prepView } from './prep.js';
+import { scheduleView, staffView, ensureStaffFor, staffList } from './schedule.js';
+import { eventsView, eventView } from './events.js';
+import { costsView } from './costs.js';
+import { settingsView, listView, rolesView, personView } from './settings.js';
 
-const $ = (s, el = document) => el.querySelector(s);
-const $$ = (s, el = document) => [...el.querySelectorAll(s)];
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const view = $('#view');
-const dlg = $('#dlg');
-const LS = {
-  get: (k, d) => { try { return JSON.parse(localStorage.getItem('blg.' + k)) ?? d; } catch { return d; } },
-  set: (k, v) => localStorage.setItem('blg.' + k, JSON.stringify(v)),
-};
-const isIOS = document.documentElement.classList.contains('is-ios');
-const standalone = document.documentElement.classList.contains('standalone');
+import { $, $$, esc, view, dlg, LS, isIOS, standalone, toast, copy, share, pasteInto, sheet, setTitle, setChrome, fmtDate, session } from './ui.js';
+
 const NOTICE_VERSION = 1;
 
 let profile = null;
+boardView.after = () => updateBadge();
 let notices = [];
 
-// ---------------------------------------------------------------- helpers
-
-function toast(msg, action) {
-  const t = $('#toast');
-  t.innerHTML = `<span>${esc(msg)}</span>`;
-  if (action) {
-    const b = document.createElement('button');
-    b.textContent = action.label;
-    b.onclick = () => { t.hidden = true; action.run(); };
-    t.append(b);
-  }
-  t.hidden = false;
-  clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => { t.hidden = true; }, action ? 12000 : 3000);
-}
-
-async function copy(text, done = 'Copied') {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast(done);
-  } catch {
-    // Older browsers: select a hidden field instead.
-    const ta = document.createElement('textarea');
-    ta.value = text; document.body.append(ta); ta.select();
-    document.execCommand('copy'); ta.remove(); toast(done);
-  }
-}
-
-async function share(title, text) {
-  if (navigator.share) {
-    try { await navigator.share({ title, text }); return; } catch (e) { if (e.name === 'AbortError') return; }
-  }
-  copy(text, 'Copied. Paste it into a text message.');
-}
-
-async function pasteInto(ta) {
-  try { ta.value = await navigator.clipboard.readText(); ta.dispatchEvent(new Event('input')); }
-  catch { ta.focus(); toast('Long-press the box and tap Paste'); }
-}
-
-// Opens the bottom sheet. Resolves with whatever close(value) gets.
-function sheet({ title, body, left = 'Cancel', right, onMount, dismissable = true }) {
-  return new Promise((resolve) => {
-    dlg.innerHTML = `
-      <div class="sheet-head">
-        ${left ? `<button class="btn plain small" data-act="left" type="button">${esc(left)}</button>` : '<span style="width:70px"></span>'}
-        <h3>${esc(title)}</h3>
-        ${right ? `<button class="btn plain small" data-act="right" type="button" style="font-weight:700">${esc(right)}</button>` : '<span style="width:70px"></span>'}
-      </div>
-      <div class="sheet-body">${body}</div>`;
-    let result;
-    const close = (v) => { result = v; dlg.close(); };
-    dlg.onclose = () => resolve(result);
-    dlg.oncancel = (e) => { if (!dismissable) e.preventDefault(); };
-    const api = { close, el: dlg };
-    $('[data-act=left]', dlg)?.addEventListener('click', () => close(undefined));
-    const r = $('[data-act=right]', dlg);
-    if (r) r.addEventListener('click', () => api.onRight ? api.onRight() : close(true));
-    onMount?.(api);
-    dlg.showModal();
-    $('.sheet-body', dlg).scrollTop = 0;
-  });
-}
-
-function setTitle(text, actionHtml = '') {
-  $('#title').textContent = text;
-  $('#title-action').innerHTML = actionHtml;
-}
-
-function setChrome({ locked = false, tab = null, back = false }) {
-  document.body.classList.toggle('locked', locked);
-  $('#tabs').hidden = locked;
-  $('#btn-bell').hidden = locked;
-  $('#btn-back').hidden = !back;
-  $$('#tabs a').forEach((a) => a.classList.toggle('on', a.dataset.tab === tab));
-  window.scrollTo(0, 0);
-}
-
-const fmtDate = (t) => new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
 // ------------------------------------------------- startup screen (RRA-014)
 
@@ -186,10 +107,11 @@ async function loadNotices() {
     const r = await fetch(NOTIFICATIONS_URL, { cache: 'no-store' });
     if (r.ok) { notices = (await r.json()).messages || []; LS.set('noticesCache', notices); }
   } catch { notices = LS.get('noticesCache', []); }
+  session.notices = notices;
   updateBadge();
   const popped = new Set(LS.get('popped', []));
   const fresh = notices.find((n) => !popped.has(n.id));
-  if (fresh && profile && !dlg.open) {
+  if (fresh && profile && !dlg.open && (await data.settings()).popups !== false) {
     popped.add(fresh.id); LS.set('popped', [...popped]);
     await sheet({
       title: 'Notice', left: null, right: 'OK',
@@ -203,223 +125,13 @@ function unreadCount() {
   return notices.filter((n) => !read.has(n.id)).length;
 }
 
-function updateBadge() {
-  const n = unreadCount();
+async function updateBadge() {
+  const n = unreadCount() + (profile ? await unreadPosts() : 0);
   $('#tab-badge').hidden = !n;
   $('#tab-badge').textContent = n;
   $('#bell-dot').hidden = !n;
 }
 
-function noticesView() {
-  setChrome({ tab: 'notices' });
-  setTitle('Notices');
-  const read = new Set(LS.get('read', []));
-  view.innerHTML = notices.length
-    ? notices.map((n) => `
-      <div class="card">
-        <p class="muted small">${esc(n.from || 'Management')} · ${esc(n.date || '')} ${read.has(n.id) ? '' : '<span class="chip warn">New</span>'}</p>
-        <h3 style="margin:4px 0">${esc(n.title)}</h3><p>${esc(n.body)}</p>
-      </div>`).join('') + '<p class="muted small center">Notices are sent to everyone by management.</p>'
-    : '<div class="empty">No notices yet.</div>';
-  LS.set('read', notices.map((n) => n.id));
-  updateBadge();
-}
-
-// --------------------------------------------- house recipes (RRA-025)
-// Saved encrypted on this phone. Sharing them between phones needs the
-// recipe archive (RRA-001), which is not approved yet.
-
-const CATEGORIES = ['Rub', 'Sauce', 'Dressing', 'Marinade', 'Other'];
-const recipes = {
-  all: async () => (await store.all('recipe:')).sort((a, b) => a.name.localeCompare(b.name)),
-  get: (id) => store.get(`recipe:${id}`),
-  save: (r) => store.put(`recipe:${r.id}`, r),
-  remove: (id) => store.del(`recipe:${id}`),
-};
-
-async function recipesView() {
-  setChrome({ tab: 'recipes' });
-  setTitle('House recipes', '<button class="btn btn-new" id="new-recipe" type="button">NEW RECIPE</button>');
-  $('#new-recipe').onclick = () => recipeDialog();
-  const list = await recipes.all();
-  const filter = LS.get('recipeKind', 'house');
-  const q = (recipesView.q || '').toLowerCase();
-  const shown = list.filter((r) => r.kind === filter && (!q || r.name.toLowerCase().includes(q) || (r.category || '').toLowerCase().includes(q)));
-  const byCat = {};
-  for (const r of shown) (byCat[r.kind === 'house' ? r.category || 'Other' : 'Dishes'] ||= []).push(r);
-  view.innerHTML = `
-    <div class="segmented" role="tablist">
-      <button data-k="house" class="${filter === 'house' ? 'on' : ''}" type="button">House recipes</button>
-      <button data-k="dish" class="${filter === 'dish' ? 'on' : ''}" type="button">Dishes</button>
-    </div>
-    <div class="search"><input type="search" id="q" placeholder="Search" value="${esc(recipesView.q || '')}"></div>
-    ${shown.length ? Object.entries(byCat).map(([cat, rs]) => `
-      <div class="section-label">${esc(cat)}</div>
-      <div class="group">${rs.map((r) => `
-        <a class="row" href="#/recipe/${r.id}"><span class="grow"><span class="title">${esc(r.name)}</span>
-        <span class="sub">${esc(r.kind === 'house' ? [r.yield && `Yield ${r.yield}`, r.storage].filter(Boolean).join(' · ') : usesText(r, list))}</span></span></a>`).join('')}
-      </div>`).join('')
-    : `<div class="empty">${q ? 'Nothing matches that search.' : filter === 'house'
-      ? 'No house recipes yet.<br>Tap <b>NEW RECIPE</b> to add a rub, sauce or dressing.'
-      : 'No dishes yet. A dish can link to the house recipes it uses, like a wing sauce.'}</div>`}
-    <p class="muted small center">Recipes are saved on this phone, encrypted.</p>`;
-  $$('.segmented button', view).forEach((b) => { b.onclick = () => { LS.set('recipeKind', b.dataset.k); recipesView(); }; });
-  const qi = $('#q');
-  qi.oninput = () => { recipesView.q = qi.value; clearTimeout(qi.t); qi.t = setTimeout(async () => { await recipesView(); const n = $('#q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 200); };
-}
-
-function usesText(r, list) {
-  const names = (r.uses || []).map((id) => list.find((x) => x.id === id)?.name).filter(Boolean);
-  return names.length ? 'Uses ' + names.join(', ') : '';
-}
-
-async function recipeView(id) {
-  setChrome({ tab: 'recipes', back: true });
-  const r = await recipes.get(id);
-  if (!r) { location.hash = '#/recipes'; return; }
-  const list = await recipes.all();
-  const uses = (r.uses || []).map((u) => list.find((x) => x.id === u)).filter(Boolean);
-  const usedIn = list.filter((x) => (x.uses || []).includes(r.id));
-  setTitle(r.name, '<button class="btn plain small" id="edit" type="button">Edit</button>');
-  $('#edit').onclick = () => recipeDialog(r);
-  view.innerHTML = `
-    <div class="recipe">
-      <p><span class="chip">${r.kind === 'house' ? esc(r.category || 'House recipe') : 'Dish'}</span></p>
-      ${r.kind === 'house' && (r.yield || r.storage) ? `<div class="facts">
-        <div><b>Yield</b>${esc(r.yield || '—')}</div><div><b>Storage</b>${esc(r.storage || '—')}</div></div>` : ''}
-      ${uses.length ? `<h2>Uses house recipes</h2><div class="group">${uses.map((u) => `<a class="row" href="#/recipe/${u.id}"><span class="grow">${esc(u.name)}</span></a>`).join('')}</div>` : ''}
-      <h2>Ingredients</h2>
-      <div class="card"><ul class="ing">${(r.ingredients || []).map((i) => `<li><span class="qty">${esc(i.qty)}</span><span>${esc(i.item)}</span></li>`).join('')}</ul></div>
-      <h2>Step by step</h2>
-      <div class="card"><ol class="steps">${(r.steps || []).map((s) => `<li>${esc(s)}</li>`).join('')}</ol></div>
-      ${usedIn.length ? `<h2>Used in</h2><div class="group">${usedIn.map((u) => `<a class="row" href="#/recipe/${u.id}"><span class="grow">${esc(u.name)}</span></a>`).join('')}</div>` : ''}
-      <details class="comments" id="comments">
-        <summary>Comments (${(r.comments || []).length})</summary>
-        ${(r.comments || []).map((c) => `<div class="comment"><div class="who">${esc(c.by)} · ${fmtDate(c.at)}</div>${esc(c.text)}</div>`).join('')}
-        <label class="field"><span>Add a comment</span><textarea id="c-text" style="min-height:64px"></textarea></label>
-        <button class="btn tonal small" id="c-add" type="button">Add comment</button>
-      </details>
-      <p class="muted small" style="margin-top:24px">Added by ${esc(r.by || '—')} · updated ${fmtDate(r.updated || r.created)}</p>
-      <button class="btn danger block no-print" id="del" type="button">Delete recipe</button>
-    </div>`;
-  $('#c-add').onclick = async () => {
-    const text = $('#c-text').value.trim();
-    if (!text) return;
-    r.comments = [...(r.comments || []), { by: profile.name, at: Date.now(), text }];
-    await recipes.save(r);
-    await recipeView(id);
-    $('#comments').open = true;
-  };
-  $('#del').onclick = async () => {
-    const ok = await sheet({
-      title: 'Delete recipe?', right: 'Delete',
-      body: `<p>Delete <b>${esc(r.name)}</b> from this phone?${usedIn.length ? ` It is used in ${usedIn.length} dish${usedIn.length > 1 ? 'es' : ''}; those links will be removed.` : ''}</p>`,
-    });
-    if (!ok) return;
-    for (const d of usedIn) { d.uses = d.uses.filter((u) => u !== r.id); await recipes.save(d); }
-    await recipes.remove(r.id);
-    toast('Recipe deleted');
-    location.hash = '#/recipes';
-  };
-}
-
-async function recipeDialog(existing) {
-  const r = existing ? structuredClone(existing) : { kind: LS.get('recipeKind', 'house'), category: 'Sauce', ingredients: [{ qty: '', item: '' }, { qty: '', item: '' }], steps: [], uses: [], comments: [] };
-  const house = (await recipes.all()).filter((x) => x.kind === 'house' && x.id !== r.id);
-  const ingRow = (i = { qty: '', item: '' }) => `
-    <div class="ing-edit"><input type="text" placeholder="Qty" value="${esc(i.qty)}" aria-label="Quantity">
-    <input type="text" placeholder="Ingredient" value="${esc(i.item)}" aria-label="Ingredient">
-    <button type="button" aria-label="Remove">×</button></div>`;
-  const saved = await sheet({
-    title: existing ? 'Edit recipe' : 'New recipe', right: 'Save',
-    body: `
-      <label class="field"><span>Name</span><input type="text" id="r-name" value="${esc(r.name || '')}" placeholder="e.g. Honey Sriracha wing sauce" autocomplete="off"></label>
-      <div class="segmented" id="r-kind">
-        <button type="button" data-k="house">House recipe</button><button type="button" data-k="dish">Dish</button>
-      </div>
-      <div id="house-only">
-        <label class="field"><span>Type</span><select id="r-cat">${CATEGORIES.map((c) => `<option ${c === r.category ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
-      </div>
-      <div class="field"><span class="muted small" style="margin-left:4px">Ingredients and quantities</span>
-        <div id="r-ings" style="margin-top:6px">${(r.ingredients.length ? r.ingredients : [{}]).map(ingRow).join('')}</div>
-        <button class="btn plain small" id="r-add-ing" type="button">+ Add ingredient</button>
-      </div>
-      <label class="field"><span>Instructions (one step per line)</span><textarea id="r-steps" placeholder="Whisk the butter and hot sauce over low heat&#10;Add honey and sriracha&#10;Cool, label and date">${esc((r.steps || []).join('\n'))}</textarea></label>
-      <div id="house-only-2" class="facts" style="background:none">
-        <label class="field" style="margin:0"><span>Yield</span><input type="text" id="r-yield" value="${esc(r.yield || '')}" placeholder="e.g. 2 qt"></label>
-        <label class="field" style="margin:0"><span>Storage</span><input type="text" id="r-storage" value="${esc(r.storage || '')}" placeholder="e.g. Walk-in, 7 days"></label>
-      </div>
-      <div id="dish-only">
-        <div class="section-label" style="margin-left:4px">Uses house recipes</div>
-        <div class="checks">${house.length ? house.map((h) => `<label><input type="checkbox" value="${h.id}" ${(r.uses || []).includes(h.id) ? 'checked' : ''}>${esc(h.name)}</label>`).join('') : '<p class="muted small">No house recipes yet.</p>'}</div>
-      </div>
-      <details class="comments" style="margin-top:12px">
-        <summary>Comments</summary>
-        <textarea id="r-comment" placeholder="Optional note for the team" style="min-height:64px"></textarea>
-      </details>
-      <p id="r-err" class="small" style="color:var(--danger)"></p>`,
-    onMount: (api) => {
-      const el = api.el;
-      const setKind = (k) => {
-        r.kind = k;
-        $$('#r-kind button', el).forEach((b) => b.classList.toggle('on', b.dataset.k === k));
-        $('#house-only', el).hidden = k !== 'house';
-        $('#house-only-2', el).hidden = k !== 'house';
-        $('#dish-only', el).hidden = k !== 'dish';
-      };
-      setKind(r.kind);
-      $$('#r-kind button', el).forEach((b) => { b.onclick = () => setKind(b.dataset.k); });
-      const wireRemove = () => $$('.ing-edit button', el).forEach((b) => { b.onclick = () => { if ($$('.ing-edit', el).length > 1) b.parentElement.remove(); }; });
-      wireRemove();
-      $('#r-add-ing', el).onclick = () => { $('#r-ings', el).insertAdjacentHTML('beforeend', ingRow()); wireRemove(); $('#r-ings .ing-edit:last-child input', el).focus(); };
-      api.onRight = () => {
-        const name = $('#r-name', el).value.trim();
-        const ingredients = $$('.ing-edit', el).map((row) => { const [q, i] = $$('input', row); return { qty: q.value.trim(), item: i.value.trim() }; }).filter((i) => i.item);
-        const steps = $('#r-steps', el).value.split('\n').map((s) => s.trim()).filter(Boolean);
-        const err = !name ? 'Give the recipe a name.' : !ingredients.length ? 'Add at least one ingredient.' : !steps.length ? 'Add the instructions.' : '';
-        if (err) { $('#r-err', el).textContent = err; return; }
-        const comment = $('#r-comment', el).value.trim();
-        Object.assign(r, {
-          name, ingredients, steps,
-          category: r.kind === 'house' ? $('#r-cat', el).value : undefined,
-          yield: r.kind === 'house' ? $('#r-yield', el).value.trim() : undefined,
-          storage: r.kind === 'house' ? $('#r-storage', el).value.trim() : undefined,
-          uses: r.kind === 'dish' ? $$('#dish-only input:checked', el).map((c) => c.value) : [],
-          comments: comment ? [...(r.comments || []), { by: profile.name, at: Date.now(), text: comment }] : r.comments || [],
-        });
-        api.close(true);
-      };
-    },
-  });
-  if (!saved) return;
-  const now = Date.now();
-  if (!r.id) { r.id = randomId(8); r.created = now; r.by = profile.name; }
-  r.updated = now;
-  await recipes.save(r);
-  LS.set('recipeKind', r.kind);
-  toast(existing ? 'Saved' : 'Recipe added');
-  if (location.hash === `#/recipe/${r.id}`) recipeView(r.id); else location.hash = `#/recipe/${r.id}`;
-}
-
-// ------------------------------------------------ starter stock (RRA-024)
-
-function stockView() {
-  setChrome({ tab: 'stock' });
-  setTitle('Starter stock');
-  const q = (stockView.q || '').toLowerCase();
-  const groups = STARTER_STOCK.map((g) => ({ ...g, items: g.items.filter((i) => !q || i.join(' ').toLowerCase().includes(q)) })).filter((g) => g.items.length);
-  view.innerHTML = `
-    <div class="hint small">${esc(STOCK_STATUS)}</div>
-    <div class="search"><input type="search" id="q" placeholder="Search stock" value="${esc(stockView.q || '')}"></div>
-    ${groups.map((g) => `
-      <div class="section-label">${esc(g.group)}</div>
-      <div class="group">${g.items.map(([name, unit, used]) => `
-        <div class="row"><span class="grow"><span class="title">${esc(name)}</span>${used ? `<span class="sub">${esc(used)}</span>` : ''}</span>
-        ${unit ? `<span class="meta">${esc(unit)}</span>` : ''}</div>`).join('')}</div>`).join('') || '<div class="empty">Nothing matches that search.</div>'}
-    <p class="muted small center">Par levels and counts come with stock tracking (not built yet).</p>`;
-  const qi = $('#q');
-  qi.oninput = () => { stockView.q = qi.value; clearTimeout(qi.t); qi.t = setTimeout(() => { stockView(); const n = $('#q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 200); };
-}
 
 // ------------------------------------------------------------- More
 
@@ -430,9 +142,17 @@ function moreView() {
   view.innerHTML = `
     <div class="card">
       <b>${esc(profile.name)}</b> <span class="chip">${esc(access.ROLES[profile.role] || profile.role)}</span>
-      <p class="muted small">${profile.role === 'owner' ? 'Owner phone. Access does not expire.' : `Access stays on while you use it. It ends after ${daysLeft} days without opening the app.`}</p>
+      <p class="muted small">${profile.role === 'owner' ? 'Host phone. Access does not expire.' : `Access stays on while you use it. It ends after ${daysLeft} days without opening the app.`}</p>
     </div>
-    ${access.can(profile, 'invite') ? `<div class="group"><a class="row" href="#/team"><span class="grow">Invite and approve staff</span></a></div>` : ''}
+    <div class="group">
+      ${canSee('schedule') ? '<a class="row" href="#/schedule"><span class="grow">Schedule</span></a>' : ''}
+      ${canSee('events') ? '<a class="row" href="#/events"><span class="grow">Events (BEOs)</span></a>' : ''}
+      ${canSee('costs') ? '<a class="row" href="#/costs"><span class="grow">Costs and waste</span></a>' : ''}
+    </div>
+    <div class="group">
+      ${canSee('settings') || isHost() ? '<a class="row" href="#/settings"><span class="grow">Settings</span></a>' : ''}
+      ${access.can(profile, 'invite') ? '<a class="row" href="#/team"><span class="grow">Invite and approve phones</span></a>' : ''}
+    </div>
     <div class="group">
       <a class="row" href="#/about"><span class="grow">About and how-to</span></a>
       <a class="row" href="#/whatsnew"><span class="grow">What's new</span><span class="meta">${VERSION}</span></a>
@@ -445,7 +165,7 @@ function moreView() {
     <p class="muted small center">${esc(APP_NAME)} ${VERSION} · build ${BUILD}</p>`;
   $('#show-notice').onclick = () => sheet({ title: 'Notices of use', left: null, right: 'Done', body: NOTICE_HTML });
   $('#leave').onclick = async () => {
-    const ok = await sheet({ title: 'Remove access?', right: 'Remove', body: `<p>This deletes the app's data from this phone, including recipes saved here. You'll need a new invite to use it again.</p>${profile.role === 'owner' ? '<p class="hint">This is the Owner phone. Removing access deletes the Owner key, and a new key has to be added to the app.</p>' : ''}` });
+    const ok = await sheet({ title: 'Remove access?', right: 'Remove', body: `<p>This deletes the app's data from this phone, including recipes saved here. You'll need a new invite to use it again.</p>${profile.role === 'owner' ? '<p class="hint">This is the Host phone. Removing access deletes the Host key, and a new key has to be added to the app.</p>' : ''}` });
     if (!ok) return;
     await access.wipeAccess();
     localStorage.removeItem('blg.expiredNotice');
@@ -467,9 +187,11 @@ function aboutView() {
     </div>
     <div class="section-label">How to use it</div>
     <div class="card small">
-      <p><b>Recipes:</b> house recipes are the rubs, sauces and dressings made in house. Tap <b>NEW RECIPE</b> to add one, with its ingredients, steps, yield and storage. A dish can link to the house recipes it uses.</p>
-      <p><b>Stock:</b> the starter list of what the kitchen keeps on hand. Search it by name or dish.</p>
-      <p><b>Notices:</b> messages from management to everyone. A red dot means something new.</p>
+      <p><b>Recipes:</b> the dish archive and the house recipes (rubs, sauces, dressings). Tap <b>UPLOAD</b> or <b>NEW RECIPE</b> to add one. A dish can link to the house recipes it uses. Any recipe can be printed, at ×2 or ×4 batch.</p>
+      <p><b>Prep:</b> today's prep list by station. Tap an item when it's done.</p>
+      <p><b>Stock:</b> count with + and −, then Save count. Needed shows what's below par, and Order guides splits it by vendor.</p>
+      <p><b>Board:</b> messages for everyone, the kitchen or managers, plus notices from management. A red dot means something new.</p>
+      <p><b>More:</b> schedule, events, costs and waste, Settings, and this page.</p>
       <p><b>Access:</b> the app opens only on the phone a manager approved. It locks itself after ${INACTIVITY_DAYS} days without use.</p>
       <p><b>Install it:</b> on iPhone, tap Share, then Add to Home Screen. On Android, tap the menu, then Install app.</p>
     </div>
@@ -559,7 +281,7 @@ async function teamView(incoming) {
     <div class="section-label">1. Send an invite</div>
     <div class="card">
       <label class="field" style="margin-top:0"><span>Their name</span><input type="text" id="i-name" placeholder="e.g. Sam (line cook)" autocomplete="off"></label>
-      ${access.can(profile, 'invite.manager') ? `<label class="field"><span>Role</span><select id="i-role"><option value="staff">Staff</option><option value="manager">Manager (can invite staff)</option></select></label>` : ''}
+      ${access.can(profile, 'invite.manager') ? `<label class="field"><span>Role</span><select id="i-role"><option value="staff">Staff</option><option value="chef">Chef</option><option value="manager">Manager (can invite staff)</option></select></label>` : ''}
       <button class="btn block" id="i-make" type="button">Create invite</button>
       <p class="muted small">Each invite works once, on one phone, within ${INVITE_HOURS} hours.</p>
     </div>
@@ -647,13 +369,13 @@ async function lockedView(incoming) {
 
   if (ownerInfo && !ROOT_KEYS.includes(ownerInfo.pub)) {
     view.innerHTML = `
-      <h2>Owner setup</h2>
-      <p>This phone made the Owner key below. The app opens for you once this key is added to the app and published.</p>
+      <h2>Host setup</h2>
+      <p>This phone made the Host key below. The app opens for you once this key is added to the app and published.</p>
       <div class="card mono small">${esc(ownerInfo.pub)}</div>
-      <button class="btn block" id="copy" type="button">Copy Owner key</button>
+      <button class="btn block" id="copy" type="button">Copy Host key</button>
       <p class="muted small">The key is public: it lets other phones check that invites really come from you. The secret half never leaves this phone.</p>
       <button class="btn plain block" id="restart" type="button">Start over</button>`;
-    $('#copy').onclick = () => copy(ownerInfo.pub, 'Owner key copied');
+    $('#copy').onclick = () => copy(ownerInfo.pub, 'Host key copied');
     $('#restart').onclick = async () => { await store.wipe(); location.reload(); };
     return;
   }
@@ -696,8 +418,8 @@ async function lockedView(incoming) {
       <button class="btn" id="go" type="button">Continue</button>
     </div>
     <p id="err" class="small" style="color:var(--danger)"></p>
-    ${ROOT_KEYS.length ? '' : `<div class="card" style="margin-top:28px"><b>Owner setup</b><p class="small muted">No Owner key is set yet. If you are the Owner, set it up on your own phone${isIOS ? ', from the home screen app' : ''}.</p>
-      <button class="btn tonal block" id="owner" type="button">I'm the Owner: set up this phone</button></div>`}`;
+    ${ROOT_KEYS.length ? '' : `<div class="card" style="margin-top:28px"><b>Host setup</b><p class="small muted">No Host key is set yet. If you are the Host (the app's administrator), set it up on your own phone${isIOS ? ', from the home screen app' : ''}.</p>
+      <button class="btn tonal block" id="owner" type="button">I'm the Host: set up this phone</button></div>`}`;
   $('#copy-in')?.addEventListener('click', () => copy(incoming, 'Code copied'));
   $('#paste').onclick = () => pasteInto($('#code'));
   $('#go').onclick = async () => {
@@ -715,10 +437,10 @@ async function lockedView(incoming) {
   if (incoming && !(isIOS && !standalone)) $('#go').click();
   $('#owner')?.addEventListener('click', async () => {
     const name = await sheet({
-      title: 'Owner setup', right: 'Create key',
-      body: `<p>This makes the Owner key on this phone. Only do this once, on the Owner's own phone${isIOS ? ' (open the app from the home screen first)' : ''}.</p>
-        <label class="field"><span>Your name</span><input type="text" id="o-name" value="Gaylan"></label>`,
-      onMount: (api) => { api.onRight = () => api.close($('#o-name', api.el).value.trim() || 'Owner'); },
+      title: 'Host setup', right: 'Create key',
+      body: `<p>This makes the Host key on this phone. Only do this once, on the Host's own phone${isIOS ? ' (open the app from the home screen first)' : ''}.</p>
+        <label class="field"><span>Your name</span><input type="text" id="o-name" value="Host"></label>`,
+      onMount: (api) => { api.onRight = () => api.close($('#o-name', api.el).value.trim() || 'Host'); },
     });
     if (!name) return;
     await access.ownerSetup(name);
@@ -731,8 +453,24 @@ async function lockedView(incoming) {
 const routes = {
   recipes: () => recipesView(),
   recipe: (id) => recipeView(id),
-  stock: () => stockView(),
-  notices: () => noticesView(),
+  print: (id) => printView(id),
+  prep: () => prepView(),
+  stock: () => stockView(false),
+  'stock-items': () => stockView(true),
+  needed: () => neededView(),
+  orders: () => ordersView(),
+  vendors: () => vendorsView(),
+  board: () => boardView(),
+  notices: () => boardView(),
+  schedule: () => scheduleView(),
+  staff: () => staffView(),
+  events: () => eventsView(),
+  event: (id) => eventView(id),
+  costs: () => costsView(),
+  settings: () => settingsView(),
+  list: (k) => listView(k),
+  roles: () => rolesView(),
+  person: (id) => personView(id),
   more: () => moreView(),
   about: () => aboutView(),
   whatsnew: () => whatsNewView(),
@@ -743,11 +481,12 @@ const routes = {
 async function route() {
   if (!profile) return;
   const [, name = 'recipes', arg] = location.hash.match(/^#\/([^/]+)\/?(.*)$/) || [];
+  session.staff = await staffList(); // permissions (RRA-002) read this
   (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
 }
 
 $('#btn-back').onclick = () => (history.length > 1 ? history.back() : (location.hash = '#/recipes'));
-$('#btn-bell').onclick = () => { location.hash = '#/notices'; };
+$('#btn-bell').onclick = () => { location.hash = '#/board'; };
 window.addEventListener('hashchange', route);
 
 // A code can arrive in the link (#t=...). Take it out of the address bar.
@@ -766,6 +505,7 @@ async function boot() {
     await access.wipeAccess();
     profile = null;
   }
+  session.profile = profile;
   await startupScreen();
   if (!profile) {
     // Revoked activation on this phone: clear it so the phone can be invited again.
@@ -773,6 +513,9 @@ async function boot() {
     return lockedView(incoming);
   }
   access.touch();
+  await data.seed();
+  await ensureStaffFor(profile);
+  data.onChange(() => updateBadge());
   await noticeGate();
   if (incoming && access.parse(incoming)?.kind === 'req') { location.hash = '#/team'; return teamView(incoming); }
   if (!location.hash || location.hash === '#') location.hash = '#/recipes'; else route();

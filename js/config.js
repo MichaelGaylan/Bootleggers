@@ -2,10 +2,21 @@
 // Bump VERSION and BUILD on every release, and add one line to WHATS_NEW.
 
 export const APP_NAME = 'Bootleggers Kitchen';
-export const VERSION = '0.1.0';
-export const BUILD = '2026.11.18-1';
+export const VERSION = '0.2.0';
+export const BUILD = '2026.11.18-2';
 
 export const WHATS_NEW = [
+  {
+    version: '0.2.0', build: '2026.11.18-2', date: '2026-11-18',
+    lines: [
+      'Recipe archive for every dish, with photos, plate cost and links to house recipes.',
+      'Print any recipe, scaled ×2, ×3 or ×4.',
+      "Today's prep list by station, ticked off as you go.",
+      'Stock counts with par levels, a needed list and order guides by vendor.',
+      'Message board, schedule with swap requests, event sheets (BEOs), costs and waste log.',
+      'Settings for staff, roles and permissions, vendors, stock items, stations and menu sections. Owner is now Host.',
+    ],
+  },
   {
     version: '0.1.0', build: '2026.11.18-1', date: '2026-11-18',
     lines: [
@@ -14,9 +25,9 @@ export const WHATS_NEW = [
   },
 ];
 
-// Public keys (base64url, raw P-256) of the Owner device(s). Only invites that
+// Public keys (base64url, raw P-256) of the Host device(s): the app's administrator. Only invites that
 // trace back to one of these keys can open the app. Empty = the app offers
-// "Owner setup" so the first Owner key can be created on the Owner's phone.
+// "Host setup" so the first Host key can be created on the Host's phone.
 export const ROOT_KEYS = [];
 
 // Access ends after this many days without opening the app (RRA-019).
