@@ -44,8 +44,15 @@ export const REPORT_PREFIX = 'Bootleggers —';
 
 // Shared team data (RRA-031): the web config from the Firebase console
 // (Project settings → Your apps → Web). Public by design; the data itself is
-// encrypted with the team key before it is sent. null = data stays on each phone.
-export const FIREBASE = null;
+// encrypted with the team key before it is sent. Set to null to keep data on each phone only.
+export const FIREBASE = {
+  apiKey: 'AIzaSyDXZuUDplTUfzB1WN58Qk5mE2TVf4Q_aPU',
+  authDomain: 'bootleggers-kitchen.firebaseapp.com',
+  projectId: 'bootleggers-kitchen',
+  storageBucket: 'bootleggers-kitchen.firebasestorage.app',
+  messagingSenderId: '49283173779',
+  appId: '1:49283173779:web:9193c90d1cb752fdfc2c66',
+};
 
 // Global messages to everyone (RRA-015) and revoked invites (RRA-019).
 // Both are plain files published with the app.
