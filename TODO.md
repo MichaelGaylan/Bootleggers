@@ -3,12 +3,12 @@
 Rule: every build item goes on the Build list and waits until Gaylan says "Build list". Nothing is built before then.
 Platform: a web app that works on iPhone and Android, like the VYBEON apps. Only a Manager can hand it out, through an invite. An invite can't be passed on by anyone else: it works once, on one device.
 
-Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001-011/rra-previews.html. Gaylan approved them with changes on 2026-11-18 and ordered the build. Built in 0.2.0. Until RRA-031 is done, team data stays on each phone.
+Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001-011/rra-previews.html. Gaylan approved them with changes on 2026-11-18 and ordered the build. Built in 0.2.0. Shared data turns on once the Firebase config is added (RRA-032).
 
 ## 🔴 Needs you
 - [ ] RRA-026 · Turn on GitHub Pages so the app has a web address · Infra · S — repo Settings → Pages → Source "Deploy from a branch" → main / root → Save
 - [ ] RRA-027 · Create the Host key on your own phone · Safety · S — open the app from your home screen, tap "I'm the Host: set up this phone", tap Copy Host key and send it to Claude to add to the app
-- [ ] RRA-031 · Pick where shared team data lives (decision card in the thread) · Infra · S
+- [ ] RRA-032 · Create the Firebase project and send the web config; paste firestore.rules into Firestore → Rules · Infra · S — steps in the project thread
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
@@ -30,6 +30,7 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [x] RRA-011 · Recipe costing and waste log · Data · M
 - [x] RRA-029 · Settings section: Staff, Roles, Invites, Vendors, Stock items, Prep stations, Menu sections, app options, About, Report a problem · UI · M
 - [x] RRA-030 · Rename Owner to Host everywhere (no personal name in the app) · UI · S
+- [x] RRA-031 · Shared team data: Firebase chosen (2026-11-18); sync built, encrypted with a team key handed over in each approval · Infra · M
 ### 0.1.0 · build 2026.11.18-1
 - [x] RRA-012 · About section: short how-to, version and build, "What's new" updates link, Report a problem · UI · M
 - [x] RRA-013 · Native phone colors and buttons (follow the iOS/Android system look, light and dark) · UI · M

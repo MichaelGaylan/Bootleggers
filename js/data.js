@@ -15,7 +15,7 @@ const listeners = new Set();
 
 export function useSync(a) { adapter = a; }
 export function onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); }
-const changed = (coll) => listeners.forEach((fn) => fn(coll));
+const changed = (coll, remote = false) => listeners.forEach((fn) => fn(coll, remote));
 
 export const list = (coll) => store.all(`${coll}:`);
 export const get = (coll, id) => store.get(`${coll}:${id}`);
@@ -38,7 +38,7 @@ export async function remove(coll, id) {
 // A change that arrived from another phone.
 export async function applyRemote(coll, id, doc) {
   if (doc) await store.put(`${coll}:${id}`, doc); else await store.del(`${coll}:${id}`);
-  changed(coll);
+  changed(coll, true);
 }
 
 // Single settings record.
@@ -46,15 +46,24 @@ export async function settings() {
   return (await store.get('settings')) || {};
 }
 export async function saveSettings(s) {
+  s.updated = Date.now();
   await store.put('settings', s);
   adapter?.push('settings', { id: 'settings', ...s });
+  changed('settings');
+}
+export async function applyRemoteSettings(s) {
+  delete s.id;
+  await store.put('settings', s);
+  changed('settings', true);
 }
 
 export const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
 
-// First run: load the starter stock list and sensible defaults.
-export async function seed() {
+// First run: load the starter stock list and sensible defaults. With shared
+// data on, only the Host phone seeds; other phones receive the team's data.
+export async function seed({ shared = false, host = false } = {}) {
   if (await store.get('seeded')) return;
+  if (shared && !host) { await store.put('seeded', { at: Date.now(), skipped: true }); return; }
   for (const g of STARTER_STOCK) {
     for (const [name, unit] of g.items) {
       await put('stock', { name, unit: unit || 'each', group: g.group, par: 0, onHand: 0, vendor: '', price: '' });

@@ -4,7 +4,7 @@
 //   vault: app records, each sealed with AES-GCM before it is written
 // Wiping access deletes the whole database, which destroys the keys too.
 
-import { newDataKey, newDeviceKey, seal, unseal } from './crypto.js';
+import { newDataKey, newDeviceKey, newEcdhKey, seal, unseal } from './crypto.js';
 
 const DB_NAME = 'bootleggers';
 let dbp = null;
@@ -48,6 +48,7 @@ async function key(name, make) {
 }
 
 export const deviceKey = () => key('device', newDeviceKey);
+export const ecdhKey = () => key('ecdh', newEcdhKey);
 
 async function getDataKey() {
   if (!dataKey) dataKey = await key('data', newDataKey);

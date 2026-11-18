@@ -6,6 +6,7 @@ import { AREAS, ROLE_DEFAULTS, level, canChange, isHost } from './perms.js';
 import { ROLES, can as canAccess } from './access.js';
 import { staffList } from './schedule.js';
 import { INACTIVITY_DAYS } from './config.js';
+import * as sync from './sync.js';
 
 export async function settingsView() {
   setChrome({ tab: 'more', back: true });
@@ -35,6 +36,7 @@ export async function settingsView() {
     <div class="group">
       <div class="row"><span class="grow">Popups for new notices</span><button class="toggle ${s.popups !== false ? 'on' : ''}" id="popups" type="button" ${edit ? '' : 'disabled'} aria-label="Popups for new notices"></button></div>
       <div class="row"><span class="grow">Food cost target</span><span class="meta">${s.foodCostTarget || 30}%</span>${edit ? '<button class="btn plain small" id="target" type="button">Change</button>' : ''}</div>
+      <div class="row"><span class="grow">Shared team data</span><span class="meta">${esc(syncLabel())}</span></div>
       <div class="row"><span class="grow">Lock after no use</span><span class="meta">${INACTIVITY_DAYS} days</span></div>
       <a class="row" href="#/about"><span class="grow">About</span></a>
       <a class="row" href="#/report"><span class="grow">Report a problem</span></a>
@@ -49,6 +51,11 @@ export async function settingsView() {
     });
     if (v) { s.foodCostTarget = v; await data.saveSettings(s); settingsView(); }
   });
+}
+
+function syncLabel() {
+  const st = sync.status();
+  return { off: 'Not set up (this phone only)', starting: 'Connecting…', on: 'Connected, encrypted', nokey: 'Needs a new invite', error: 'Problem: ' + st.detail }[st.state] || st.state;
 }
 
 // Editable list of names: prep stations, menu sections.

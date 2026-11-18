@@ -15,7 +15,7 @@
 // (signed by the Host) travels with every code that Manager signs ("chain").
 
 import { ROOT_KEYS, INVITE_HOURS, INACTIVITY_DAYS, ACCESS_URL } from './config.js';
-import { sign, verify, exportPublic, shortCode, randomId, textToB64u, b64uToText } from './crypto.js';
+import { sign, verify, exportPublic, shortCode, randomId, textToB64u, b64uToText, sealTo, openFrom, b64uEnc, b64uDec, newTeamKeyBytes } from './crypto.js';
 import * as store from './store.js';
 
 const LAST_USED = 'blg.lastUsed';
@@ -113,16 +113,35 @@ export async function readRequest(code) {
   if (!inv) throw new Error('This request is for an invite sent from another phone. Only the manager who sent the invite can approve it.');
   if (inv.status === 'approved') throw new Error(`The invite for ${inv.name} was already used. Each invite works once.`);
   if (Date.now() > inv.exp) throw new Error(`The invite for ${inv.name} has expired. Send a new one.`);
-  return { invite: inv, dev: p.dev, deviceCode: await deviceCode(p.dev) };
+  return { invite: inv, dev: p.dev, ek: p.ek, deviceCode: await deviceCode(p.dev) };
 }
 
 export async function approve(profile, request) {
   const { invite, dev } = request;
   const payload = { iid: invite.iid, name: invite.name, role: invite.role, dev, iat: Date.now(), by: await myPublicKey() };
   if (profile.activation) payload.chain = profile.activation;
+  // Hand over the team key for shared data, sealed so only the new phone can open it.
+  const tk = await teamKeyBytes();
+  if (tk && request.ek) payload.tk = await sealTo(request.ek, tk);
   const code = await signToken('act', payload);
   await store.put(`invite:${invite.iid}`, { ...invite, status: 'approved', approved: Date.now(), deviceCode: request.deviceCode });
   return code;
+}
+
+// ----- Team key (shared data, RRA-031) -----
+// One AES key for the whole team encrypts everything stored online. The Host
+// phone makes it; each approval passes it on, sealed to the new phone.
+
+export async function teamKeyBytes() {
+  const b = await store.get('teamkey');
+  return b ? b64uDec(b) : null;
+}
+
+export async function ensureTeamKey(profile) {
+  if (await store.get('teamkey')) return true;
+  if (profile?.role !== 'owner') return false;
+  await store.put('teamkey', b64uEnc(newTeamKeyBytes()));
+  return true;
 }
 
 // ----- New phone side -----
@@ -131,7 +150,8 @@ export async function acceptInvite(code) {
   const p = await check(code, 'inv');
   if (Date.now() > p.exp) throw new Error('This invite has expired. Ask your manager for a new one.');
   const dev = await myPublicKey();
-  const req = await signToken('req', { iid: p.iid, name: p.name, dev, iat: Date.now(), by: dev });
+  const ek = await exportPublic((await store.ecdhKey()).publicKey);
+  const req = await signToken('req', { iid: p.iid, name: p.name, dev, ek, iat: Date.now(), by: dev });
   const pending = { iid: p.iid, name: p.name, role: p.role, from: p.by, request: req, deviceCode: await deviceCode(dev) };
   await store.put('pending', pending);
   return pending;
@@ -143,6 +163,10 @@ export async function activate(code) {
   const p = await check(code, 'act');
   const dev = await myPublicKey();
   if (p.dev !== dev) throw new Error('This activation code belongs to a different phone. Activation codes only work on the phone that asked for them.');
+  if (p.tk) {
+    try { await store.put('teamkey', b64uEnc(await openFrom((await store.ecdhKey()).privateKey, p.tk))); }
+    catch { throw new Error('This activation was made for a different request. Ask your manager to approve your latest request.'); }
+  }
   const profile = { name: p.name, role: p.role, iid: p.iid, activation: parse(code).raw, since: Date.now() };
   await store.put('profile', profile);
   await store.del('pending');

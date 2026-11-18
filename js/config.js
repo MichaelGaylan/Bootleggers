@@ -15,6 +15,7 @@ export const WHATS_NEW = [
       'Stock counts with par levels, a needed list and order guides by vendor.',
       'Message board, schedule with swap requests, event sheets (BEOs), costs and waste log.',
       'Settings for staff, roles and permissions, vendors, stock items, stations and menu sections. Owner is now Host.',
+      'Shared team data through Firebase, encrypted on each phone with a team key that only invited phones receive.',
     ],
   },
   {
@@ -40,6 +41,11 @@ export const INVITE_HOURS = 72;
 // to the inbox it is registered to. Never put the inbox address here.
 export const WEB3FORMS_KEY = '003383c6-4896-4f71-bdec-f7ada99ae0ec';
 export const REPORT_PREFIX = 'Bootleggers —';
+
+// Shared team data (RRA-031): the web config from the Firebase console
+// (Project settings → Your apps → Web). Public by design; the data itself is
+// encrypted with the team key before it is sent. null = data stays on each phone.
+export const FIREBASE = null;
 
 // Global messages to everyone (RRA-015) and revoked invites (RRA-019).
 // Both are plain files published with the app.

@@ -7,6 +7,7 @@ import {
 import * as access from './access.js';
 import * as store from './store.js';
 import * as data from './data.js';
+import * as sync from './sync.js';
 import { canSee, isHost } from './perms.js';
 import { recipesView, recipeView, printView } from './recipes.js';
 import { stockView, neededView, ordersView, vendorsView } from './stock.js';
@@ -478,6 +479,17 @@ const routes = {
   team: (arg) => teamView(arg),
 };
 
+// Redraw the current screen when shared data arrives from another phone,
+// unless a sheet is open or someone is typing.
+let rt = null;
+function debounceRoute() {
+  clearTimeout(rt);
+  rt = setTimeout(() => {
+    const typing = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+    if (!dlg.open && !typing) route();
+  }, 400);
+}
+
 async function route() {
   if (!profile) return;
   const [, name = 'recipes', arg] = location.hash.match(/^#\/([^/]+)\/?(.*)$/) || [];
@@ -513,9 +525,15 @@ async function boot() {
     return lockedView(incoming);
   }
   access.touch();
-  await data.seed();
+  await data.seed({ shared: sync.enabled(), host: profile.role === 'owner' });
   await ensureStaffFor(profile);
-  data.onChange(() => updateBadge());
+  await access.ensureTeamKey(profile);
+  if (!boot.wired) {
+    boot.wired = true;
+    sync.start(profile, () => { if (location.hash.startsWith('#/settings')) route(); });
+    data.onChange((coll, remote) => { if (remote) debounceRoute(); });
+    data.onChange(() => updateBadge());
+  }
   await noticeGate();
   if (incoming && access.parse(incoming)?.kind === 'req') { location.hash = '#/team'; return teamView(incoming); }
   if (!location.hash || location.hash === '#') location.hash = '#/recipes'; else route();
