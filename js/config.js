@@ -2,10 +2,14 @@
 // Bump VERSION and BUILD on every release, and add one line to WHATS_NEW.
 
 export const APP_NAME = 'Bootleggers Kitchen';
-export const VERSION = '0.2.3';
-export const BUILD = '2026.11.18-5';
+export const VERSION = '0.2.4';
+export const BUILD = '2026.11.18-6';
 
 export const WHATS_NEW = [
+  {
+    version: '0.2.4', build: '2026.11.18-6', date: '2026-11-18',
+    lines: ['New Host key for the Host phone, so it opens as Host again.'],
+  },
   {
     version: '0.2.3', build: '2026.11.18-5', date: '2026-11-18',
     lines: ['The Host can always set up a new Host key from the Invite only screen, so the Host phone cannot be locked out.'],
@@ -42,7 +46,7 @@ export const WHATS_NEW = [
 // trace back to one of these keys can open the app. Empty = the app offers
 // "Host setup" so the first Host key can be created on the Host's phone.
 export const ROOT_KEYS = [
-  'BG302HsWOPkEyblja_BVenbtca2eMqya_1jZ-rTrnWgiJ-HhzFxKQGuuSdOzkbgNvaPurTSgcx9OpYpS1shuduw', // Host phone, added 2026-11-18
+  'BK1NN42HvfwbPZ0vGQp_H7geN30lY-lD1ZNdNhKz160oBRAAbSIaBX2cYpCWsxONq61DIEnX9SkcJ3b51zqDPUA', // Host phone (home screen app), added 2026-11-18; replaces the lost key
 ];
 
 // Access ends after this many days without opening the app (RRA-019).
