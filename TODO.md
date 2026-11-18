@@ -6,8 +6,6 @@ Platform: a web app that works on iPhone and Android, like the VYBEON apps. Only
 Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001-011/rra-previews.html. Gaylan approved them with changes on 2026-11-18 and ordered the build. Built in 0.2.0. Firebase config is in the app; shared data works once the rules are published (RRA-032).
 
 ## 🔴 Needs you
-- [ ] RRA-026 · Turn on GitHub Pages so the app has a web address · Infra · S — repo Settings → Pages → Source "Deploy from a branch" → main / root → Save
-- [ ] RRA-027 · Create the Host key on your own phone · Safety · S — open the app from your home screen, tap "I'm the Host: set up this phone", tap Copy Host key and send it to Claude to add to the app
 - [ ] RRA-032 · Paste firestore.rules into Firebase → Databases & Storage → Firestore → Rules → Publish · Infra · S — project and config done 2026-11-18
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
@@ -16,6 +14,10 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 ## 🟡 Hold
 
 ## 🟣 Done
+### 0.2.1 · build 2026.11.18-3
+- [x] RRA-027 · Host key added to the app (Host phone set up) · Safety · S
+### No release (Gaylan's step)
+- [x] RRA-026 · GitHub Pages turned on · Infra · S
 ### 0.2.0 · build 2026.11.18-2
 - [x] RRA-001 · Recipe archive: shared library of every dish, by menu section, with photo, build, steps and house recipes used; Host/Chef/Managers upload · Data · L
 - [x] RRA-002 · Roles and permissions: Host (app admin, full control above everyone, can't be lowered), then Chef, Manager, cooks with see/change switches per area · Safety · L
