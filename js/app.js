@@ -419,8 +419,10 @@ async function lockedView(incoming) {
       <button class="btn" id="go" type="button">Continue</button>
     </div>
     <p id="err" class="small" style="color:var(--danger)"></p>
-    ${ROOT_KEYS.length ? '' : `<div class="card" style="margin-top:28px"><b>Host setup</b><p class="small muted">No Host key is set yet. If you are the Host (the app's administrator), set it up on your own phone${isIOS ? ', from the home screen app' : ''}.</p>
-      <button class="btn tonal block" id="owner" type="button">I'm the Host: set up this phone</button></div>`}`;
+    <div class="card" style="margin-top:28px"><b>Host setup</b><p class="small muted">${ROOT_KEYS.length
+      ? `For the Host only. If the Host phone lost its key (for example, the app was removed and added again), make a new Host key here and send it in. It does nothing until it is added to the app.`
+      : `No Host key is set yet. If you are the Host (the app's administrator), set it up on your own phone${isIOS ? ', from the home screen app' : ''}.`}</p>
+      <button class="btn tonal block" id="owner" type="button">I'm the Host: set up this phone</button></div>`;
   $('#copy-in')?.addEventListener('click', () => copy(incoming, 'Code copied'));
   $('#paste').onclick = () => pasteInto($('#code'));
   $('#go').onclick = async () => {
