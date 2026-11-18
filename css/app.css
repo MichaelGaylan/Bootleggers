@@ -204,11 +204,11 @@ a.row::after, button.row.nav::after { content: ""; width: 8px; height: 8px; bord
 
 label.field { display: block; margin: 12px 0; }
 label.field > span { display: block; font-size: 0.85rem; color: var(--text-2); margin: 0 0 4px 4px; }
-input[type=text], input[type=search], textarea, select {
+input[type=text], input[type=search], input[type=password], textarea, select {
   width: 100%; font: inherit; color: var(--text); background: var(--field-bg);
   border: 1px solid var(--sep); border-radius: 10px; padding: 11px 12px;
 }
-.android input[type=text], .android input[type=search], .android textarea, .android select { border-radius: 4px; border-color: var(--text-2); background: transparent; }
+.android input[type=text], .android input[type=search], .android input[type=password], .android textarea, .android select { border-radius: 4px; border-color: var(--text-2); background: transparent; }
 textarea { min-height: 96px; resize: vertical; }
 input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
 .search { margin: 0 0 12px; }
