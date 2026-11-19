@@ -346,3 +346,25 @@ dialog.sheet[open] { animation: rise 0.28s cubic-bezier(.2,.8,.2,1); display: fl
   .view > *:not(.paper):not(.paper-like):not(.print-only) { display: none !important; }
   .paper { box-shadow: none; padding: 0; font-size: 12pt; }
 }
+
+/* ---------- 0.4.0 ---------- */
+/* Stock count: search and a floating Save stay pinned under the header (RRA-040). */
+.stock-tools { position: sticky; top: var(--hdr); z-index: 5; margin: 0 -16px; padding: 6px 16px 2px; background: var(--bg); }
+.fab-row { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+.fab { width: auto; height: 40px; padding: 0 18px; border-radius: 999px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22); font-size: 0.95rem; }
+/* Stock sections open one at a time (RRA-041). */
+.acc-head {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin: 8px 0 0; padding: 13px 16px;
+  border: 0; border-radius: var(--radius); background: var(--card); color: var(--text); font: inherit; font-weight: 600; text-align: left; cursor: pointer;
+}
+.acc-head::after { content: "›"; font-size: 1.3rem; line-height: 1; color: var(--text-2); transition: transform 0.15s; }
+.acc-head.open::after { transform: rotate(90deg); }
+.acc-head.open { border-radius: var(--radius) var(--radius) 0 0; }
+.acc-head + .acc-body { margin-top: 0; border-radius: 0 0 var(--radius) var(--radius); }
+.android .acc-head { background: var(--card-2); border-radius: 12px; }
+/* Schedule printout (RRA-042). */
+.paper .sched-print { width: 100%; border-collapse: collapse; font-size: 10pt; margin: 6px 0 14px; }
+.paper .sched-print th, .paper .sched-print td { border: 1px solid #999; padding: 4px 5px; text-align: center; }
+.paper .sched-print td:first-child, .paper .sched-print th:first-child { text-align: left; }
+.paper .week { break-inside: avoid; page-break-inside: avoid; }
+.acc-head .grow { flex: 1; min-width: 0; }

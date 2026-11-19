@@ -2,10 +2,21 @@
 // Bump VERSION and BUILD on every release, and add one line to WHATS_NEW.
 
 export const APP_NAME = 'Bootleggers Kitchen';
-export const VERSION = '0.3.1';
-export const BUILD = '2026.11.19-1';
+export const VERSION = '0.4.0';
+export const BUILD = '2026.11.19-2';
 
 export const WHATS_NEW = [
+  {
+    version: '0.4.0', build: '2026.11.19-2', date: '2026-11-19',
+    lines: [
+      'Managers can invite Staff or Chef. Only the Host can invite a Manager.',
+      'Stock count: the Save button floats at the top, above the search, and shows how many items changed.',
+      'Stock sections stay closed until you tap one. Opening another closes the first.',
+      'Print the schedule for 1 to 8 weeks at once (Schedule → Print schedule).',
+      "A new phone's request now reaches the inviter by itself, with a note and a badge, so there is no need to wait on the screen.",
+      'Ten common food-service vendors are ready in Vendors. Edit or remove any you don\'t use.',
+    ],
+  },
   {
     version: '0.3.1', build: '2026.11.19-1', date: '2026-11-19',
     lines: ['The full Bootleggers menu is in the Recipe archive, sorted by menu section with prices, and the stock list matches it (sauces by heat, sauce cups by size, tea supplies).'],

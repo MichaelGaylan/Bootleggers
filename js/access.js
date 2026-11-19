@@ -94,10 +94,14 @@ function kindName(k) {
 // ----- Manager side -----
 
 export async function createInvite(profile, name, role) {
+  if (!['staff', 'chef', ...(can(profile, 'invite.manager') ? ['manager'] : [])].includes(role)) throw new Error('You can\'t invite that role.');
   const pub = await myPublicKey();
   const iid = randomId(9);
   const now = Date.now();
-  const payload = { iid, name, role, iat: now, exp: now + INVITE_HOURS * 3600000, by: pub };
+  // rk: this phone's sealing key, so the new phone can drop its request in
+  // the shared inbox for this phone only (RRA-043).
+  const rk = await exportPublic((await store.ecdhKey()).publicKey);
+  const payload = { iid, name, role, iat: now, exp: now + INVITE_HOURS * 3600000, by: pub, rk };
   if (profile.activation) payload.chain = profile.activation;
   const code = await signToken('inv', payload);
   await store.put(`invite:${iid}`, { iid, name, role, iat: now, exp: payload.exp, status: 'sent' });
@@ -131,6 +135,19 @@ export async function approve(profile, request, role) {
   const code = await signToken('act', payload);
   await store.put(`invite:${invite.iid}`, { ...invite, role: payload.role, status: 'approved', approved: Date.now(), deviceCode: request.deviceCode });
   return code;
+}
+
+// ----- Request inbox (RRA-043) -----
+// The new phone seals its request to the inviter's phone and drops it in the
+// shared data. Only that phone can open it; it still checks the device code.
+
+export async function sealRequest(pending) {
+  return sealTo(pending.rk, new TextEncoder().encode(pending.request));
+}
+
+export async function openRequest(box) {
+  const bytes = await openFrom((await store.ecdhKey()).privateKey, box);
+  return new TextDecoder().decode(bytes);
 }
 
 // ----- Staff restore (RRA-036) -----
@@ -224,7 +241,7 @@ export async function acceptInvite(code) {
   const dev = await myPublicKey();
   const ek = await exportPublic((await store.ecdhKey()).publicKey);
   const req = await signToken('req', { iid: p.iid, name: p.name, dev, ek, iat: Date.now(), by: dev });
-  const pending = { iid: p.iid, name: p.name, role: p.role, from: p.by, request: req, deviceCode: await deviceCode(dev) };
+  const pending = { iid: p.iid, name: p.name, role: p.role, from: p.by, rk: p.rk || null, request: req, deviceCode: await deviceCode(dev) };
   await store.put('pending', pending);
   return pending;
 }
