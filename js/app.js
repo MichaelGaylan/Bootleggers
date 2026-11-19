@@ -42,6 +42,17 @@ function startupScreen() {
     const card = $('#splash-card');
     const skip = $('#splash-skip');
     splash.hidden = false;
+    // Whoosh with the opening clip (RRA-048), first launch and updates only.
+    // iPhone blocks sound until a tap: then it plays on the first tap instead.
+    const whoosh = new Audio('assets/whoosh.mp3');
+    whoosh.preload = 'auto';
+    let whooshed = false;
+    const playWhoosh = () => {
+      if (whooshed) return;
+      whoosh.play().then(() => { whooshed = true; }).catch(() => {});
+    };
+    splash.addEventListener('pointerdown', playWhoosh, { once: true });
+    video.addEventListener('playing', playWhoosh, { once: true });
     let shown = false;
     const showCard = () => {
       if (shown) return;
@@ -60,6 +71,7 @@ function startupScreen() {
         <button class="btn" type="button">${updated ? 'Continue' : 'Get started'}</button>`;
       card.hidden = false;
       $('button', card).onclick = () => {
+        playWhoosh();
         LS.set('seenVersion', VERSION);
         splash.style.transition = 'opacity .35s'; splash.style.opacity = '0';
         setTimeout(() => { splash.hidden = true; splash.style.opacity = ''; resolve(); }, 350);

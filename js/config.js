@@ -2,10 +2,14 @@
 // Bump VERSION and BUILD on every release, and add one line to WHATS_NEW.
 
 export const APP_NAME = 'Bootleggers Kitchen';
-export const VERSION = '0.4.1';
-export const BUILD = '2026.11.19-3';
+export const VERSION = '0.4.2';
+export const BUILD = '2026.11.19-4';
 
 export const WHATS_NEW = [
+  {
+    version: '0.4.2', build: '2026.11.19-4', date: '2026-11-19',
+    lines: ['A whoosh plays with the opening screen, on first launch and after each update.'],
+  },
   {
     version: '0.4.1', build: '2026.11.19-3', date: '2026-11-19',
     lines: [
