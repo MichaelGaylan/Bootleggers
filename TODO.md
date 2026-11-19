@@ -9,11 +9,12 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
-- [ ] RRA-048 · Play the whoosh sound (/mnt/project-files/assets/whoosh.mp3) with the opening screen, only on first launch and after an update. iPhone blocks sound until a tap, so it plays on the tap that opens the app if autoplay is blocked · UX · S
 
 ## 🟡 Hold
 
 ## 🟣 Done
+### 0.4.2 · build 2026.11.19-4
+- [x] RRA-048 · Play the whoosh sound (/mnt/project-files/assets/whoosh.mp3) with the opening screen, only on first launch and after an update. iPhone blocks sound until a tap, so it plays on the tap that opens the app if autoplay is blocked · UX · S
 ### 0.4.1 · build 2026.11.19-3
 - [x] RRA-046 · Order guides: Print button is grayed out and the phone says "This website has been blocked from automatic printing". Make printing work from the installed app (with a share/save-as-PDF fallback); check recipe and schedule printing too · Bug · S
 - [x] RRA-047 · Recipe archive (Dishes): menu sections start closed; opening one closes the one already open, like Stock count · UX · S
