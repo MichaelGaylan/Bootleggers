@@ -6,20 +6,22 @@ Platform: a web app that works on iPhone and Android, like the VYBEON apps. Only
 Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001-011/rra-previews.html. Gaylan approved them with changes on 2026-11-18 and ordered the build. Built in 0.2.0. Firebase config is in the app; shared data works once the rules are published (RRA-032).
 
 ## 🔴 Needs you
-- [ ] RRA-032 · Paste firestore.rules into Firebase → Databases & Storage → Firestore → Rules → Publish · Infra · S — project and config done 2026-11-18
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
-- [ ] RRA-040 · Stock count: floating Save button that stays fixed above the right side of the stock search · UX · S
-- [ ] RRA-041 · Stock sections start closed; opening one closes the one already open (accordion), to cut scrolling · UX · S
-- [ ] RRA-042 · Print the schedule for several weeks at once · Feature · S
-- [ ] RRA-043 · Notify the inviter when a phone's request is waiting for approval, so they can do other things meanwhile · Access · M
-- [ ] RRA-044 · Preset vendors: 10 common food-service suppliers for Bootleggers' usual items · Content · S
-- [ ] RRA-039 · Managers can pick Staff or Chef when sending an invite (today a manager's invites are always Staff; only the Host picks the role) · Access · S
 
 ## 🟡 Hold
 
 ## 🟣 Done
+### 0.4.0 · build 2026.11.19-2
+- [x] RRA-040 · Stock count: floating Save button that stays fixed above the right side of the stock search · UX · S
+- [x] RRA-041 · Stock sections start closed; opening one closes the one already open (accordion), to cut scrolling · UX · S
+- [x] RRA-042 · Print the schedule for several weeks at once · Feature · S
+- [x] RRA-043 · Notify the inviter when a phone's request is waiting for approval, so they can do other things meanwhile · Access · M
+- [x] RRA-044 · Preset vendors: 10 common food-service suppliers for Bootleggers' usual items · Content · S
+- [x] RRA-039 · Managers can pick Staff or Chef when sending an invite (today a manager's invites are always Staff; only the Host picks the role) · Access · S
+### Your steps
+- [x] RRA-032 · Paste firestore.rules into Firebase → Databases & Storage → Firestore → Rules → Publish · Infra · S — project and config done 2026-11-18 (published by Gaylan)
 ### 0.3.1 · build 2026.11.19-1
 - [x] RRA-045 · Full menu from the Host added to the Recipe archive by section with prices; stock list updated to match · Content · S
 ### 0.3.0 · build 2026.11.18-7

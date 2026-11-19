@@ -13,11 +13,11 @@ import { recipesView, recipeView, printView } from './recipes.js';
 import { stockView, neededView, ordersView, vendorsView } from './stock.js';
 import { boardView, unreadPosts } from './board.js';
 import { prepView } from './prep.js';
-import { scheduleView, staffView, ensureStaffFor, staffList } from './schedule.js';
+import { scheduleView, staffView, ensureStaffFor, staffList, schedulePrintView } from './schedule.js';
 import { eventsView, eventView } from './events.js';
 import { costsView } from './costs.js';
 import { settingsView, listView, rolesView, personView } from './settings.js';
-import { applyMenu } from './menu.js';
+import { applyMenu, applyVendors } from './menu.js';
 
 import { $, $$, esc, view, dlg, LS, isIOS, standalone, toast, copy, share, pasteInto, sheet, setTitle, setChrome, fmtDate, session } from './ui.js';
 
@@ -25,6 +25,8 @@ const NOTICE_VERSION = 1;
 
 let profile = null;
 boardView.after = () => updateBadge();
+// Requests from new phones waiting for this phone's approval (RRA-043).
+const waiting = new Map();
 let notices = [];
 
 
@@ -127,8 +129,23 @@ function unreadCount() {
   return notices.filter((n) => !read.has(n.id)).length;
 }
 
+async function onRequest(iid, box) {
+  if (waiting.has(iid)) return;
+  const text = await access.openRequest(box);
+  const req = await access.readRequest(text); // throws if used, expired or not ours
+  waiting.set(iid, { iid, text, name: req.invite.name, at: Date.now() });
+  updateBadge();
+  if (location.hash.startsWith('#/team') && !dlg.open) teamView();
+  else toast(`${req.invite.name}'s phone is waiting for your approval`);
+  if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+    navigator.serviceWorker?.ready.then((r) => r.showNotification('Bootleggers Kitchen', {
+      body: `${req.invite.name}'s phone is waiting for your approval.`, tag: `req-${iid}`, icon: 'assets/app-icon-192.png',
+    })).catch(() => {});
+  }
+}
+
 async function updateBadge() {
-  const n = unreadCount() + (profile ? await unreadPosts() : 0);
+  const n = unreadCount() + (profile ? await unreadPosts() : 0) + waiting.size;
   $('#tab-badge').hidden = !n;
   $('#tab-badge').textContent = n;
   $('#bell-dot').hidden = !n;
@@ -153,7 +170,7 @@ function moreView() {
     </div>
     <div class="group">
       ${canSee('settings') || isHost() ? '<a class="row" href="#/settings"><span class="grow">Settings</span></a>' : ''}
-      ${access.can(profile, 'invite') ? '<a class="row" href="#/team"><span class="grow">Invite and approve phones</span></a>' : ''}
+      ${access.can(profile, 'invite') ? `<a class="row" href="#/team"><span class="grow">Invite and approve phones</span>${waiting.size ? `<span class="chip warn">${waiting.size} waiting</span>` : ''}</a>` : ''}
       ${isHost() ? `<a class="row" href="#/backup"><span class="grow">Host backup</span>${LS.get('backupAt', 0) ? '' : '<span class="chip warn">Not made yet</span>'}</a>` : ''}
     </div>
     <div class="group">
@@ -370,13 +387,15 @@ async function teamView(incoming) {
     <div class="section-label">1. Send an invite</div>
     <div class="card">
       <label class="field" style="margin-top:0"><span>Their name</span><input type="text" id="i-name" placeholder="e.g. Sam (line cook)" autocomplete="off"></label>
-      ${access.can(profile, 'invite.manager') ? `<label class="field"><span>Role</span><select id="i-role"><option value="staff">Staff</option><option value="chef">Chef</option><option value="manager">Manager (can invite staff)</option></select></label>` : ''}
+      <label class="field"><span>Role</span><select id="i-role"><option value="staff">Staff</option><option value="chef">Chef</option>${access.can(profile, 'invite.manager') ? '<option value="manager">Manager (can invite and approve phones)</option>' : ''}</select></label>
       <button class="btn block" id="i-make" type="button">Create invite</button>
       <p class="muted small">Each invite works once, on one phone, within ${INVITE_HOURS} hours.</p>
     </div>
+    ${waiting.size ? `<div class="section-label">Waiting for you</div>
+    <div class="group">${[...waiting.values()].map((w) => `<button class="row nav" type="button" data-wait="${esc(w.iid)}"><span class="grow"><span class="title">${esc(w.name)}</span><span class="sub">Their phone sent a request</span></span><span class="chip warn">Check</span></button>`).join('')}</div>` : ''}
     <div class="section-label">2. Approve their phone</div>
     <div class="card">
-      <p class="small muted" style="margin-top:0">When they open the invite, their phone gives them a request to send back to you. Paste it here.</p>
+      <p class="small muted" style="margin-top:0">When they open the invite, their request shows up above by itself${sync.enabled() ? '' : ' (with shared data on)'}. If it doesn't, they can send it by text: paste it here.</p>
       <textarea id="a-code" placeholder="Paste the request" style="min-height:70px">${esc(incoming || '')}</textarea>
       <div class="btn-row" style="margin-top:10px">
         <button class="btn tonal" id="a-paste" type="button">Paste</button>
@@ -395,7 +414,10 @@ async function teamView(incoming) {
     const name = $('#i-name').value.trim();
     if (!name) { $('#i-name').focus(); return; }
     const role = $('#i-role')?.value || 'staff';
-    const code = await access.createInvite(profile, name, role);
+    if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
+    let code;
+    try { code = await access.createInvite(profile, name, role); }
+    catch (e) { toast(e.message); return; }
     const link = `${location.origin}${location.pathname}#t=${code}`;
     const text = `Bootleggers Kitchen invite for ${name}. Open this on your own phone (works once, for ${INVITE_HOURS} hours):\n${link}`;
     await sheet({
@@ -403,7 +425,7 @@ async function teamView(incoming) {
       body: `<p>Send this to <b>${esc(name)}</b> by text message. It works once, only on the first phone that's approved.</p>
         <button class="btn block" id="s" type="button">Send invite</button>
         <button class="btn plain block" id="c" type="button" style="margin-top:6px">Copy invite</button>
-        <p class="muted small">Next: they'll send you back a request. Paste it under “Approve their phone”.</p>`,
+        <p class="muted small">Next: when they open it, their request shows up under “Waiting for you” and you get a note. Keep using the app meanwhile.</p>`,
       onMount: ({ el }) => {
         $('#s', el).onclick = () => share('Bootleggers Kitchen invite', text);
         $('#c', el).onclick = () => copy(text, 'Invite copied');
@@ -411,6 +433,7 @@ async function teamView(incoming) {
     });
     teamView();
   };
+  $$('[data-wait]', view).forEach((b) => { b.onclick = () => { $('#a-code').value = waiting.get(b.dataset.wait)?.text || ''; $('#a-go').click(); }; });
   $('#a-paste').onclick = () => pasteInto($('#a-code'));
   $('#a-go').onclick = async () => {
     let req;
@@ -435,6 +458,7 @@ async function teamView(incoming) {
     let code;
     try { code = await access.approve(profile, req, typeof ok === 'string' ? ok : undefined); }
     catch (e) { toast(e.message); return; }
+    if (waiting.has(req.invite.iid)) { waiting.delete(req.invite.iid); sync.clearRequest(req.invite.iid); updateBadge(); }
     const text = `Bootleggers Kitchen activation for ${req.invite.name}. Copy this whole message, then open the app and tap Paste:\n${code}`;
     await sheet({
       title: 'Approved', left: null, right: 'Done',
@@ -481,8 +505,12 @@ async function lockedView(incoming) {
   if (pending) {
     view.innerHTML = `
       <h2>Almost there, ${esc(pending.name)}</h2>
-      <p><b>Step 1.</b> Send your request to ${pending.restore ? 'a manager or the Host' : 'the manager who invited you'}.</p>
-      <button class="btn block" id="send" type="button">Send request</button>
+      ${pending.posted
+        ? `<p><b>Step 1.</b> Done: your request went to the manager who invited you. They get a note in the app. If they don't see it, send it by text too.</p>
+          <button class="btn tonal block" id="send" type="button">Send request by text</button>`
+        : `<p><b>Step 1.</b> Send your request to ${pending.restore ? 'a manager or the Host' : 'the manager who invited you'}.</p>
+          <p id="auto" class="small muted"></p>
+          <button class="btn block" id="send" type="button">Send request</button>`}
       <p style="margin-top:18px"><b>Step 2.</b> Your manager will ask for this code. Read it to them:</p>
       <div class="code-big">${esc(pending.deviceCode)}</div>
       <p style="margin-top:18px"><b>Step 3.</b> Paste the activation your manager sends back.</p>
@@ -495,6 +523,17 @@ async function lockedView(incoming) {
       <button class="btn plain block" id="restart" type="button">${pending.restore ? 'Start again' : 'Use a different invite'}</button>`;
     const req = `Bootleggers Kitchen request from ${pending.name}. Paste this in the app under More → Invite and approve staff:\n${pending.request}`;
     $('#send').onclick = () => share('Bootleggers Kitchen request', req);
+    if (pending.rk && !pending.posted && sync.enabled()) {
+      $('#auto').textContent = 'Sending your request to your manager’s phone…';
+      access.sealRequest(pending)
+        .then((box) => sync.postRequest(pending.iid, box))
+        .then(async (sent) => {
+          if (!sent) return;
+          await store.put('pending', { ...pending, posted: Date.now() });
+          if (!dlg.open && !$('#code').value) lockedView();
+        })
+        .catch(() => { const a = $('#auto'); if (a) a.textContent = 'Couldn’t send it automatically (no signal?). Send it by text instead.'; });
+    }
     $('#paste').onclick = () => pasteInto($('#code'));
     $('#go').onclick = async () => {
       try { profile = await access.activate($('#code').value); localStorage.removeItem('blg.expiredNotice'); toast(`Welcome, ${profile.name}`); boot(); }
@@ -580,6 +619,7 @@ const routes = {
   board: () => boardView(),
   notices: () => boardView(),
   schedule: () => scheduleView(),
+  'schedule-print': (arg) => schedulePrintView(arg),
   staff: () => staffView(),
   events: () => eventsView(),
   event: (id) => eventView(id),
@@ -647,11 +687,13 @@ async function boot() {
   await access.ensureTeamKey(profile);
   if (!boot.wired) {
     boot.wired = true;
+    if (access.can(profile, 'invite')) sync.onInbox(onRequest);
     sync.start(profile, () => { if (location.hash.startsWith('#/settings')) route(); });
     data.onChange((coll, remote) => { if (remote) debounceRoute(); });
     data.onChange(() => updateBadge());
   }
   await applyMenu({ shared: sync.enabled(), host: profile.role === 'owner' });
+  await applyVendors({ shared: sync.enabled(), host: profile.role === 'owner' });
   await noticeGate();
   await homeTip();
   if (incoming && access.parse(incoming)?.kind === 'req') { location.hash = '#/team'; return teamView(incoming); }

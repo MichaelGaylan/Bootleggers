@@ -40,9 +40,19 @@ export async function scheduleView() {
     <div class="group" style="margin-top:14px">
       ${me && week.published ? '<button class="row nav" id="ask" type="button"><span class="grow">Ask for a shift swap</span></button>' : ''}
       ${change ? `<a class="row" href="#/staff"><span class="grow">Add or remove staff</span><span class="meta">${staff.length}</span></a>` : ''}
+      ${staff.length ? '<button class="row nav" id="print-weeks" type="button"><span class="grow">Print schedule</span></button>' : ''}
     </div>
     <p class="muted small center">${change ? 'Tap a day to set a shift, like 10-6 or 4-cl (close).' : 'Ask a manager about changes.'}</p>`;
   $$('[data-w]', view).forEach((b) => { b.onclick = () => { scheduleView.week = addDays(wk, +b.dataset.w); scheduleView(); }; });
+  $('#print-weeks')?.addEventListener('click', async () => {
+    const n = await sheet({
+      title: 'Print schedule', right: 'Next',
+      body: `<p class="small">Starts with the week of ${label(wk)}.</p>
+        <label class="field"><span>How many weeks?</span><select id="pw-n">${[1, 2, 3, 4, 6, 8].map((x) => `<option value="${x}"${x === 2 ? ' selected' : ''}>${x} week${x > 1 ? 's' : ''}</option>`).join('')}</select></label>`,
+      onMount: (api) => { api.onRight = () => api.close(+$('#pw-n', api.el).value); },
+    });
+    if (n) location.hash = `#/schedule-print/${wk}~${n}`;
+  });
   $('#pub')?.addEventListener('click', async () => { week.published = !week.published; await data.put('week', week); toast(week.published ? 'Published' : 'Back to draft'); scheduleView(); });
   $$('[data-s]', view).forEach((td) => {
     td.onclick = async () => {
@@ -141,4 +151,35 @@ export async function ensureStaffFor(profile) {
   const staff = await staffList();
   if (staff.some((s) => (s.iid && s.iid === profile.iid) || s.name === profile.name)) return;
   await data.put('staff', { name: profile.name, position: profile.role === 'manager' ? 'Manager' : profile.role === 'chef' ? 'Chef' : 'Line cook', role: profile.role, iid: profile.iid });
+}
+
+// ------------------------------------------------- print several weeks (RRA-042)
+
+export async function schedulePrintView(arg = '') {
+  setChrome({ tab: 'more', back: true });
+  setTitle('Print schedule');
+  const [start = data.weekStart(), n = '2'] = arg.split('~');
+  const count = Math.min(8, Math.max(1, +n || 1));
+  const change = canChange('schedule');
+  const staff = await staffList();
+  const weeks = [];
+  for (let i = 0; i < count; i++) {
+    const id = addDays(start, i * 7);
+    weeks.push((await data.get('week', id)) || { id, shifts: {}, published: false });
+  }
+  view.innerHTML = `
+    <div class="paper">
+      <h3>Bootleggers schedule</h3>
+      <div class="paper-meta">${label(start)} to ${label(addDays(start, count * 7 - 1))} · printed ${new Date().toLocaleDateString()}</div>
+      ${weeks.map((w) => `<div class="week">
+        <p style="margin:12px 0 0"><b>Week of ${label(w.id)}</b>${w.published ? '' : ' <i>(draft, not published)</i>'}</p>
+        ${w.published || change ? `<table class="sched-print"><tr><th></th>${DAYS.map((d, i) => `<th>${d} ${addDays(w.id, i).slice(8)}</th>`).join('')}</tr>
+          ${staff.map((s) => `<tr><td>${esc(s.name)}</td>${DAYS.map((_, i) => `<td>${esc(w.shifts?.[s.id]?.[i] || '')}</td>`).join('')}</tr>`).join('')}</table>`
+          : '<p class="small">Not published yet.</p>'}
+      </div>`).join('')}
+      <div class="paper-foot">Bootleggers Bar &amp; Grill</div>
+    </div>
+    <button class="btn block no-print" id="print" type="button" style="margin-top:14px">Print</button>
+    <p class="muted small center no-print">On a phone, choose a printer from the share sheet, or save as PDF.</p>`;
+  $('#print').onclick = () => window.print();
 }

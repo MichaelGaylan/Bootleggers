@@ -94,3 +94,29 @@ export async function applyMenu({ shared = false, host = false } = {}) {
   }
   await store.put('menu', { version: MENU_VERSION, at: Date.now() });
 }
+
+// Preset vendors (RRA-044): common food-service suppliers for what Bootleggers
+// stocks. Added once on the Host phone; edit or take out any you don't use.
+export const PRESET_VENDORS = [
+  ['Sysco', 'Broadline: proteins, frozen, dairy, produce, dry goods, paper'],
+  ['US Foods', 'Broadline: proteins, frozen, dairy, produce, dry goods, paper'],
+  ['Performance Foodservice (PFG)', 'Broadline: wings, burgers, fryer items, paper'],
+  ['Gordon Food Service', 'Broadline and Gordon stores: frozen, dairy, dry goods'],
+  ["Restaurant Depot", 'Cash and carry: anything short between deliveries'],
+  ["Sam's Club", 'Cash and carry: drinks, snacks, paper, cleaning'],
+  ['Coca-Cola bottler', 'Coca-Cola, Diet Coke, Sprite, Ginger Ale, juices'],
+  ['Red Bull distributor', 'Red Bull, Red Bull Sugar Free'],
+  ['Ecolab', 'Dish machine chemicals, sanitizer, cleaning'],
+  ['Cintas', 'Linens, towels, aprons, mats, first aid'],
+];
+const VENDOR_PRESET_VERSION = 1;
+
+export async function applyVendors({ shared = false, host = false } = {}) {
+  if (shared && !host) return;
+  if (((await store.get('vendor-presets'))?.version || 0) >= VENDOR_PRESET_VERSION) return;
+  const have = new Set((await data.list('vendor')).map((v) => key(v.name)));
+  for (const [name, carries] of PRESET_VENDORS) {
+    if (!have.has(key(name))) await data.put('vendor', { name, carries, deadline: '', contact: '', preset: true });
+  }
+  await store.put('vendor-presets', { version: VENDOR_PRESET_VERSION, at: Date.now() });
+}

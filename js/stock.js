@@ -31,7 +31,7 @@ export async function stockView(forceEdit) {
   // (add, remove, par, vendor) is for people who manage orders or Settings.
   const manage = canChange('orders') || canChange('settings');
   if (!manage) editing = false;
-  const list = await items();
+  const list = (await items()).map((s) => dirty[s.id] || s);
   const vs = await vendors();
   const q = (stockView.q || '').toLowerCase();
   const shown = list.filter((s) => !q || `${s.name} ${s.group} ${s.vendor}`.toLowerCase().includes(q));
@@ -42,10 +42,14 @@ export async function stockView(forceEdit) {
   view.innerHTML = `
     ${editing ? '' : tabs('count')}
     ${list.some((s) => s.group && !s.par) && !editing ? `<div class="hint small">${esc(STOCK_STATUS)} Set a par for each item in Edit list.</div>` : ''}
-    <div class="search"><input type="search" id="q" placeholder="Search stock" value="${esc(stockView.q || '')}"></div>
+    <div class="stock-tools">
+      ${!editing && change ? `<div class="fab-row"><button class="btn fab" id="save" type="button">Save count<span id="save-n"></span></button></div>` : ''}
+      <div class="search"><input type="search" id="q" placeholder="Search stock" value="${esc(stockView.q || '')}"></div>
+    </div>
     ${Object.entries(groups).map(([g, its]) => `
-      <div class="section-label">${esc(g)}</div>
-      <div class="group">${its.map((s) => `<div class="row" data-id="${s.id}">
+      <button class="acc-head${q || stockView.open === g ? ' open' : ''}" type="button" data-g="${esc(g)}"><span class="grow">${esc(g)}</span>
+        <span class="meta">${its.filter(isLow).length ? `<span class="pill lo">${its.filter(isLow).length} low</span> ` : ''}${its.length}</span></button>
+      <div class="group acc-body"${q || stockView.open === g ? '' : ' hidden'}>${its.map((s) => `<div class="row" data-id="${s.id}">
         ${editing ? `<button class="rm" type="button" data-rm="${s.id}" aria-label="Remove ${esc(s.name)}">−</button>` : ''}
         <span class="grow"${editing ? ` data-edit="${s.id}" style="cursor:pointer"` : ''}><span class="title">${esc(s.name)}</span>
           <span class="sub">${+s.par ? `Par ${esc(s.par)} ${esc(s.unit)}` : 'No par set'}${s.vendor ? ` · ${esc(vs.find((v) => v.id === s.vendor)?.name || '')}` : ''}
@@ -54,11 +58,21 @@ export async function stockView(forceEdit) {
           ? `<span class="stepper"><button type="button" data-d="-1">−</button><b>${esc(s.onHand)}</b><button type="button" data-d="1">+</button></span>`
           : `<span class="meta">${esc(s.onHand)} ${esc(s.unit)}</span>`}
       </div>`).join('')}</div>`).join('') || '<div class="empty">No stock items match.</div>'}
-    ${editing ? '<button class="btn tonal block" id="add" type="button">+ Add item</button>'
-      : change ? '<button class="btn block" id="save" type="button">Save count</button>' : ''}
+    ${editing ? '<button class="btn tonal block" id="add" type="button">+ Add item</button>' : ''}
     <p class="muted small center">${editing ? 'Tap an item to change its par, unit or vendor. Tap the red button to remove one you no longer stock.'
       : last?.countedAt ? `Last counted by ${esc(last.countedBy)}, ${fmtDate(last.countedAt)}` : 'Not counted yet.'}</p>`;
   wireTabs();
+  // One section open at a time (RRA-041); a search opens every match.
+  $$('.acc-head', view).forEach((h) => {
+    h.onclick = () => {
+      const opening = !h.classList.contains('open');
+      $$('.acc-head', view).forEach((x) => { x.classList.toggle('open', false); x.nextElementSibling.hidden = true; });
+      if (opening) { h.classList.add('open'); h.nextElementSibling.hidden = false; }
+      stockView.open = opening ? h.dataset.g : null;
+    };
+  });
+  const showDirty = () => { const n = Object.keys(dirty).length; const el = $('#save-n'); if (el) el.textContent = n ? ` (${n})` : ''; };
+  showDirty();
   $('#edit')?.addEventListener('click', () => { editing = !editing; stockView(); });
   $('#add')?.addEventListener('click', () => itemDialog());
   $$('[data-edit]', view).forEach((el) => { el.onclick = async () => itemDialog(await data.get('stock', el.dataset.edit)); });
@@ -72,10 +86,11 @@ export async function stockView(forceEdit) {
   $$('.stepper button', view).forEach((b) => {
     b.onclick = () => {
       const row = b.closest('[data-id]');
-      const s = list.find((x) => x.id === row.dataset.id);
+      const s = dirty[row.dataset.id] || list.find((x) => x.id === row.dataset.id);
       s.onHand = Math.max(0, +s.onHand + +b.dataset.d);
       dirty[s.id] = s;
       $('b', row).textContent = s.onHand;
+      showDirty();
     };
   });
   $('#save')?.addEventListener('click', async () => {
@@ -173,7 +188,7 @@ export async function vendorsView() {
   const change = canChange('orders');
   view.innerHTML = `
     <div class="group">${vs.map((v) => `<div class="row">${change ? `<button class="rm" type="button" data-rm="${v.id}" aria-label="Remove ${esc(v.name)}">−</button>` : ''}
-      <span class="grow"${change ? ` data-edit="${v.id}" style="cursor:pointer"` : ''}><span class="title">${esc(v.name)}</span><span class="sub">${esc([v.deadline && `Order by ${v.deadline}`, v.contact].filter(Boolean).join(' · '))}</span></span></div>`).join('') || '<div class="row muted">No vendors yet.</div>'}</div>
+      <span class="grow"${change ? ` data-edit="${v.id}" style="cursor:pointer"` : ''}><span class="title">${esc(v.name)}</span><span class="sub">${esc([v.carries, v.deadline && `Order by ${v.deadline}`, v.contact].filter(Boolean).join(' · '))}</span></span></div>`).join('') || '<div class="row muted">No vendors yet.</div>'}</div>
     ${change ? '<button class="btn tonal block" id="add" type="button">+ Add vendor</button>' : ''}
     <p class="muted small">Each stock item picks one of these vendors. Order guides group what's needed by vendor.</p>`;
   $('#add')?.addEventListener('click', () => vendorDialog());
@@ -193,8 +208,9 @@ async function vendorDialog(existing) {
     title: existing ? 'Vendor' : 'Add vendor', right: 'Save',
     body: `<label class="field"><span>Name</span><input type="text" id="v-name" value="${esc(v.name)}" placeholder="e.g. Sysco"></label>
       <label class="field"><span>Order deadline</span><input type="text" id="v-dl" value="${esc(v.deadline)}" placeholder="e.g. Wed 2 PM"></label>
-      <label class="field"><span>Rep or phone (optional)</span><input type="text" id="v-contact" value="${esc(v.contact)}"></label>`,
-    onMount: (api) => { api.onRight = () => { const n = $('#v-name', api.el).value.trim(); if (!n) return; Object.assign(v, { name: n, deadline: $('#v-dl', api.el).value.trim(), contact: $('#v-contact', api.el).value.trim() }); api.close(true); }; },
+      <label class="field"><span>Rep or phone (optional)</span><input type="text" id="v-contact" value="${esc(v.contact)}"></label>
+      <label class="field"><span>What they carry (optional)</span><input type="text" id="v-carries" value="${esc(v.carries || '')}"></label>`,
+    onMount: (api) => { api.onRight = () => { const n = $('#v-name', api.el).value.trim(); if (!n) return; Object.assign(v, { name: n, deadline: $('#v-dl', api.el).value.trim(), contact: $('#v-contact', api.el).value.trim(), carries: $('#v-carries', api.el).value.trim() }); api.close(true); }; },
   });
   if (!ok) return;
   await data.put('vendor', v);
