@@ -9,6 +9,8 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
+- [ ] RRA-046 · Order guides: Print button is grayed out and the phone says "This website has been blocked from automatic printing". Make printing work from the installed app (with a share/save-as-PDF fallback); check recipe and schedule printing too · Bug · S
+- [ ] RRA-047 · Recipe archive (Dishes): menu sections start closed; opening one closes the one already open, like Stock count · UX · S
 
 ## 🟡 Hold
 
