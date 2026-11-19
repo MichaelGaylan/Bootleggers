@@ -5,6 +5,7 @@ import * as data from './data.js';
 import { $, $$, esc, view, LS, sheet, toast, setTitle, setChrome, copy, fmtDate, session } from './ui.js';
 import { canChange, canSee } from './perms.js';
 import { STOCK_STATUS } from './starter-stock.js';
+import { printButtons, wirePrint } from './pdf.js';
 
 const items = async () => (await data.list('stock')).sort((a, b) => (a.group || '').localeCompare(b.group || '') || data.byName(a, b));
 const vendors = async () => (await data.list('vendor')).sort(data.byName);
@@ -172,10 +173,14 @@ export async function ordersView() {
       <div class="group">${g.its.map((s) => `<div class="row"><span class="grow">${esc(s.name)}</span><span class="meta">${need(s)} ${esc(s.unit)}</span></div>`).join('')}</div>`).join('')
       || '<div class="empty">Nothing to order. Everything is at or above par.</div>'}
     ${groups.length ? `<div class="paper print-only"><h3>Order guides · ${new Date().toLocaleDateString()}</h3><pre style="white-space:pre-wrap;font:inherit">${esc(text)}</pre></div>
-      <div class="btn-row no-print"><button class="btn tonal" id="print" type="button">Print</button><button class="btn" id="copy" type="button">Copy to send</button></div>` : ''}
+      ${printButtons()}
+      <button class="btn plain block no-print" id="copy" type="button">Copy to send</button>` : ''}
     ${canChange('orders') ? '<div class="group no-print" style="margin-top:14px"><a class="row" href="#/vendors"><span class="grow">Add or remove vendors</span><span class="meta">Settings</span></a></div>' : ''}`;
   wireTabs();
-  $('#print')?.addEventListener('click', () => window.print());
+  wirePrint({
+    $, title: `Order guides - ${new Date().toLocaleDateString()}`,
+    getLines: () => groups.flatMap((g) => [`# ${g.v.name}${g.v.deadline ? ` (order by ${g.v.deadline})` : ''}`, ...g.its.map((s) => `   ${s.name}: ${need(s)} ${s.unit}`), '']),
+  });
   $('#copy')?.addEventListener('click', () => copy(text, 'Order copied'));
 }
 

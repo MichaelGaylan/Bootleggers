@@ -4,6 +4,7 @@
 import * as data from './data.js';
 import { $, $$, esc, view, LS, sheet, toast, setTitle, setChrome, fmtDate, session } from './ui.js';
 import { canChange, canSee } from './perms.js';
+import { printButtons, wirePrint } from './pdf.js';
 
 const CATEGORIES = ['Rub', 'Sauce', 'Dressing', 'Marinade', 'Other'];
 const all = async () => (await data.list('recipe')).sort(data.byName);
@@ -27,6 +28,8 @@ export async function recipesView() {
   // Dishes from the menu keep the menu's order; others follow by name.
   for (const g of Object.values(groups)) g.sort((a, b) => (a.menuOrder ?? 1e6) - (b.menuOrder ?? 1e6) || data.byName(a, b));
   const keys = Object.keys(groups).sort((a, b) => (order.indexOf(a) + 99) % 99 - (order.indexOf(b) + 99) % 99);
+  // One section open at a time, like Stock count (RRA-047). Kept per tab.
+  const openKey = (recipesView.open || {})[kind];
   view.innerHTML = `
     <div class="segmented" role="tablist">
       <button data-k="dish" class="${kind === 'dish' ? 'on' : ''}" type="button">Dishes</button>
@@ -34,14 +37,22 @@ export async function recipesView() {
     </div>
     <div class="search"><input type="search" id="q" placeholder="Search names and ingredients" value="${esc(recipesView.q || '')}"></div>
     ${keys.length ? keys.map((g) => `
-      <div class="section-label">${esc(g)}</div>
-      <div class="group">${groups[g].map((r) => `
+      <button class="acc-head${q || openKey === g ? ' open' : ''}" type="button" data-g="${esc(g)}"><span class="grow">${esc(g)}</span><span class="meta">${groups[g].length}</span></button>
+      <div class="group acc-body"${q || openKey === g ? '' : ' hidden'}>${groups[g].map((r) => `
         <a class="row" href="#/recipe/${r.id}">${r.photo ? `<img src="${r.photo}" alt="" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none">` : ''}
         <span class="grow"><span class="title">${esc(r.name)}</span><span class="sub">${esc(subline(r, list))}</span></span>${r.kind === 'dish' && r.price ? `<span class="meta">${data.money(r.price)}</span>` : ''}</a>`).join('')}</div>`).join('')
     : `<div class="empty">${q ? 'Nothing matches that search.' : kind === 'dish'
       ? `No dishes yet.${edit ? '<br>Tap <b>UPLOAD</b> to add the first one.' : ''}`
       : `No house recipes yet.${edit ? '<br>Tap <b>NEW RECIPE</b> to add a rub, sauce or dressing.' : ''}`}</div>`}`;
   $$('.segmented button', view).forEach((b) => { b.onclick = () => { LS.set('recipeKind', b.dataset.k); recipesView(); }; });
+  $$('.acc-head', view).forEach((h) => {
+    h.onclick = () => {
+      const opening = !h.classList.contains('open');
+      $$('.acc-head', view).forEach((x) => { x.classList.toggle('open', false); x.nextElementSibling.hidden = true; });
+      if (opening) { h.classList.add('open'); h.nextElementSibling.hidden = false; }
+      recipesView.open = { ...(recipesView.open || {}), [kind]: opening ? h.dataset.g : null };
+    };
+  });
   const qi = $('#q');
   qi.oninput = () => { recipesView.q = qi.value; clearTimeout(qi.t); qi.t = setTimeout(async () => { await recipesView(); const n = $('#q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 200); };
 }
@@ -145,10 +156,18 @@ export async function printView(id) {
       <ol>${(r.steps || []).map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
       <div class="paper-foot">Bootleggers Bar &amp; Grill · Proprietary, do not share</div>
     </div>
-    <button class="btn block no-print" id="print" type="button" style="margin-top:14px">Print</button>
-    <p class="muted small center no-print">Prints in black and white on letter paper. On a phone, choose a printer from the share sheet.</p>`;
+    ${printButtons()}`;
   $$('.segmented button', view).forEach((b) => { b.onclick = () => { printView.k = +b.dataset.k; printView(id); }; });
-  $('#print').onclick = () => window.print();
+  wirePrint({
+    $, title: `${r.name}${k > 1 ? ` (x${k} batch)` : ''}`,
+    getLines: () => [
+      `${r.kind === 'house' ? r.category || 'House recipe' : r.section || 'Dish'}${r.yield ? ` - yield ${scaleQty(r.yield, k)}` : ''}${r.storage ? ` - ${r.storage}` : ''}`,
+      '',
+      ...((r.ingredients || []).length ? ['# Ingredients', ...(r.ingredients || []).filter((i) => i.item || i.qty).map((i) => `   ${scaleQty(i.qty, k) || ''}  ${i.item || ''}`), ''] : []),
+      ...((r.steps || []).length ? ['# Steps', ...(r.steps || []).map((s, i) => `${i + 1}. ${s}`), ''] : []),
+      'Proprietary, do not share.',
+    ],
+  });
 }
 
 // ------------------------------------------------------------ editor

@@ -13,6 +13,9 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 ## 🟡 Hold
 
 ## 🟣 Done
+### 0.4.1 · build 2026.11.19-3
+- [x] RRA-046 · Order guides: Print button is grayed out and the phone says "This website has been blocked from automatic printing". Make printing work from the installed app (with a share/save-as-PDF fallback); check recipe and schedule printing too · Bug · S
+- [x] RRA-047 · Recipe archive (Dishes): menu sections start closed; opening one closes the one already open, like Stock count · UX · S
 ### 0.4.0 · build 2026.11.19-2
 - [x] RRA-040 · Stock count: floating Save button that stays fixed above the right side of the stock search · UX · S
 - [x] RRA-041 · Stock sections start closed; opening one closes the one already open (accordion), to cut scrolling · UX · S
