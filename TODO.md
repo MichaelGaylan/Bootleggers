@@ -9,6 +9,7 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
+- [ ] RRA-049 · Stock items (Edit list): after removing an item, stay on the edit page for more removals instead of going back to Stock count · Bug · S
 
 ## 🟡 Hold
 
