@@ -24,6 +24,8 @@ export async function recipesView() {
   const order = kind === 'dish' ? [...(settings.sections || []), 'Other'] : CATEGORIES;
   const groups = {};
   for (const r of shown) (groups[(kind === 'dish' ? r.section : r.category) || 'Other'] ||= []).push(r);
+  // Dishes from the menu keep the menu's order; others follow by name.
+  for (const g of Object.values(groups)) g.sort((a, b) => (a.menuOrder ?? 1e6) - (b.menuOrder ?? 1e6) || data.byName(a, b));
   const keys = Object.keys(groups).sort((a, b) => (order.indexOf(a) + 99) % 99 - (order.indexOf(b) + 99) % 99);
   view.innerHTML = `
     <div class="segmented" role="tablist">
@@ -35,7 +37,7 @@ export async function recipesView() {
       <div class="section-label">${esc(g)}</div>
       <div class="group">${groups[g].map((r) => `
         <a class="row" href="#/recipe/${r.id}">${r.photo ? `<img src="${r.photo}" alt="" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none">` : ''}
-        <span class="grow"><span class="title">${esc(r.name)}</span><span class="sub">${esc(subline(r, list))}</span></span></a>`).join('')}</div>`).join('')
+        <span class="grow"><span class="title">${esc(r.name)}</span><span class="sub">${esc(subline(r, list))}</span></span>${r.kind === 'dish' && r.price ? `<span class="meta">${data.money(r.price)}</span>` : ''}</a>`).join('')}</div>`).join('')
     : `<div class="empty">${q ? 'Nothing matches that search.' : kind === 'dish'
       ? `No dishes yet.${edit ? '<br>Tap <b>UPLOAD</b> to add the first one.' : ''}`
       : `No house recipes yet.${edit ? '<br>Tap <b>NEW RECIPE</b> to add a rub, sauce or dressing.' : ''}`}</div>`}`;

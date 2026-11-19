@@ -2,10 +2,14 @@
 // Bump VERSION and BUILD on every release, and add one line to WHATS_NEW.
 
 export const APP_NAME = 'Bootleggers Kitchen';
-export const VERSION = '0.3.0';
-export const BUILD = '2026.11.18-7';
+export const VERSION = '0.3.1';
+export const BUILD = '2026.11.19-1';
 
 export const WHATS_NEW = [
+  {
+    version: '0.3.1', build: '2026.11.19-1', date: '2026-11-19',
+    lines: ['The full Bootleggers menu is in the Recipe archive, sorted by menu section with prices, and the stock list matches it (sauces by heat, sauce cups by size, tea supplies).'],
+  },
   {
     version: '0.3.0', build: '2026.11.18-7', date: '2026-11-18',
     lines: [

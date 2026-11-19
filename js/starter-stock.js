@@ -1,5 +1,5 @@
 // Preinstalled starter stock list for Bootleggers Augusta (RRA-024).
-// DRAFT from the online menu; ingredients are inferred from item names and
+// DRAFT from the menu (updated 2026-11-19 from the Host's full menu); ingredients are inferred from item names and
 // wait for chef review. Par levels are left for the manager (RRA-006 hook).
 
 export const STOCK_STATUS = 'Draft from the online menu. Waiting for chef review.';
@@ -38,18 +38,23 @@ export const STARTER_STOCK = [
     ['Wing breading/flour, seasonings, salt, pepper', 'each'],
   ] },
   { group: 'Sauces and dressings', items: [
-    ['Ranch', ''], ['Blue Cheese', ''], ['BBQ', ''], ['Honey Mustard', ''], ['Honey Sriracha', ''], ['Buffalo base (mild/medium/hot)', ''],
-    ['Italian', ''], ['Caesar dressing', ''], ['Ketchup', ''], ['Mayo', ''], ['Mustard', ''], ['Salsa', ''], ['House wing sauces', '', 'See House recipes'],
+    ['Ranch', 'jug'], ['Blue Cheese', 'jug'], ['BBQ', 'jug'], ['Honey Mustard', 'jug'], ['Honey Sriracha', 'jug'],
+    ['Mild Buffalo', 'jug'], ['Medium Buffalo', 'jug'], ['Hot Buffalo', 'jug'],
+    ['Italian', 'jug'], ['Caesar dressing', 'jug'], ['Ketchup', 'case'], ['Mayo', 'jug'], ['Mustard', 'jug'], ['Salsa', 'jug'], ['House wing sauces', '', 'See House recipes'],
   ] },
   { group: 'Non-alcoholic beverages', items: [
     ['Bottled water', ''], ['Coca-Cola', ''], ['Diet Coke', ''], ['Sprite', ''], ['Ginger Ale', ''], ['Cranberry juice', ''],
-    ['Orange juice', ''], ['Pineapple juice', ''], ['Red Bull', ''], ['Red Bull Sugar Free', ''], ['Sweet tea', ''], ['Unsweet tea (tea bags and sugar)', ''],
+    ['Orange juice', ''], ['Pineapple juice', ''], ['Red Bull', 'case'], ['Red Bull Sugar Free', 'case'], ['Iced tea bags', 'box'], ['Sugar', 'bag'],
   ] },
   { group: 'Bar', items: [
     ['Draft beer, bottles and cans, liquor, wine, mixers, garnishes', '', 'To fill in: not on the website'],
   ] },
   { group: 'Paper and to-go', items: [
-    ['To-go clamshells', ''], ['Sauce cups and lids', ''], ['Foil', ''], ['Napkins', ''], ['Wet wipes', ''],
+    ['To-go clamshells', ''], ['Sauce cups, small', 'sleeve'], ['Sauce cups, large', 'sleeve'], ['Sauce cup lids, small', 'sleeve'], ['Sauce cup lids, large', 'sleeve'], ['Foil', ''], ['Napkins', ''], ['Wet wipes', ''],
     ['To-go bags', ''], ['Gloves', ''], ['Deli paper', ''],
   ] },
 ];
+
+// Starter items the 2026-11-19 menu update split or renamed. applyMenu()
+// removes them from a phone's list only while they are still untouched.
+export const REPLACED_STOCK = ['Buffalo base (mild/medium/hot)', 'Unsweet tea (tea bags and sugar)', 'Sauce cups and lids', 'Sweet tea'];
