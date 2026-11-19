@@ -9,6 +9,7 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
+- [ ] RRA-048 · Play the whoosh sound (/mnt/project-files/assets/whoosh.mp3) with the opening screen, only on first launch and after an update. iPhone blocks sound until a tap, so it plays on the tap that opens the app if autoplay is blocked · UX · S
 
 ## 🟡 Hold
 
