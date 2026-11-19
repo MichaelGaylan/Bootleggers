@@ -2,10 +2,17 @@
 // Bump VERSION and BUILD on every release, and add one line to WHATS_NEW.
 
 export const APP_NAME = 'Bootleggers Kitchen';
-export const VERSION = '0.4.0';
-export const BUILD = '2026.11.19-2';
+export const VERSION = '0.4.1';
+export const BUILD = '2026.11.19-3';
 
 export const WHATS_NEW = [
+  {
+    version: '0.4.1', build: '2026.11.19-3', date: '2026-11-19',
+    lines: [
+      'Printing works from the app: order guides, recipes and the schedule each have Print and "Save or share PDF". The PDF opens the share sheet, where you can print it, save it or send it.',
+      'Recipe archive sections stay closed until you tap one. Opening another closes the first, like Stock count.',
+    ],
+  },
   {
     version: '0.4.0', build: '2026.11.19-2', date: '2026-11-19',
     lines: [

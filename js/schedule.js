@@ -4,6 +4,7 @@ import * as data from './data.js';
 import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session } from './ui.js';
 import { canChange, myStaff, isHost } from './perms.js';
 import { ROLES } from './access.js';
+import { printButtons, wirePrint } from './pdf.js';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 export const POSITIONS = ['Chef', 'Line cook', 'Prep cook', 'Dishwasher', 'Server', 'Bartender', 'Host stand', 'Manager'];
@@ -179,7 +180,17 @@ export async function schedulePrintView(arg = '') {
       </div>`).join('')}
       <div class="paper-foot">Bootleggers Bar &amp; Grill</div>
     </div>
-    <button class="btn block no-print" id="print" type="button" style="margin-top:14px">Print</button>
-    <p class="muted small center no-print">On a phone, choose a printer from the share sheet, or save as PDF.</p>`;
-  $('#print').onclick = () => window.print();
+    ${printButtons()}`;
+  const pad = (v, n) => String(v || '').slice(0, n).padEnd(n);
+  wirePrint({
+    $, mono: true, title: `Bootleggers schedule ${label(start)} to ${label(addDays(start, count * 7 - 1))}`,
+    getLines: () => weeks.flatMap((w) => [
+      `# Week of ${label(w.id)}${w.published ? '' : ' (draft)'}`,
+      ...(w.published || change ? [
+        pad('', 14) + DAYS.map((d, i) => pad(`${d} ${addDays(w.id, i).slice(8)}`, 9)).join(''),
+        ...staff.map((s) => pad(s.name, 14) + DAYS.map((_, i) => pad(w.shifts?.[s.id]?.[i], 9)).join('')),
+      ] : ['Not published yet.']),
+      '',
+    ]),
+  });
 }
