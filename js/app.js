@@ -17,6 +17,7 @@ import { scheduleView, staffView, ensureStaffFor, staffList } from './schedule.j
 import { eventsView, eventView } from './events.js';
 import { costsView } from './costs.js';
 import { settingsView, listView, rolesView, personView } from './settings.js';
+import { applyMenu } from './menu.js';
 
 import { $, $$, esc, view, dlg, LS, isIOS, standalone, toast, copy, share, pasteInto, sheet, setTitle, setChrome, fmtDate, session } from './ui.js';
 
@@ -650,6 +651,7 @@ async function boot() {
     data.onChange((coll, remote) => { if (remote) debounceRoute(); });
     data.onChange(() => updateBadge());
   }
+  await applyMenu({ shared: sync.enabled(), host: profile.role === 'owner' });
   await noticeGate();
   await homeTip();
   if (incoming && access.parse(incoming)?.kind === 'req') { location.hash = '#/team'; return teamView(incoming); }
