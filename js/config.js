@@ -2,10 +2,20 @@
 // Bump VERSION and BUILD on every release, and add one line to WHATS_NEW.
 
 export const APP_NAME = 'Bootleggers Kitchen';
-export const VERSION = '0.4.2';
-export const BUILD = '2026.11.19-4';
+export const VERSION = '0.5.0';
+export const BUILD = '2026.11.20-1';
 
 export const WHATS_NEW = [
+  {
+    version: '0.5.0', build: '2026.11.20-1', date: '2026-11-20',
+    lines: [
+      'Tablets and computers get their own layout: a sidebar with every section, all sections open, and stock and dishes as wide tables.',
+      'Colored chips everywhere: In stock green, Low stock orange, Ingredient blue, Sub recipe purple.',
+      'The schedule is grouped by role with colored bands and shift pills. Tablets show the whole week; phones show one day at a time with a day picker. Time off and open shifts are new.',
+      'Stock items: removing an item keeps you on the edit page.',
+      'Stock count: Save clears the search, and the search bar has an X to clear it.',
+    ],
+  },
   {
     version: '0.4.2', build: '2026.11.19-4', date: '2026-11-19',
     lines: ['A whoosh plays with the opening screen, on first launch and after each update.'],

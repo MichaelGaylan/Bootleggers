@@ -9,14 +9,15 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
-- [ ] RRA-052 · Schedule layout (reference: /mnt/project-files/references/rra-052-schedule-layout.png), RRA-051 colors. Tablet and computer: week grid with days across the top, staff grouped under colored role bands (e.g. Bartender, Host, Manager, Server, Kitchen), each shift a colored pill with a role letter badge and times, TIME OFF pills, an Open shifts row. Phone: same colors and role badges, one day at a time with a day picker, grouped by role · UX · L
-- [ ] RRA-051 · Tablet and computer layout (reference: /mnt/project-files/references/rra-051-tablet-layout.png). Phones stay as they are. On wide screens: a left sidebar listing every section (Recipes, Prep, Stock, Board, Schedule, Settings...) instead of bottom tabs; sections shown open instead of collapsed; stock and dishes as wide tables (item, type, unit, on hand, par, status, vendor/price). Colored chips like the reference: In stock (green), Low stock (orange), Ingredient (blue) vs Sub recipe / house recipe (purple), used on phones too · UX · L
-- [ ] RRA-050 · Stock count: after searching and changing a count, Save clears the search and shows the full list again; also an X in the search bar to clear it · UX · S
-- [ ] RRA-049 · Stock items (Edit list): after removing an item, stay on the edit page for more removals instead of going back to Stock count · Bug · S
 
 ## 🟡 Hold
 
 ## 🟣 Done
+### 0.5.0 · build 2026.11.20-1
+- [x] RRA-049 · Stock items (Edit list): after removing an item, stay on the edit page for more removals instead of going back to Stock count · Bug · S
+- [x] RRA-050 · Stock count: after searching and changing a count, Save clears the search and shows the full list again; also an X in the search bar to clear it · UX · S
+- [x] RRA-051 · Tablet and computer layout (reference: /mnt/project-files/references/rra-051-tablet-layout.png). Phones stay as they are. On wide screens: a left sidebar listing every section (Recipes, Prep, Stock, Board, Schedule, Settings...) instead of bottom tabs; sections shown open instead of collapsed; stock and dishes as wide tables (item, type, unit, on hand, par, status, vendor/price). Colored chips like the reference: In stock (green), Low stock (orange), Ingredient (blue) vs Sub recipe / house recipe (purple), used on phones too · UX · L
+- [x] RRA-052 · Schedule layout (reference: /mnt/project-files/references/rra-052-schedule-layout.png), RRA-051 colors. Tablet and computer: week grid with days across the top, staff grouped under colored role bands (e.g. Bartender, Host, Manager, Server, Kitchen), each shift a colored pill with a role letter badge and times, TIME OFF pills, an Open shifts row. Phone: same colors and role badges, one day at a time with a day picker, grouped by role · UX · L
 ### 0.4.2 · build 2026.11.19-4
 - [x] RRA-048 · Play the whoosh sound (/mnt/project-files/assets/whoosh.mp3) with the opening screen, only on first launch and after an update. iPhone blocks sound until a tap, so it plays on the tap that opens the app if autoplay is blocked · UX · S
 ### 0.4.1 · build 2026.11.19-3

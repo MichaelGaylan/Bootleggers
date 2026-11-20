@@ -2,7 +2,7 @@
 // and order guides by vendor (RRA-008). Starts from the starter list (RRA-024).
 
 import * as data from './data.js';
-import { $, $$, esc, view, LS, sheet, toast, setTitle, setChrome, copy, fmtDate, session } from './ui.js';
+import { $, $$, esc, view, LS, sheet, toast, setTitle, setChrome, copy, fmtDate, session, isWide, chip, searchBox } from './ui.js';
 import { canChange, canSee } from './perms.js';
 import { STOCK_STATUS } from './starter-stock.js';
 import { printButtons, wirePrint } from './pdf.js';
@@ -11,6 +11,8 @@ const items = async () => (await data.list('stock')).sort((a, b) => (a.group || 
 const vendors = async () => (await data.list('vendor')).sort(data.byName);
 const isLow = (s) => +s.par > 0 && +s.onHand < +s.par;
 const need = (s) => Math.max(0, +s.par - +s.onHand);
+// Status chip (RRA-051): In stock green, Low stock orange.
+const status = (s) => (+s.par ? (isLow(s) ? chip('Low stock', 'orange') : chip('In stock', 'green')) : chip('No par', 'gray'));
 
 function tabs(on) {
   return `<div class="segmented">
@@ -39,22 +41,41 @@ export async function stockView(forceEdit) {
   const groups = {};
   for (const s of shown) (groups[s.group || 'Other'] ||= []).push(s);
   const last = list.reduce((m, s) => (s.countedAt > (m?.countedAt || 0) ? s : m), null);
+  const wide = isWide();
+  const costs = canSee('costs');
+  const vName = (id) => vs.find((v) => v.id === id)?.name || '';
+  // Tablet and computer (RRA-051): one wide table, every group open.
+  const wideTable = () => (shown.length ? `<p class="muted small">Showing ${shown.length} of ${list.length} items</p>
+    <div class="wtable-wrap"><table class="wtable">
+      <thead><tr><th>Item</th><th>Type</th><th>Unit</th><th class="num">On hand</th><th class="num">Par</th><th>Status</th><th>Vendor</th>${costs ? '<th class="num">Value</th>' : ''}</tr></thead>
+      ${Object.entries(groups).map(([g, its]) => `<tbody><tr class="band"><td colspan="${costs ? 8 : 7}">${esc(g)} <span class="muted">· ${its.length}${its.filter(isLow).length ? ` · ${its.filter(isLow).length} low` : ''}</span></td></tr>
+        ${its.map((s) => `<tr data-id="${s.id}">
+          <td>${editing ? `<button class="rm" type="button" data-rm="${s.id}" aria-label="Remove ${esc(s.name)}">−</button> <span class="link" data-edit="${s.id}">${esc(s.name)}</span>` : esc(s.name)}</td>
+          <td>${chip('Ingredient', 'blue')}</td>
+          <td>${esc(s.unit)}</td>
+          <td class="num">${!editing && change ? `<span class="stepper"><button type="button" data-d="-1">−</button><b>${esc(s.onHand)}</b><button type="button" data-d="1">+</button></span>` : esc(s.onHand)}</td>
+          <td class="num">${+s.par ? esc(s.par) : '—'}</td>
+          <td>${status(s)}</td>
+          <td>${esc(vName(s.vendor)) || '<span class="muted">—</span>'}</td>
+          ${costs ? `<td class="num">${s.price ? data.money(+s.price * +s.onHand) : '—'}</td>` : ''}
+        </tr>`).join('')}</tbody>`).join('')}
+    </table></div>` : '<div class="empty">No stock items match.</div>');
   setTitle(editing ? 'Stock items' : 'Stock count', manage ? `<button class="btn plain small" id="edit" type="button">${editing ? 'Done' : 'Edit list'}</button>` : '');
   view.innerHTML = `
     ${editing ? '' : tabs('count')}
     ${list.some((s) => s.group && !s.par) && !editing ? `<div class="hint small">${esc(STOCK_STATUS)} Set a par for each item in Edit list.</div>` : ''}
     <div class="stock-tools">
       ${!editing && change ? `<div class="fab-row"><button class="btn fab" id="save" type="button">Save count<span id="save-n"></span></button></div>` : ''}
-      <div class="search"><input type="search" id="q" placeholder="Search stock" value="${esc(stockView.q || '')}"></div>
+      ${searchBox('q', 'Search stock', stockView.q)}
     </div>
-    ${Object.entries(groups).map(([g, its]) => `
+    ${wide ? wideTable() : Object.entries(groups).map(([g, its]) => `
       <button class="acc-head${q || stockView.open === g ? ' open' : ''}" type="button" data-g="${esc(g)}"><span class="grow">${esc(g)}</span>
-        <span class="meta">${its.filter(isLow).length ? `<span class="pill lo">${its.filter(isLow).length} low</span> ` : ''}${its.length}</span></button>
+        <span class="meta">${its.filter(isLow).length ? `${chip(`${its.filter(isLow).length} low`, 'orange')} ` : ''}${its.length}</span></button>
       <div class="group acc-body"${q || stockView.open === g ? '' : ' hidden'}>${its.map((s) => `<div class="row" data-id="${s.id}">
         ${editing ? `<button class="rm" type="button" data-rm="${s.id}" aria-label="Remove ${esc(s.name)}">−</button>` : ''}
         <span class="grow"${editing ? ` data-edit="${s.id}" style="cursor:pointer"` : ''}><span class="title">${esc(s.name)}</span>
           <span class="sub">${+s.par ? `Par ${esc(s.par)} ${esc(s.unit)}` : 'No par set'}${s.vendor ? ` · ${esc(vs.find((v) => v.id === s.vendor)?.name || '')}` : ''}
-          ${+s.par ? (isLow(s) ? ' <span class="pill lo">Low</span>' : ' <span class="pill okp">OK</span>') : ''}</span></span>
+          ${+s.par ? ` ${status(s)}` : ''}</span></span>
         ${editing ? '' : change
           ? `<span class="stepper"><button type="button" data-d="-1">−</button><b>${esc(s.onHand)}</b><button type="button" data-d="1">+</button></span>`
           : `<span class="meta">${esc(s.onHand)} ${esc(s.unit)}</span>`}
@@ -74,7 +95,8 @@ export async function stockView(forceEdit) {
   });
   const showDirty = () => { const n = Object.keys(dirty).length; const el = $('#save-n'); if (el) el.textContent = n ? ` (${n})` : ''; };
   showDirty();
-  $('#edit')?.addEventListener('click', () => { editing = !editing; stockView(); });
+  // RRA-049: the mode lives in the address, so a redraw stays on the edit page.
+  $('#edit')?.addEventListener('click', () => { location.hash = editing ? '#/stock' : '#/stock-items'; });
   $('#add')?.addEventListener('click', () => itemDialog());
   $$('[data-edit]', view).forEach((el) => { el.onclick = async () => itemDialog(await data.get('stock', el.dataset.edit)); });
   $$('[data-rm]', view).forEach((b) => {
@@ -100,9 +122,11 @@ export async function stockView(forceEdit) {
     const n = Object.keys(dirty).length;
     dirty = {};
     toast(n ? `Count saved (${n} item${n > 1 ? 's' : ''})` : 'No changes to save');
+    stockView.q = ''; // RRA-050: back to the full list
     stockView();
   });
   const qi = $('#q');
+  $('#q-x').onclick = () => { stockView.q = ''; stockView(); };
   qi.oninput = () => { stockView.q = qi.value; clearTimeout(qi.t); qi.t = setTimeout(async () => { await stockView(); const n = $('#q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 200); };
 }
 

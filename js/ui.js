@@ -11,6 +11,16 @@ export const LS = {
 };
 export const isIOS = document.documentElement.classList.contains('is-ios');
 export const standalone = document.documentElement.classList.contains('standalone');
+// Tablet and computer layout (RRA-051): a sidebar and wide tables from 768px (iPad upright and up).
+export const wideMQ = matchMedia('(min-width: 768px)');
+export const isWide = () => wideMQ.matches;
+
+// Colored chips (RRA-051), the same on phones and wide screens.
+export const chip = (text, color) => `<span class="chip c-${color}">${esc(text)}</span>`;
+
+// Search box with an X that clears it (RRA-050).
+export const searchBox = (id, placeholder, value) => `<div class="search"><input type="search" id="${id}" placeholder="${esc(placeholder)}" value="${esc(value || '')}">
+  <button class="search-x" type="button" id="${id}-x" aria-label="Clear search"${value ? '' : ' hidden'}>×</button></div>`;
 
 // ---------------------------------------------------------------- helpers
 
@@ -84,6 +94,10 @@ export function setTitle(text, actionHtml = '') {
 export function setChrome({ locked = false, tab = null, back = false }) {
   document.body.classList.toggle('locked', locked);
   $('#tabs').hidden = locked;
+  $('#side').hidden = locked;
+  const name = (location.hash.match(/^#\/([^/]+)/) || [])[1] || 'recipes';
+  const SIDE = { recipe: 'recipes', print: 'recipes', 'stock-items': 'stock', 'schedule-print': 'schedule', notices: 'board', event: 'events', vendors: 'settings', staff: 'settings', list: 'settings', roles: 'settings', person: 'settings' };
+  $$('#side a').forEach((a) => a.classList.toggle('on', a.dataset.r === (SIDE[name] || name)));
   $('#btn-bell').hidden = locked;
   $('#btn-back').hidden = !back;
   $$('#tabs a').forEach((a) => a.classList.toggle('on', a.dataset.tab === tab));

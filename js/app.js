@@ -19,7 +19,7 @@ import { costsView } from './costs.js';
 import { settingsView, listView, rolesView, personView } from './settings.js';
 import { applyMenu, applyVendors } from './menu.js';
 
-import { $, $$, esc, view, dlg, LS, isIOS, standalone, toast, copy, share, pasteInto, sheet, setTitle, setChrome, fmtDate, session } from './ui.js';
+import { $, $$, esc, view, dlg, LS, isIOS, standalone, toast, copy, share, pasteInto, sheet, setTitle, setChrome, fmtDate, session, wideMQ } from './ui.js';
 
 const NOTICE_VERSION = 1;
 
@@ -161,6 +161,34 @@ async function updateBadge() {
   $('#tab-badge').hidden = !n;
   $('#tab-badge').textContent = n;
   $('#bell-dot').hidden = !n;
+  const sb = $('#side-badge');
+  if (sb) { sb.hidden = !n; sb.textContent = n; }
+}
+
+// Sidebar for tablets and computers (RRA-051): every section, no More tab.
+function renderSide() {
+  const link = (r, label, extra = '') => `<a href="#/${r}" data-r="${r}"><span class="grow">${label}</span>${extra}</a>`;
+  const items = [
+    link('recipes', 'Recipes'),
+    canSee('prep') ? link('prep', 'Prep') : '',
+    canSee('stock') ? link('stock', 'Stock count') : '',
+    canSee('stock') ? link('needed', 'Needed') : '',
+    canSee('orders') ? link('orders', 'Order guides') : '',
+    canSee('board') ? link('board', 'Board', '<i id="side-badge" class="sbadge" hidden></i>') : '',
+    canSee('schedule') ? link('schedule', 'Schedule') : '',
+    canSee('events') ? link('events', 'Events (BEOs)') : '',
+    canSee('costs') ? link('costs', 'Costs and waste') : '',
+    '<hr>',
+    canSee('settings') || isHost() ? link('settings', 'Settings') : '',
+    access.can(profile, 'invite') ? link('team', 'Invite and approve', waiting.size ? `<span class="chip warn">${waiting.size}</span>` : '') : '',
+    isHost() ? link('backup', 'Host backup') : '',
+    '<hr>',
+    link('about', 'About and how-to'),
+    link('whatsnew', "What's new"),
+    link('more', 'More'),
+  ];
+  $('#side').innerHTML = `<div class="side-who"><b>${esc(profile.name)}</b><span>${esc(access.ROLES[profile.role] || profile.role)}</span></div>${items.join('')}`;
+  updateBadge();
 }
 
 
@@ -663,12 +691,15 @@ async function route() {
   if (!profile) return;
   const [, name = 'recipes', arg] = location.hash.match(/^#\/([^/]+)\/?(.*)$/) || [];
   session.staff = await staffList(); // permissions (RRA-002) read this
+  renderSide();
   (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
 }
 
 $('#btn-back').onclick = () => (history.length > 1 ? history.back() : (location.hash = '#/recipes'));
 $('#btn-bell').onclick = () => { location.hash = '#/board'; };
 window.addEventListener('hashchange', route);
+// Turning a tablet or resizing a window switches between the two layouts.
+wideMQ.addEventListener('change', () => { if (!dlg.open) route(); });
 
 // A code can arrive in the link (#t=...). Take it out of the address bar.
 function takeIncoming() {
