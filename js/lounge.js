@@ -6,7 +6,7 @@
 
 import * as data from './data.js';
 import { $, $$, esc, view, LS, sheet, toast, setTitle, setChrome, session, copy, isWide, chip } from './ui.js';
-import { canChange, canSee, myStaff, isHost } from './perms.js';
+import { canChange, canSee, myStaff, isHost, canTime } from './perms.js';
 import { unreadPosts } from './board.js';
 import { staffList, roleOf, pill } from './schedule.js';
 import { printButtons, wirePrint } from './pdf.js';
@@ -22,8 +22,7 @@ const weekMs = (iso) => { const [y, m, dd] = iso.split('-').map(Number); return 
 const addDays = (iso, n) => { const [y, m, dd] = iso.split('-').map(Number); return data.isoDate(new Date(y, m - 1, dd + n)); };
 const label = (iso) => { const [y, m, dd] = iso.split('-').map(Number); return new Date(y, m - 1, dd).toLocaleDateString([], { month: 'short', day: 'numeric' }); };
 const punchHours = (p) => ((p.out || Date.now()) - p.in) / H;
-// Managers and the Host see everyone's time sheets.
-export const canTime = () => isHost() || canChange('schedule') || canChange('settings');
+export { canTime };
 
 const punches = async () => (await data.list('punch')).sort((a, b) => a.in - b.in);
 const openPunch = (all, staffId) => all.find((p) => p.staffId === staffId && !p.out);

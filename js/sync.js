@@ -13,6 +13,7 @@ import * as data from './data.js';
 import * as store from './store.js';
 import { b64uEnc, b64uDec, importTeamKey } from './crypto.js';
 import { teamKeyBytes, ensureTeamKey } from './access.js';
+import { canTime, myStaff } from './perms.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const COLLS = ['recipe', 'stock', 'vendor', 'staff', 'prepitem', 'prepday', 'post', 'week', 'swap', 'event', 'waste', 'punch', 'prepsaved', 'settings'];
@@ -112,7 +113,12 @@ export async function start(profile, onStatus = () => {}) {
         if (mine && (mine.updated || 0) >= r.u) continue; // ours is as new or newer
         try {
           if (r.c === 'settings') { if (!r.d) await data.applyRemoteSettings(await open(r)); }
-          else await data.applyRemote(r.c, r.i, r.d ? null : await open(r));
+          else {
+            const doc = r.d ? null : await open(r);
+            // Someone else's hours stay off phones that can't see time sheets (RRA-055).
+            if (doc && r.c === 'punch' && !canTime() && doc.staffId !== myStaff()?.id) continue;
+            await data.applyRemote(r.c, r.i, doc);
+          }
         } catch { set('error', 'Some shared data could not be opened with this phone\'s team key.'); }
       }
       if (first) {

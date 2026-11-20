@@ -27,6 +27,9 @@ export const ROLE_DEFAULTS = {
 };
 
 export const isHost = () => session.profile?.role === 'owner';
+// Time sheets with everyone's hours (RRA-055): managers and the Host only,
+// by access role. Staff and chefs see only their own time sheet.
+export const canTime = () => isHost() || session.profile?.role === 'manager';
 
 // The staff record that belongs to this phone's person, if any.
 export function myStaff() {
