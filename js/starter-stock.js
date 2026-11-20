@@ -1,5 +1,5 @@
 // Preinstalled starter stock list for Bootleggers Augusta (RRA-024).
-// DRAFT from the menu (updated 2026-11-19 from the Host's full menu); ingredients are inferred from item names and
+// DRAFT from the menu (updated 2026-11-19 from the Admin's full menu); ingredients are inferred from item names and
 // wait for chef review. Par levels are left for the manager (RRA-006 hook).
 
 export const STOCK_STATUS = 'Draft from the online menu. Waiting for chef review.';

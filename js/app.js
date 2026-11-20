@@ -184,7 +184,7 @@ function renderSide() {
     '<hr>',
     canSee('settings') || isHost() ? link('settings', 'Settings') : '',
     access.can(profile, 'invite') ? link('team', 'Invite and approve', waiting.size ? `<span class="chip warn">${waiting.size}</span>` : '') : '',
-    isHost() ? link('backup', 'Host backup') : '',
+    isHost() ? link('backup', 'Admin backup') : '',
     '<hr>',
     link('about', 'About and how-to'),
     link('whatsnew', "What's new"),
@@ -204,7 +204,7 @@ function moreView() {
   view.innerHTML = `
     <div class="card">
       <b>${esc(profile.name)}</b> <span class="chip">${esc(access.ROLES[profile.role] || profile.role)}</span>
-      <p class="muted small">${profile.role === 'owner' ? 'Host phone. Access does not expire.' : `Access stays on while you use it. It ends after ${daysLeft} days without opening the app.`}</p>
+      <p class="muted small">${profile.role === 'owner' ? 'Admin phone. Access does not expire.' : `Access stays on while you use it. It ends after ${daysLeft} days without opening the app.`}</p>
     </div>
     <div class="group">
       ${canSee('schedule') ? '<a class="row" href="#/schedule"><span class="grow">Schedule</span></a>' : ''}
@@ -214,7 +214,7 @@ function moreView() {
     <div class="group">
       ${canSee('settings') || isHost() ? '<a class="row" href="#/settings"><span class="grow">Settings</span></a>' : ''}
       ${access.can(profile, 'invite') ? `<a class="row" href="#/team"><span class="grow">Invite and approve phones</span>${waiting.size ? `<span class="chip warn">${waiting.size} waiting</span>` : ''}</a>` : ''}
-      ${isHost() ? `<a class="row" href="#/backup"><span class="grow">Host backup</span>${LS.get('backupAt', 0) ? '' : '<span class="chip warn">Not made yet</span>'}</a>` : ''}
+      ${isHost() ? `<a class="row" href="#/backup"><span class="grow">Admin backup</span>${LS.get('backupAt', 0) ? '' : '<span class="chip warn">Not made yet</span>'}</a>` : ''}
     </div>
     <div class="group">
       <a class="row" href="#/about"><span class="grow">About and how-to</span></a>
@@ -228,7 +228,7 @@ function moreView() {
     <p class="muted small center">${esc(APP_NAME)} ${VERSION} · build ${BUILD}</p>`;
   $('#show-notice').onclick = () => sheet({ title: 'Notices of use', left: null, right: 'Done', body: NOTICE_HTML });
   $('#leave').onclick = async () => {
-    const ok = await sheet({ title: 'Remove access?', right: 'Remove', body: `<p>This deletes the app's data from this phone, including recipes saved here. You'll need a new invite to use it again.</p>${profile.role === 'owner' ? '<p class="hint">This is the Host phone. Removing access deletes the Host key. You can get back in only with a Host backup, or by adding a new key to the app.</p>' : ''}` });
+    const ok = await sheet({ title: 'Remove access?', right: 'Remove', body: `<p>This deletes the app's data from this phone, including recipes saved here. You'll need a new invite to use it again.</p>${profile.role === 'owner' ? '<p class="hint">This is the Admin phone. Removing access deletes the Admin key. You can get back in only with an Admin backup, or by adding a new key to the app.</p>' : ''}` });
     if (!ok) return;
     await access.wipeAccess();
     localStorage.removeItem('blg.expiredNotice');
@@ -247,23 +247,23 @@ async function homeTip() {
     title: 'Keep your access', left: null, right: host ? 'Later' : 'Got it',
     body: `<p>Please ${KEEP_TIP}</p>
       ${isIOS && !standalone ? '<p class="hint small">You are in Safari now. Tap Share, then <b>Add to Home Screen</b>, and use that icon from now on.</p>' : ''}
-      ${host ? `<p><b>Host:</b> make a Host backup now. If this phone loses the app, the backup gets you back in without a new key.</p>
-        <button class="btn block" id="mk" type="button">Make a Host backup</button>` : ''}`,
+      ${host ? `<p><b>Admin:</b> make an Admin backup now. If this phone loses the app, the backup gets you back in without a new key.</p>
+        <button class="btn block" id="mk" type="button">Make an Admin backup</button>` : ''}`,
     onMount: ({ close, el }) => { $('#mk', el)?.addEventListener('click', () => close('backup')); },
   });
   LS.set('homeTip', 1);
   if (go === 'backup') location.hash = '#/backup';
 }
 
-// ------------------------------------------------ Host backup (RRA-035)
+// ------------------------------------------------ Admin backup (RRA-035)
 
 async function backupView() {
   if (!isHost()) { location.hash = '#/more'; return; }
   setChrome({ tab: 'more', back: true });
-  setTitle('Host backup');
+  setTitle('Admin backup');
   const list = (await access.hostBackups()).sort((a, b) => b.at - a.at);
   view.innerHTML = `
-    <p class="small">A Host backup lets you get back in as Host on a new phone, or after the app was removed, without adding a new key to the app.</p>
+    <p class="small">An Admin backup lets you get back in as Admin on a new phone, or after the app was removed, without adding a new key to the app.</p>
     <div class="card">
       <label class="field" style="margin-top:0"><span>Backup password</span><input type="password" id="b-pw" autocomplete="new-password"></label>
       <label class="field"><span>Password again</span><input type="password" id="b-pw2" autocomplete="new-password"></label>
@@ -271,7 +271,7 @@ async function backupView() {
       <button class="btn block" id="b-make" type="button">Make backup</button>
       <p id="b-err" class="small" style="color:var(--danger)"></p>
     </div>
-    <div class="hint small">Keep the backup somewhere only you can reach, such as Notes, your password app or an email to yourself. Anyone with the backup <b>and</b> the password can act as Host.</div>
+    <div class="hint small">Keep the backup somewhere only you can reach, such as Notes, your password app or an email to yourself. Anyone with the backup <b>and</b> the password can act as Admin.</div>
     <div class="section-label">Backups made on this phone</div>
     <div class="group">${list.length ? list.map((b) => `<div class="row"><span class="grow"><span class="title">${fmtDate(b.at)}</span><span class="sub">id ${esc(b.bid)}</span></span></div>`).join('') : '<div class="row muted">None yet.</div>'}</div>
     <p class="muted small">If a backup is lost or shared by mistake, send its id to the app's developer so it can be added to the revoked list.</p>`;
@@ -284,14 +284,14 @@ async function backupView() {
     try { res = await access.createHostBackup(profile, pw); }
     catch (e) { $('#b-err').textContent = e.message; btn.disabled = false; btn.textContent = 'Make backup'; return; }
     LS.set('backupAt', Date.now());
-    const text = `Bootleggers Kitchen Host backup (${res.bid}, ${new Date().toLocaleDateString()}). To restore: open the app from the home screen, tap "Restore from a Host backup", paste this and enter the password.\n${res.text}`;
+    const text = `Bootleggers Kitchen Admin backup (${res.bid}, ${new Date().toLocaleDateString()}). To restore: open the app from the home screen, tap "Restore from an Admin backup", paste this and enter the password.\n${res.text}`;
     await sheet({
       title: 'Backup ready', left: null, right: 'Done',
       body: `<p>Save this backup now. It is not kept anywhere else.</p>
         <button class="btn block" id="s" type="button">Save or send backup</button>
         <button class="btn plain block" id="c" type="button" style="margin-top:6px">Copy backup</button>`,
       onMount: ({ el }) => {
-        $('#s', el).onclick = () => share('Bootleggers Kitchen Host backup', text);
+        $('#s', el).onclick = () => share('Bootleggers Kitchen Admin backup', text);
         $('#c', el).onclick = () => copy(text, 'Backup copied');
       },
     });
@@ -301,9 +301,9 @@ async function backupView() {
 
 async function restoreSheet(prefill) {
   return sheet({
-    title: 'Restore Host', right: 'Restore',
-    body: `<p class="small">Paste your Host backup and enter its password.</p>
-      <textarea id="r-text" placeholder="Paste the Host backup" style="min-height:70px">${esc(prefill || '')}</textarea>
+    title: 'Restore Admin', right: 'Restore',
+    body: `<p class="small">Paste your Admin backup and enter its password.</p>
+      <textarea id="r-text" placeholder="Paste the Admin backup" style="min-height:70px">${esc(prefill || '')}</textarea>
       <button class="btn tonal small" id="r-paste" type="button" style="margin-top:6px">Paste</button>
       <label class="field"><span>Backup password</span><input type="password" id="r-pw" autocomplete="current-password"></label>
       <p id="r-err" class="small" style="color:var(--danger)"></p>`,
@@ -342,7 +342,7 @@ function aboutView() {
       <p><b>Access:</b> the app opens only on the phone a manager approved. It locks itself after ${INACTIVITY_DAYS} days without use.</p>
       <p><b>Install it:</b> on iPhone, tap Share, then Add to Home Screen. On Android, tap the menu, then Install app.</p>
       <p><b>Keep your access:</b> ${KEEP_TIP}</p>
-      <p><b>Lost access?</b> On the Invite only screen, tap <b>Ask to get back in</b> and send the request to a manager. The Host can restore from a Host backup instead.</p>
+      <p><b>Lost access?</b> On the Invite only screen, tap <b>Ask to get back in</b> and send the request to a manager. The Admin can restore from an Admin backup instead.</p>
     </div>
     <div class="group">
       <a class="row" href="#/whatsnew"><span class="grow">What's new</span></a>
@@ -534,13 +534,13 @@ async function lockedView(incoming) {
 
   if (ownerInfo && !ROOT_KEYS.includes(ownerInfo.pub)) {
     view.innerHTML = `
-      <h2>Host setup</h2>
-      <p>This phone made the Host key below. The app opens for you once this key is added to the app and published.</p>
+      <h2>Admin setup</h2>
+      <p>This phone made the Admin key below. The app opens for you once this key is added to the app and published.</p>
       <div class="card mono small">${esc(ownerInfo.pub)}</div>
-      <button class="btn block" id="copy" type="button">Copy Host key</button>
+      <button class="btn block" id="copy" type="button">Copy Admin key</button>
       <p class="muted small">The key is public: it lets other phones check that invites really come from you. The secret half never leaves this phone.</p>
       <button class="btn plain block" id="restart" type="button">Start over</button>`;
-    $('#copy').onclick = () => copy(ownerInfo.pub, 'Host key copied');
+    $('#copy').onclick = () => copy(ownerInfo.pub, 'Admin key copied');
     $('#restart').onclick = async () => { await store.wipe(); location.reload(); };
     return;
   }
@@ -551,7 +551,7 @@ async function lockedView(incoming) {
       ${pending.posted
         ? `<p><b>Step 1.</b> Done: your request went to the manager who invited you. They get a note in the app. If they don't see it, send it by text too.</p>
           <button class="btn tonal block" id="send" type="button">Send request by text</button>`
-        : `<p><b>Step 1.</b> Send your request to ${pending.restore ? 'a manager or the Host' : 'the manager who invited you'}.</p>
+        : `<p><b>Step 1.</b> Send your request to ${pending.restore ? 'a manager or the Admin' : 'the manager who invited you'}.</p>
           <p id="auto" class="small muted"></p>
           <button class="btn block" id="send" type="button">Send request</button>`}
       <p style="margin-top:18px"><b>Step 2.</b> Your manager will ask for this code. Read it to them:</p>
@@ -598,14 +598,14 @@ async function lockedView(incoming) {
       <button class="btn" id="go" type="button">Continue</button>
     </div>
     <p id="err" class="small" style="color:var(--danger)"></p>
-    ${ROOT_KEYS.length ? `<div class="card" style="margin-top:28px"><b>Had the app before?</b><p class="small muted">If this phone lost its access (for example, the app was removed), ask to get back in. A manager or the Host approves it, with no new invite.</p>
+    ${ROOT_KEYS.length ? `<div class="card" style="margin-top:28px"><b>Had the app before?</b><p class="small muted">If this phone lost its access (for example, the app was removed), ask to get back in. A manager or the Admin approves it, with no new invite.</p>
       <label class="field"><span>Your name</span><input type="text" id="rs-name" placeholder="As the team knows you" autocomplete="name"></label>
       <button class="btn tonal block" id="rs-go" type="button">Ask to get back in</button></div>` : ''}
-    <div class="card" style="margin-top:16px"><b>Host setup</b><p class="small muted">${ROOT_KEYS.length
-      ? `For the Host only. If the Host phone lost its key (for example, the app was removed and added again), make a new Host key here and send it in. It does nothing until it is added to the app.`
-      : `No Host key is set yet. If you are the Host (the app's administrator), set it up on your own phone${isIOS ? ', from the home screen app' : ''}.`}</p>
-      ${ROOT_KEYS.length ? '<button class="btn block" id="restore" type="button">Restore from a Host backup</button>' : ''}
-      <button class="btn tonal block" id="owner" type="button" style="margin-top:8px">I'm the Host: set up this phone</button></div>`;
+    <div class="card" style="margin-top:16px"><b>Admin setup</b><p class="small muted">${ROOT_KEYS.length
+      ? `For the Admin only. If the Admin phone lost its key (for example, the app was removed and added again), make a new Admin key here and send it in. It does nothing until it is added to the app.`
+      : `No Admin key is set yet. If you are the Admin (the app's administrator), set it up on your own phone${isIOS ? ', from the home screen app' : ''}.`}</p>
+      ${ROOT_KEYS.length ? '<button class="btn block" id="restore" type="button">Restore from an Admin backup</button>' : ''}
+      <button class="btn tonal block" id="owner" type="button" style="margin-top:8px">I'm the Admin: set up this phone</button></div>`;
   $('#rs-go')?.addEventListener('click', async () => {
     const n = $('#rs-name').value.trim();
     if (!n) { $('#rs-name').focus(); return; }
@@ -615,7 +615,7 @@ async function lockedView(incoming) {
   const doRestore = async (prefill) => {
     const p = await restoreSheet(prefill);
     if (!p) return;
-    profile = p; localStorage.removeItem('blg.expiredNotice'); toast('Welcome back, Host'); boot();
+    profile = p; localStorage.removeItem('blg.expiredNotice'); toast('Welcome back, Admin'); boot();
   };
   $('#restore')?.addEventListener('click', () => doRestore());
   $('#copy-in')?.addEventListener('click', () => copy(incoming, 'Code copied'));
@@ -636,10 +636,10 @@ async function lockedView(incoming) {
   if (incoming && !(isIOS && !standalone)) $('#go').click();
   $('#owner')?.addEventListener('click', async () => {
     const name = await sheet({
-      title: 'Host setup', right: 'Create key',
-      body: `<p>This makes the Host key on this phone. Only do this once, on the Host's own phone${isIOS ? ' (open the app from the home screen first)' : ''}.</p>
-        <label class="field"><span>Your name</span><input type="text" id="o-name" value="Host"></label>`,
-      onMount: (api) => { api.onRight = () => api.close($('#o-name', api.el).value.trim() || 'Host'); },
+      title: 'Admin setup', right: 'Create key',
+      body: `<p>This makes the Admin key on this phone. Only do this once, on the Admin's own phone${isIOS ? ' (open the app from the home screen first)' : ''}.</p>
+        <label class="field"><span>Your name</span><input type="text" id="o-name" value="Admin"></label>`,
+      onMount: (api) => { api.onRight = () => api.close($('#o-name', api.el).value.trim() || 'Admin'); },
     });
     if (!name) return;
     await access.ownerSetup(name);
@@ -737,6 +737,11 @@ async function boot() {
   await data.seed({ shared: sync.enabled(), host: profile.role === 'owner' });
   await ensureStaffFor(profile);
   await access.ensureTeamKey(profile);
+  // The Admin phone makes the pay key and shares its public half (RRA-055).
+  if (profile.role === 'owner' && await access.ensurePayKey(profile)) {
+    const s = await data.settings(); const pk = await access.payKeyInfo();
+    if (s.payPub !== pk.pub) await data.saveSettings({ ...s, payPub: pk.pub });
+  }
   if (!boot.wired) {
     boot.wired = true;
     if (access.can(profile, 'invite')) sync.onInbox(onRequest);

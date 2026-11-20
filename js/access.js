@@ -1,7 +1,7 @@
 // Invite-only access (RRA-018) and expiry (RRA-019). No server is needed.
 //
 // Every code is "BLG1.<kind>.<payload>.<signature>":
-//   inv  invite      signed by a Manager or Host device, valid for INVITE_HOURS
+//   inv  invite      signed by a Manager or Admin device, valid for INVITE_HOURS
 //   req  request     signed by the new phone's own device key
 //   act  activation  signed by the Manager, names the new phone's device key
 //
@@ -11,18 +11,18 @@
 // once, and an activation only works on the phone whose key it names, so a
 // forwarded invite or activation does not open the app anywhere else.
 //
-// Trust: an Host key is listed in config ROOT_KEYS. A Manager's activation
-// (signed by the Host) travels with every code that Manager signs ("chain").
+// Trust: an Admin key is listed in config ROOT_KEYS. A Manager's activation
+// (signed by the Admin) travels with every code that Manager signs ("chain").
 
 import { ROOT_KEYS, INVITE_HOURS, INACTIVITY_DAYS, ACCESS_URL } from './config.js';
-import { sign, verify, exportPublic, shortCode, randomId, textToB64u, b64uToText, sealTo, openFrom, b64uEnc, b64uDec, newTeamKeyBytes, newBackupKey, exportPrivate, importKeyPair, passwordSeal, passwordOpen } from './crypto.js';
+import { sign, verify, exportPublic, shortCode, randomId, textToB64u, b64uToText, sealTo, openFrom, b64uEnc, b64uDec, newTeamKeyBytes, newBackupKey, exportPrivate, importKeyPair, passwordSeal, passwordOpen , newPayKey, importDhPrivate } from './crypto.js';
 import * as store from './store.js';
 
 const LAST_USED = 'blg.lastUsed';
 const DAY = 86400000;
 
-// The internal key stays 'owner' so existing codes keep working; people see "Host".
-export const ROLES = { owner: 'Host', manager: 'Manager', chef: 'Chef', staff: 'Staff' };
+// The internal key stays 'owner' so existing codes keep working; people see "Admin".
+export const ROLES = { owner: 'Admin', manager: 'Manager', chef: 'Chef', staff: 'Staff' };
 const CAN_INVITE = ['owner', 'manager'];
 
 // Hook for RRA-002 (roles and permissions). Everyone can do everything that
@@ -66,7 +66,7 @@ export async function loadRevocations() {
   return revoked;
 }
 
-// Checks the signature and that the signer traces back to an Host key.
+// Checks the signature and that the signer traces back to an Admin key.
 // Returns the payload or throws an Error with a plain-language message.
 export async function check(code, kind) {
   const t = typeof code === 'string' ? parse(code) : code;
@@ -125,13 +125,16 @@ export async function approve(profile, request, role) {
   const { invite, dev } = request;
   if (request.restore) {
     if (!ROLES[role] || role === 'owner') throw new Error('Choose a role.');
-    if (role === 'manager' && !can(profile, 'invite.manager')) throw new Error('Only the Host can approve a manager.');
+    if (role === 'manager' && !can(profile, 'invite.manager')) throw new Error('Only the Admin can approve a manager.');
   }
   const payload = { iid: invite.iid, name: invite.name, role: request.restore ? role : invite.role, dev, iat: Date.now(), by: await myPublicKey() };
   if (profile.activation) payload.chain = profile.activation;
   // Hand over the team key for shared data, sealed so only the new phone can open it.
   const tk = await teamKeyBytes();
   if (tk && request.ek) payload.tk = await sealTo(request.ek, tk);
+  // Managers also get the pay key, which opens everyone's hours and pay rates.
+  const pk = await store.get('paykey');
+  if (pk && request.ek && payload.role === 'manager') payload.pk = await sealTo(request.ek, new TextEncoder().encode(JSON.stringify(pk)));
   const code = await signToken('act', payload);
   await store.put(`invite:${invite.iid}`, { ...invite, role: payload.role, status: 'approved', approved: Date.now(), deviceCode: request.deviceCode });
   return code;
@@ -152,7 +155,7 @@ export async function openRequest(box) {
 
 // ----- Staff restore (RRA-036) -----
 // A phone that lost its access asks again without an invite. Any manager or
-// the Host checks the device code with the person and approves it once.
+// the Admin checks the device code with the person and approves it once.
 
 async function readRestore(p) {
   const done = await store.get(`invite:${p.iid}`);
@@ -173,16 +176,16 @@ export async function requestRestore(name) {
   return pending;
 }
 
-// ----- Host backup (RRA-035) -----
-// The Host's own key never leaves the phone. A backup holds a second Host
-// key instead: made for the backup, signed by this Host phone, and sealed
-// with a password. Restoring it on any phone makes that phone a Host again,
+// ----- Admin backup (RRA-035) -----
+// The Admin's own key never leaves the phone. A backup holds a second Admin
+// key instead: made for the backup, signed by this Admin phone, and sealed
+// with a password. Restoring it on any phone makes that phone an Admin again,
 // with no new app release. Each backup has an id that can be revoked like an invite.
 
 const BACKUP_RE = /BLGBAK1\.([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/;
 
 export async function createHostBackup(profile, password) {
-  if (profile?.role !== 'owner') throw new Error('Only the Host can make a Host backup.');
+  if (profile?.role !== 'owner') throw new Error('Only the Admin can make an Admin backup.');
   const pair = await newBackupKey();
   const pub = await exportPublic(pair.publicKey);
   const bid = `host-${randomId(6)}`;
@@ -190,7 +193,7 @@ export async function createHostBackup(profile, password) {
   if (profile.activation) payload.chain = profile.activation;
   const act = await signToken('act', payload);
   const tk = await store.get('teamkey');
-  const sealed = await passwordSeal(password, { v: 1, act, priv: await exportPrivate(pair.privateKey), pub, tk: tk || null, name: profile.name });
+  const sealed = await passwordSeal(password, { v: 1, act, priv: await exportPrivate(pair.privateKey), pub, tk: tk || null, pk: (await store.get('paykey')) || null, name: profile.name });
   await store.put(`backup:${bid}`, { bid, at: Date.now() });
   return { bid, text: `BLGBAK1.${sealed}` };
 }
@@ -201,14 +204,15 @@ export const isBackupText = (text) => BACKUP_RE.test(String(text || ''));
 
 export async function restoreHostBackup(text, password) {
   const m = String(text || '').match(BACKUP_RE);
-  if (!m) throw new Error("That doesn't look like a Host backup.");
+  if (!m) throw new Error("That doesn't look like an Admin backup.");
   let b;
   try { b = await passwordOpen(password, m[1]); }
   catch { throw new Error('Wrong password, or the backup is damaged.'); }
   const p = await check(b.act, 'act');
-  if (p.role !== 'owner' || p.dev !== b.pub) throw new Error('This backup is not a Host backup.');
+  if (p.role !== 'owner' || p.dev !== b.pub) throw new Error('This backup is not an Admin backup.');
   await store.setDeviceKey(await importKeyPair(b.priv, b.pub));
   if (b.tk) await store.put('teamkey', b.tk);
+  if (b.pk) await store.put('paykey', b.pk);
   await store.del('pending');
   await store.del('owner-setup');
   const profile = { name: p.name, role: 'owner', iid: p.iid, activation: parse(b.act).raw, since: Date.now(), restored: true };
@@ -218,7 +222,7 @@ export async function restoreHostBackup(text, password) {
 }
 
 // ----- Team key (shared data, RRA-031) -----
-// One AES key for the whole team encrypts everything stored online. The Host
+// One AES key for the whole team encrypts everything stored online. The Admin
 // phone makes it; each approval passes it on, sealed to the new phone.
 
 export async function teamKeyBytes() {
@@ -232,6 +236,28 @@ export async function ensureTeamKey(profile) {
   await store.put('teamkey', b64uEnc(newTeamKeyBytes()));
   return true;
 }
+
+// ----- Pay key (RRA-055) -----
+// Everyone's hours and pay rates are sealed to this key in the shared data.
+// The Admin phone makes it; only managers get the private half, at approval.
+// Staff phones seal their own punches to its public half (settings.payPub).
+
+export async function ensurePayKey(profile) {
+  if (await store.get('paykey')) return true;
+  if (profile?.role !== 'owner') return false;
+  await store.put('paykey', await newPayKey());
+  return true;
+}
+export const payKeyInfo = () => store.get('paykey');
+let payPriv = null;
+export async function payPrivate() {
+  const k = await store.get('paykey');
+  if (!k) return null;
+  if (!payPriv || payPriv.pub !== k.pub) payPriv = { pub: k.pub, key: await importDhPrivate(k.priv) };
+  return payPriv.key;
+}
+// This phone's sealing key, so a manager's fix to your hours can reach you.
+export const myEcdhPublic = async () => exportPublic((await store.ecdhKey()).publicKey);
 
 // ----- New phone side -----
 
@@ -256,6 +282,9 @@ export async function activate(code) {
     try { await store.put('teamkey', b64uEnc(await openFrom((await store.ecdhKey()).privateKey, p.tk))); }
     catch { throw new Error('This activation was made for a different request. Ask your manager to approve your latest request.'); }
   }
+  if (p.pk) {
+    try { await store.put('paykey', JSON.parse(new TextDecoder().decode(await openFrom((await store.ecdhKey()).privateKey, p.pk)))); } catch { /* no pay key: time sheets show a note */ }
+  }
   const profile = { name: p.name, role: p.role, iid: p.iid, activation: parse(code).raw, since: Date.now() };
   await store.put('profile', profile);
   await store.del('pending');
@@ -263,7 +292,7 @@ export async function activate(code) {
   return profile;
 }
 
-// Host bootstrap: the first Host key is created on the Host's phone, then
+// Admin bootstrap: the first Admin key is created on the Admin's phone, then
 // added to ROOT_KEYS in config.js and published.
 export async function ownerSetup(name) {
   const pub = await myPublicKey();
@@ -278,14 +307,14 @@ export async function currentProfile() {
   const pub = await myPublicKey();
   if (ROOT_KEYS.includes(pub)) {
     const setup = await store.get('owner-setup');
-    return { name: setup?.name || 'Host', role: 'owner', since: setup?.at || Date.now() };
+    return { name: setup?.name || 'Admin', role: 'owner', since: setup?.at || Date.now() };
   }
   const profile = await store.get('profile');
   if (!profile) return null;
   try {
     await check(profile.activation, 'act');
   } catch {
-    return null; // revoked, or the Host key that signed it was replaced
+    return null; // revoked, or the Admin key that signed it was replaced
   }
   return profile;
 }

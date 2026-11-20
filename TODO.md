@@ -1,7 +1,7 @@
 # Restaurant Recipe App (RRA) — Build list
 
 Rule: every build item goes on the Build list and waits until Gaylan says "Build list". Nothing is built before then.
-Platform: a web app that works on iPhone and Android, like the VYBEON apps. Only a Manager can hand it out, through an invite. An invite can't be passed on by anyone else: it works once, on one device.
+Platform: a web app that works on iPhone and Android, like the VYBEON apps. Only a Manager or the Admin can hand it out, through an invite. An invite can't be passed on by anyone else: it works once, on one device.
 
 Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001-011/rra-previews.html. Gaylan approved them with changes on 2026-11-18 and ordered the build. Built in 0.2.0. Firebase config is in the app; shared data works once the rules are published (RRA-032).
 
@@ -14,6 +14,10 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 
 ## 🟣 Done
 ### 0.5.0 · build 2026.11.20-1
+- [x] RRA-059 · Pay: hourly rate per employee; Time sheets show hours, overtime (over 40 h at 1.5x), rate and pay, printable and as PDF for payroll. Everyone's hours and rates are sealed in shared data with a managers-only pay key made on the Admin phone; staff phones keep only their own hours · Feature · L
+- [x] RRA-060 · Admin sets each manager's access to time sheets and pay rates (No / See / Change) in Roles and permissions; only the Admin can change them · Feature · M
+- [x] RRA-061 · Rename the app's top position from Host to Admin everywhere (Host stays a front-of-house role); existing Admin phones keep full control · UX · S
+- [x] RRA-062 · Prep: when every task is checked off, Today's prep clears itself for the next shift (with Undo); Saved items refill it · UX · S
 - [x] RRA-058 · Stock: tabs at the top for food and non-food supplies (All, Food and bar, Cleaning and chemicals, Paper and to-go, Smallwares, Linens and uniforms), with starter items in each new section. Compared with the reference list (Gaylan's image, 2026-11-20); Equipment inventory is not included · Feature · M
 - [x] RRA-053 · Employee lounge: one section for staff that holds the bulletin board (Board messages), the schedule and tasks. Messaging and the schedule live in the lounge · Feature · L
 - [x] RRA-054 · One-tap Employee lounge button on the landing page, for every employee · UX · S

@@ -1,12 +1,13 @@
 // Employee lounge (RRA-053): the staff's home for the board, the schedule,
 // today's tasks and the time clock. One tap from the landing page (RRA-054).
 // Time clock and time sheets (RRA-055): staff clock in and out here; managers
-// and the Host see everyone's hours compiled by week, can fix a missed punch,
+// and the Admin see everyone's hours compiled by week, can fix a missed punch,
 // and print or send the time sheet for payroll.
 
 import * as data from './data.js';
 import { $, $$, esc, view, LS, sheet, toast, setTitle, setChrome, session, copy, isWide, chip } from './ui.js';
 import { canChange, canSee, myStaff, isHost, canTime } from './perms.js';
+import { payKeyInfo } from './access.js';
 import { unreadPosts } from './board.js';
 import { staffList, roleOf, pill } from './schedule.js';
 import { printButtons, wirePrint } from './pdf.js';
@@ -112,25 +113,38 @@ export async function loungeView() {
 
 // ------------------------------------------------------------ time sheets
 
-function personBlock(st, ps, wk, edit) {
+// Pay (RRA-055): hours over 40 in the week are overtime at 1.5 times the rate.
+const OT_AFTER = 40;
+const money = (n) => `$${(Math.round(n * 100) / 100).toFixed(2)}`;
+function pay(total, rate) {
+  const reg = Math.min(total, OT_AFTER); const ot = Math.max(0, total - OT_AFTER);
+  return { reg, ot, pay: rate ? reg * rate + ot * rate * 1.5 : null };
+}
+
+function personBlock(st, ps, wk, can, rate) {
+  const edit = !!can?.time;
   const total = ps.reduce((s, p) => s + punchHours(p), 0);
-  return { total, html: `<div class="group acc-body ts-body">${ps.map((p) => `<div class="row"${edit ? ` data-punch="${p.id}"` : ''}>
+  const pp = pay(total, rate);
+  return { total, ...pp, html: `<div class="group acc-body ts-body">${can?.rates ? `<button class="row nav" type="button" data-rate="${st.id}"><span class="grow"><span class="title">Hourly rate</span>
+      <span class="sub">${rate ? `${money(rate)} an hour · ${hrs(pp.reg)} regular${pp.ot ? ` + ${hrs(pp.ot)} overtime` : ''}` : 'Not set. Tap to add it.'}</span></span>
+      <span class="meta">${pp.pay !== null ? `<b>${money(pp.pay)}</b>` : ''}</span></button>` : ''}${ps.map((p) => `<div class="row"${edit ? ` data-punch="${p.id}"` : ''}>
       <span class="grow"><span class="title">${d(p.in)}</span><span class="sub">${t(p.in)} – ${p.out ? t(p.out) : 'on the clock'}${p.editedBy ? ` · fixed by ${esc(p.editedBy)}` : ''}</span></span>
       <span class="meta">${p.out ? hrs(punchHours(p)) : chip('Open', 'green')}</span></div>`).join('') || '<div class="row muted">No punches this week.</div>'}
       ${edit ? `<button class="row nav" type="button" data-addpunch="${st.id}"><span class="grow" style="color:var(--accent)">+ Add a missed shift</span></button>` : ''}</div>` };
 }
 
-function lines(people, wk) {
-  const out = [`Week of ${label(wk)} - ${label(addDays(wk, 6))}`, ''];
-  let grand = 0;
+function lines(people, wk, rates, withPay) {
+  const out = [`Week of ${label(wk)} - ${label(addDays(wk, 6))}`, ...(withPay ? [`Overtime: hours over ${OT_AFTER} in the week at 1.5x the rate`] : []), ''];
+  let grand = 0; let grandPay = 0;
   for (const { st, ps } of people) {
     const total = ps.reduce((s, p) => s + punchHours(p), 0);
-    grand += total;
-    out.push(`# ${st.name}${st.position ? ` (${st.position})` : ''}: ${hrs(total)}`);
+    const rate = rates[st.id]; const pp = pay(total, rate);
+    grand += total; grandPay += pp.pay || 0;
+    out.push(`# ${st.name}${st.position ? ` (${st.position})` : ''}: ${hrs(total)}${pp.ot ? ` (${hrs(pp.reg)} reg + ${hrs(pp.ot)} OT)` : ''}${withPay ? (rate ? ` x ${money(rate)}/h = ${money(pp.pay)}` : ' (no rate set)') : ''}`);
     for (const p of ps) out.push(`   ${d(p.in).padEnd(16)} ${t(p.in).padStart(8)} - ${(p.out ? t(p.out) : 'open').padStart(8)}   ${hrs(punchHours(p))}`);
     out.push('');
   }
-  out.push(`Total, all staff: ${hrs(grand)}`);
+  out.push(`Total, all staff: ${hrs(grand)}${withPay ? ` · pay ${money(grandPay)}` : ''}`);
   return out;
 }
 
@@ -142,7 +156,7 @@ export async function timesheetView() {
   if (!me) { view.innerHTML = '<div class="empty">Ask a manager to add you to the staff list to use the time clock.</div>'; return; }
   const wk = timesheetView.week || data.weekStart();
   const ps = (await punches()).filter((p) => p.staffId === me.id && inWeek(p, wk));
-  const { total, html } = personBlock(me, ps, wk, false);
+  const { total, html } = personBlock(me, ps, wk, null, 0);
   view.innerHTML = `${weekNav(wk)}
     <div class="ts-total card"><span class="muted small">Total this week</span><b>${hrs(total)}</b></div>
     ${html.replace('acc-body ', '')}
@@ -153,7 +167,7 @@ export async function timesheetView() {
 const weekNav = (wk) => `<div class="segmented"><button type="button" data-w="-7">‹ Last</button><button type="button" class="on">${label(wk)}–${label(addDays(wk, 6))}</button><button type="button" data-w="7">Next ›</button></div>`;
 const wireWeek = (wk, go) => $$('[data-w]', view).forEach((b) => { b.onclick = () => go(addDays(wk, +b.dataset.w)); });
 
-// Everyone's hours, compiled for managers and the Host.
+// Everyone's hours, compiled for managers and the Admin.
 export async function timesheetsView() {
   setChrome({ tab: 'lounge', back: true });
   setTitle('Time sheets');
@@ -170,19 +184,30 @@ export async function timesheetsView() {
   }
   const withHours = people.filter((x) => x.ps.length);
   const grand = all.reduce((s, p) => s + punchHours(p), 0);
+  // Pay rates live in their own records, locked with the pay key.
+  const seeRates = canSee('payrates');
+  const editRates = canChange('payrates');
+  const editTime = canChange('timesheets');
+  const rates = seeRates ? Object.fromEntries((await data.list('payrate')).filter((r) => +r.rate > 0).map((r) => [r.staffId || r.id, +r.rate])) : {};
+  const hasKey = !!(await payKeyInfo());
+  const blocks = people.map(({ st, ps }) => ({ st, ps, b: personBlock(st, ps, wk, { time: editTime, rates: seeRates }, rates[st.id]) }));
+  const grandPay = blocks.reduce((s, x) => s + (x.b.pay || 0), 0);
+  const noRate = blocks.filter((x) => x.ps.length && !rates[x.st.id]).length;
   const dayHours = (ps, i) => ps.filter((p) => p.in >= weekMs(addDays(wk, i)) && p.in < weekMs(addDays(wk, i)) + DAY).reduce((s, p) => s + punchHours(p), 0);
   const open = LS.get('tsOpen', null);
   view.innerHTML = `${weekNav(wk)}
-    <div class="ts-total card"><span class="muted small">All staff this week</span><b>${hrs(grand)}</b><span class="muted small">${withHours.length} of ${staff.length} people clocked in</span></div>
-    ${isWide() ? `<div class="wtable-wrap"><table class="wtable"><thead><tr><th>Employee</th>${DAYS.map((dn, i) => `<th class="num">${dn} ${addDays(wk, i).slice(8)}</th>`).join('')}<th class="num">Total</th></tr></thead>
-      <tbody>${people.map(({ st, ps }) => `<tr><td>${esc(st.name)}</td>${DAYS.map((_, i) => { const h = dayHours(ps, i); return `<td class="num">${h ? h.toFixed(2) : '<span class="muted">—</span>'}</td>`; }).join('')}<td class="num"><b>${hrs(ps.reduce((s, p) => s + punchHours(p), 0))}</b></td></tr>`).join('')}</tbody></table></div>
+    ${hasKey ? '' : '<div class="hint small">This phone doesn\'t have the pay key yet, so it shows only hours made on this phone. A phone approved as Manager by the Admin gets it.</div>'}
+    <div class="ts-total card"><div class="ts-row"><div><span class="muted small">Hours this week</span><b>${hrs(grand)}</b></div>${seeRates ? `<div><span class="muted small">Payroll this week</span><b>${money(grandPay)}</b></div>` : ''}</div>
+      <span class="muted small">${withHours.length} of ${staff.length} people clocked in${seeRates && noRate ? ` · ${noRate} without an hourly rate` : ''}${seeRates ? ` · overtime after ${OT_AFTER} h at 1.5×` : ''}</span></div>
+    ${isWide() ? `<div class="wtable-wrap"><table class="wtable"><thead><tr><th>Employee</th>${DAYS.map((dn, i) => `<th class="num">${dn} ${addDays(wk, i).slice(8)}</th>`).join('')}<th class="num">Hours</th><th class="num">OT</th>${seeRates ? '<th class="num">Rate</th><th class="num">Pay</th>' : ''}</tr></thead>
+      <tbody>${blocks.map(({ st, ps, b }) => `<tr><td>${esc(st.name)}</td>${DAYS.map((_, i) => { const h = dayHours(ps, i); return `<td class="num">${h ? h.toFixed(2) : '<span class="muted">—</span>'}</td>`; }).join('')}<td class="num"><b>${b.total.toFixed(2)}</b></td><td class="num">${b.ot ? b.ot.toFixed(2) : '—'}</td>${seeRates ? `<td class="num">${rates[st.id] ? money(rates[st.id]) : '<span class="muted">—</span>'}</td><td class="num"><b>${b.pay !== null ? money(b.pay) : '—'}</b></td>` : ''}</tr>`).join('')}</tbody></table></div>
       <div class="section-label">Punches</div>` : ''}
-    ${people.map(({ st, ps }) => { const b = personBlock(st, ps, wk, true); return `
-      <button class="acc-head${open === st.id ? ' open' : ''}" type="button" data-g="${st.id}"><span class="grow">${esc(st.name)}</span><span class="meta">${hrs(b.total)}</span></button>
-      ${b.html.replace('<div class="group acc-body ts-body">', `<div class="group acc-body ts-body"${open === st.id ? '' : ' hidden'}>`)}`; }).join('') || '<div class="empty">No staff yet.</div>'}
+    ${blocks.map(({ st, b }) => `
+      <button class="acc-head${open === st.id ? ' open' : ''}" type="button" data-g="${st.id}"><span class="grow">${esc(st.name)}</span><span class="meta">${hrs(b.total)}${b.pay !== null ? ` · ${money(b.pay)}` : ''}</span></button>
+      ${b.html.replace('<div class="group acc-body ts-body">', `<div class="group acc-body ts-body"${open === st.id ? '' : ' hidden'}>`)}`).join('') || '<div class="empty">No staff yet.</div>'}
     ${printButtons()}
     <button class="btn plain block no-print" id="copy" type="button">Copy to send</button>
-    <p class="muted small center">Tap a punch to fix a time. Totals count open punches up to now.</p>`;
+    <p class="muted small center">${editTime ? 'Tap a punch to fix a time. ' : ''}${editRates ? 'Tap the hourly rate to change it. ' : ''}Totals count open punches up to now. Only managers the Admin allows can see this page.</p>`;
   wireWeek(wk, (w) => { timesheetsView.week = w; timesheetsView(); });
   $$('.acc-head', view).forEach((h) => {
     h.onclick = () => {
@@ -193,8 +218,24 @@ export async function timesheetsView() {
     };
   });
   const title = `Time sheets - week of ${label(wk)}`;
-  wirePrint({ $, title, mono: true, getLines: () => lines(withHours, wk) });
-  $('#copy').onclick = () => copy(lines(withHours, wk).join('\n'), 'Time sheet copied');
+  wirePrint({ $, title, mono: true, getLines: () => lines(withHours, wk, rates, seeRates) });
+  $('#copy').onclick = () => copy(lines(withHours, wk, rates, seeRates).join('\n'), 'Time sheet copied');
+  $$('[data-rate]', view).forEach((b) => {
+    b.onclick = async () => {
+      if (!editRates) { toast('Only the Admin can let you change rates'); return; }
+      const st = people.find((x) => x.st.id === b.dataset.rate).st;
+      const v = await sheet({
+        title: `${st.name} · hourly rate`, right: 'Save',
+        body: `<label class="field"><span>Dollars an hour</span><input type="text" inputmode="decimal" id="rt" value="${rates[st.id] ?? ''}" placeholder="e.g. 15.50"></label>
+          <p class="muted small">Only managers and the Admin can see rates. They are locked in the shared data so staff phones can't open them.</p>`,
+        onMount: (api) => { api.onRight = () => api.close({ v: $('#rt', api.el).value.trim().replace('$', '') }); },
+      });
+      if (!v) return;
+      await data.put('payrate', { id: st.id, staffId: st.id, rate: v.v === '' ? '' : +v.v || 0 });
+      toast('Rate saved');
+      timesheetsView();
+    };
+  });
   $$('[data-punch]', view).forEach((row) => { row.onclick = () => punchDialog(all.find((p) => p.id === row.dataset.punch)); });
   $$('[data-addpunch]', view).forEach((b) => {
     b.onclick = () => { const st = people.find((x) => x.st.id === b.dataset.addpunch).st; punchDialog(null, st, wk); };

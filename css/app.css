@@ -547,3 +547,5 @@ dialog.sheet[open] { animation: rise 0.28s cubic-bezier(.2,.8,.2,1); display: fl
 .cat-tabs i { font-style: normal; display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 9px; background: color-mix(in srgb, var(--c-orange) 22%, transparent); color: var(--c-orange); font-size: .75rem; }
 .cat-tabs button.on i { background: rgba(255,255,255,.25); color: #fff; }
 @media (min-width: 768px) { .cat-tabs { margin: 2px 0 6px; padding: 4px 0 6px; flex-wrap: wrap; } }
+.ts-row { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 4px; }
+.ts-row > div { display: flex; flex-direction: column; }

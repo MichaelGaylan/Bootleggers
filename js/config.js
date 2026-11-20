@@ -10,7 +10,11 @@ export const WHATS_NEW = [
     version: '0.5.0', build: '2026.11.20-1', date: '2026-11-20',
     lines: [
       'New Employee lounge: the time clock, your week of shifts, today\'s tasks and the bulletin board in one place. One tap from the first screen, and it replaces the Board tab.',
-      'Time clock: clock in and out in the lounge. Managers and the Host get Time sheets with everyone\'s hours by week, can fix a missed punch, and can print or send them for payroll.',
+      'Time clock: clock in and out in the lounge. Managers and the Admin get Time sheets with everyone\'s hours by week, can fix a missed punch, and can print or send them for payroll.',
+      'The app\'s top position is now called Admin, so it isn\'t confused with the Host stand. Your phone and computer stay Admin with full control.',
+      'Pay: managers and the Admin can set an hourly rate for each person. Time sheets show hours, overtime after 40 hours, rate and pay, and print or send for payroll. Hours and rates are locked so staff phones can\'t open anyone else\'s.',
+      'The Admin sets what each manager can do with time sheets and pay rates (No, See or Change) in Roles and permissions.',
+      'Prep: when every task is checked off, the list clears itself for the next shift (with Undo). Saved items fill it again with one tap each.',
       'Stock has tabs at the top: Food and bar, Cleaning, Paper and to-go, Smallwares, and Linens and uniforms, with starter items in each.',
       'Prep: in Edit, tap an item to change it. Saved items at the bottom put an item back on the list with one tap.',
       'Tablets and computers get their own layout: a sidebar with every section, all sections open, and stock and dishes as wide tables.',
@@ -34,7 +38,7 @@ export const WHATS_NEW = [
   {
     version: '0.4.0', build: '2026.11.19-2', date: '2026-11-19',
     lines: [
-      'Managers can invite Staff or Chef. Only the Host can invite a Manager.',
+      'Managers can invite Staff or Chef. Only the Admin can invite a Manager.',
       'Stock count: the Save button floats at the top, above the search, and shows how many items changed.',
       'Stock sections stay closed until you tap one. Opening another closes the first.',
       'Print the schedule for 1 to 8 weeks at once (Schedule → Print schedule).',
@@ -49,26 +53,26 @@ export const WHATS_NEW = [
   {
     version: '0.3.0', build: '2026.11.18-7', date: '2026-11-18',
     lines: [
-      'Host backup: save a password-protected backup once, and restore Host on any phone without a new key (More → Host backup).',
-      'Lost access? Tap "Ask to get back in" and a manager or the Host lets you back in, with no new invite.',
+      'Admin backup: save a password-protected backup once, and restore Admin on any phone without a new key (More → Admin backup).',
+      'Lost access? Tap "Ask to get back in" and a manager or the Admin lets you back in, with no new invite.',
       'A reminder to always open the app from its home screen icon, so your access stays saved.',
     ],
   },
   {
     version: '0.2.4', build: '2026.11.18-6', date: '2026-11-18',
-    lines: ['New Host key for the Host phone, so it opens as Host again.'],
+    lines: ['New Admin key for the Admin phone, so it opens as Admin again.'],
   },
   {
     version: '0.2.3', build: '2026.11.18-5', date: '2026-11-18',
-    lines: ['The Host can always set up a new Host key from the Invite only screen, so the Host phone cannot be locked out.'],
+    lines: ['The Admin can always set up a new Admin key from the Invite only screen, so the Admin phone cannot be locked out.'],
   },
   {
     version: '0.2.2', build: '2026.11.18-4', date: '2026-11-18',
-    lines: ['Fixes the Host phone staying on the setup screen after an update. Updates now install by themselves.'],
+    lines: ['Fixes the Admin phone staying on the setup screen after an update. Updates now install by themselves.'],
   },
   {
     version: '0.2.1', build: '2026.11.18-3', date: '2026-11-18',
-    lines: ['The Host phone is set up, so managers can now send invites.'],
+    lines: ['The Admin phone is set up, so managers can now send invites.'],
   },
   {
     version: '0.2.0', build: '2026.11.18-2', date: '2026-11-18',
@@ -78,7 +82,7 @@ export const WHATS_NEW = [
       "Today's prep list by station, ticked off as you go.",
       'Stock counts with par levels, a needed list and order guides by vendor.',
       'Message board, schedule with swap requests, event sheets (BEOs), costs and waste log.',
-      'Settings for staff, roles and permissions, vendors, stock items, stations and menu sections. Owner is now Host.',
+      'Settings for staff, roles and permissions, vendors, stock items, stations and menu sections. Owner is now Admin.',
       'Shared team data through Firebase, encrypted on each phone with a team key that only invited phones receive.',
     ],
   },
@@ -90,11 +94,11 @@ export const WHATS_NEW = [
   },
 ];
 
-// Public keys (base64url, raw P-256) of the Host device(s): the app's administrator. Only invites that
+// Public keys (base64url, raw P-256) of the Admin device(s): the app's administrator. Only invites that
 // trace back to one of these keys can open the app. Empty = the app offers
-// "Host setup" so the first Host key can be created on the Host's phone.
+// "Admin setup" so the first Admin key can be created on the Admin's phone.
 export const ROOT_KEYS = [
-  'BK1NN42HvfwbPZ0vGQp_H7geN30lY-lD1ZNdNhKz160oBRAAbSIaBX2cYpCWsxONq61DIEnX9SkcJ3b51zqDPUA', // Host phone (home screen app), added 2026-11-18; replaces the lost key
+  'BK1NN42HvfwbPZ0vGQp_H7geN30lY-lD1ZNdNhKz160oBRAAbSIaBX2cYpCWsxONq61DIEnX9SkcJ3b51zqDPUA', // Admin phone (home screen app), added 2026-11-18; replaces the lost key
 ];
 
 // Access ends after this many days without opening the app (RRA-019).

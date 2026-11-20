@@ -37,7 +37,7 @@ export async function prepView() {
     saved = (await data.list('prepsaved')).sort(data.byName);
   }
   const onList = new Set(items.map((i) => savedKey(i.name)));
-  const savedOpen = LS.get('prepSavedOpen', false);
+  const savedOpen = LS.get('prepSavedOpen', false) || !items.length;
   view.innerHTML = `
     <p class="muted small">${new Date().toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}${total ? ` · ${finished} of ${total} done` : ''}</p>
     ${order.filter((s) => byStation[s]).map((s) => `
@@ -48,7 +48,7 @@ export async function prepView() {
           ${editing ? `<button class="rm" type="button" data-rm="${i.id}" aria-label="Remove">−</button>` : '<span class="chk"></span>'}
           <span class="grow"><span class="title">${esc(i.name)}</span>${d && !editing ? `<span class="sub">${esc(d.by)} · ${new Date(d.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>` : ''}</span>
           <span class="meta">${esc(i.amount || '')}</span>${editing ? '<span class="chev">›</span>' : ''}</div>`;
-      }).join('')}</div>`).join('') || `<div class="empty">No prep items yet.${change ? '<br>Tap <b>Edit</b> to add what gets prepped each day.' : ''}</div>`}
+      }).join('')}</div>`).join('') || `<div class="empty">${done.clearedAt ? `All prep done${done.clearedBy ? ` (finished by ${esc(done.clearedBy)})` : ''}. The list is ready for the next shift.` : 'No prep items yet.'}${change ? `<br>${saved.length ? 'Tap items in <b>Saved items</b> below to fill it, or tap <b>Edit</b> to add new ones.' : 'Tap <b>Edit</b> to add what gets prepped.'}` : ''}</div>`}
     ${editing ? '<button class="btn tonal block" id="add" type="button">+ Add prep item</button><p class="muted small">Tap an item to change it. Stations are set in Settings → Prep stations.</p>' : total ? `<p class="muted small center">Tap an item when it's done. The list starts fresh each day.${change ? ' To change an item, tap Edit, then tap the item.' : ''}</p>` : ''}
     ${change && saved.length ? `<details class="saved" id="saved"${savedOpen ? ' open' : ''}>
       <summary><span class="grow">Saved items</span><span class="meta">${saved.length}</span></summary>
@@ -81,6 +81,18 @@ export async function prepView() {
         const id = row.dataset.id;
         if (done.done[id]) delete done.done[id]; else done.done[id] = { by: session.profile.name, at: Date.now() };
         await data.put('prepday', done);
+        // Everything done: the list clears itself for the next shift. Items
+        // stay in Saved items, so refilling is one tap each.
+        if (items.length && items.every((i) => done.done[i.id])) {
+          const cleared = items.map((i) => ({ ...i }));
+          for (const i of cleared) { await remember(i); await data.remove('prepitem', i.id); }
+          done.done = {}; done.clearedAt = Date.now(); done.clearedBy = session.profile.name;
+          await data.put('prepday', done);
+          toast('All prep done! The list is cleared for the next shift.', {
+            label: 'Undo',
+            run: async () => { for (const i of cleared) await data.put('prepitem', i); prepView(); },
+          });
+        }
         prepView();
       };
     });

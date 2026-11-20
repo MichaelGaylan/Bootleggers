@@ -2,8 +2,8 @@
 
 import * as data from './data.js';
 import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session, isWide } from './ui.js';
-import { canChange, myStaff, isHost } from './perms.js';
-import { ROLES } from './access.js';
+import { canChange, myStaff, isHost, canTime, level } from './perms.js';
+import { ROLES, myEcdhPublic } from './access.js';
 import { printButtons, wirePrint } from './pdf.js';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -211,15 +211,21 @@ export async function staffView() {
 
 async function staffDialog(existing) {
   const s = existing ? { ...existing } : { name: '', position: 'Line cook', role: 'staff' };
+  // Pay rates (RRA-055): managers and the Admin only, kept apart from the staff list.
+  const seeRate = canTime() && level('payrates') !== 'none';
+  const pay = seeRate && existing ? await data.get('payrate', existing.id) : null;
+  let rate = pay?.rate ?? '';
   const ok = await sheet({
     title: existing ? 'Staff member' : 'Add staff', right: 'Save',
     body: `<label class="field"><span>Name</span><input type="text" id="st-n" value="${esc(s.name)}" placeholder="Name as it appears on their invite"></label>
       <label class="field"><span>Position</span><select id="st-p">${POSITIONS.map((p) => `<option ${p === s.position ? 'selected' : ''}>${p}</option>`).join('')}</select></label>
-      <label class="field"><span>App role</span><select id="st-r">${['staff', 'chef', 'manager'].map((r) => `<option value="${r}" ${r === s.role ? 'selected' : ''}>${ROLES[r]}</option>`).join('')}</select></label>`,
-    onMount: (api) => { api.onRight = () => { const n = $('#st-n', api.el).value.trim(); if (!n) return; Object.assign(s, { name: n, position: $('#st-p', api.el).value, role: $('#st-r', api.el).value }); api.close(true); }; },
+      <label class="field"><span>App role</span><select id="st-r">${['staff', 'chef', 'manager'].map((r) => `<option value="${r}" ${r === s.role ? 'selected' : ''}>${ROLES[r]}</option>`).join('')}</select></label>
+      ${seeRate ? `<label class="field"><span>Hourly rate (only managers the Admin allows see this)</span><input type="text" inputmode="decimal" id="st-rate" value="${esc(rate)}" placeholder="$ per hour"${canChange('payrates') ? '' : ' readonly'}></label>` : ''}`,
+    onMount: (api) => { api.onRight = () => { const n = $('#st-n', api.el).value.trim(); if (!n) return; Object.assign(s, { name: n, position: $('#st-p', api.el).value, role: $('#st-r', api.el).value }); if ($('#st-rate', api.el)) rate = $('#st-rate', api.el).value.trim().replace('$', ''); api.close(true); }; },
   });
   if (!ok) return;
   await data.put('staff', s);
+  if (seeRate && canChange('payrates') && String(rate) !== String(pay?.rate ?? '')) await data.put('payrate', { id: s.id, staffId: s.id, rate: rate === '' ? '' : +rate || 0 });
   staffView();
 }
 
@@ -227,8 +233,10 @@ export async function ensureStaffFor(profile) {
   // The person using this phone is on the staff list once they have access.
   if (!profile || profile.role === 'owner') return;
   const staff = await staffList();
-  if (staff.some((s) => (s.iid && s.iid === profile.iid) || s.name === profile.name)) return;
-  await data.put('staff', { name: profile.name, position: profile.role === 'manager' ? 'Manager' : profile.role === 'chef' ? 'Chef' : 'Line cook', role: profile.role, iid: profile.iid });
+  const ek = await myEcdhPublic(); // so a manager's fix to my hours reaches this phone
+  const mine = staff.find((s) => (s.iid && s.iid === profile.iid)) || staff.find((s) => s.name === profile.name);
+  if (mine) { if (mine.ek !== ek) await data.put('staff', { ...mine, ek }); return; }
+  await data.put('staff', { name: profile.name, position: profile.role === 'manager' ? 'Manager' : profile.role === 'chef' ? 'Chef' : 'Line cook', role: profile.role, iid: profile.iid, ek });
 }
 
 // ------------------------------------------------- print several weeks (RRA-042)

@@ -1,4 +1,4 @@
-// The Bootleggers menu, as sent by the Host on 2026-11-19.
+// The Bootleggers menu, as sent by the Admin on 2026-11-19.
 // applyMenu() adds each item to the Recipe archive once, under its menu
 // section with its menu price, and brings the stock list in line with it.
 
@@ -53,7 +53,7 @@ export const MENU_SECTIONS = MENU.map((m) => m.section);
 const OLD_DEFAULT_SECTIONS = ['Wings', 'Burgers', 'Sandwiches', 'Baskets', 'Salads', 'Appetizers', 'Sides', 'Desserts'];
 const key = (s) => String(s || '').trim().toLowerCase();
 
-// Runs once per menu version, on the Host phone (or on a phone-only setup).
+// Runs once per menu version, on the Admin phone (or on a phone-only setup).
 export async function applyMenu({ shared = false, host = false } = {}) {
   if (shared && !host) return;
   if ((await store.get('menu'))?.version === MENU_VERSION) return;
@@ -96,7 +96,7 @@ export async function applyMenu({ shared = false, host = false } = {}) {
 }
 
 // Preset vendors (RRA-044): common food-service suppliers for what Bootleggers
-// stocks. Added once on the Host phone; edit or take out any you don't use.
+// stocks. Added once on the Admin phone; edit or take out any you don't use.
 export const PRESET_VENDORS = [
   ['Sysco', 'Broadline: proteins, frozen, dairy, produce, dry goods, paper'],
   ['US Foods', 'Broadline: proteins, frozen, dairy, produce, dry goods, paper'],
@@ -122,7 +122,7 @@ export async function applyVendors({ shared = false, host = false } = {}) {
 }
 
 // Non-food supplies (RRA-058): adds the starter supplies to a list made
-// before they existed. Runs once, on the Host phone when data is shared.
+// before they existed. Runs once, on the Admin phone when data is shared.
 const SUPPLIES_VERSION = 1;
 export async function applySupplies({ shared = false, host = false } = {}) {
   if (shared && !host) return;

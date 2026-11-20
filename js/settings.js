@@ -2,7 +2,7 @@
 
 import * as data from './data.js';
 import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session } from './ui.js';
-import { AREAS, ROLE_DEFAULTS, level, canChange, isHost } from './perms.js';
+import { AREAS, PAY_AREAS, ROLE_DEFAULTS, level, canChange, isHost } from './perms.js';
 import { ROLES, can as canAccess } from './access.js';
 import { staffList } from './schedule.js';
 import { INACTIVITY_DAYS } from './config.js';
@@ -41,7 +41,7 @@ export async function settingsView() {
       <a class="row" href="#/about"><span class="grow">About</span></a>
       <a class="row" href="#/report"><span class="grow">Report a problem</span></a>
     </div>
-    <p class="muted small center">${edit ? 'You can change Settings.' : 'Only the Host, and people the Host allows, can change Settings.'}</p>`;
+    <p class="muted small center">${edit ? 'You can change Settings.' : 'Only the Admin, and people the Admin allows, can change Settings.'}</p>`;
   $('#popups')?.addEventListener('click', async () => { if (!edit) return; s.popups = s.popups === false; await data.saveSettings(s); settingsView(); });
   $('#target')?.addEventListener('click', async () => {
     const v = await sheet({
@@ -82,20 +82,20 @@ export async function rolesView() {
   const staff = await staffList();
   view.innerHTML = `
     <div class="group">
-      <a class="row" href="#/person/host"><span class="grow"><span class="title">Host</span><span class="sub">App administrator · full control</span></span></a>
+      <a class="row" href="#/person/host"><span class="grow"><span class="title">Admin</span><span class="sub">App administrator · full control</span></span></a>
       ${staff.map((s) => `<a class="row" href="#/person/${s.id}"><span class="grow"><span class="title">${esc(s.name)}</span><span class="sub">${esc(ROLES[s.role] || 'Staff')}${s.perms ? ' · custom' : ''}</span></span></a>`).join('')}
     </div>
-    <p class="muted small">The Host is above every other role, and nobody can lower or remove it. Everyone else starts from their role. Tap a person to change what they can see or change.</p>`;
+    <p class="muted small">The Admin is above every other role, and nobody can lower or remove it. Everyone else starts from their role. Tap a person to change what they can see or change.</p>`;
 }
 
 export async function personView(id) {
   setChrome({ tab: 'more', back: true });
   if (id === 'host') {
-    setTitle('Host');
+    setTitle('Admin');
     view.innerHTML = `
-      <p><span class="chip">Host · full control</span></p>
-      <div class="card small">The Host can see and change everything, set everyone's permissions, hand out invites and change Settings. This can't be lowered. The Host is the phone whose key is built into the app.</div>
-      <div class="group">${Object.values(AREAS).map((a) => `<div class="row"><span class="grow">${a}</span><span class="meta">Change</span></div>`).join('')}</div>`;
+      <p><span class="chip">Admin · full control</span></p>
+      <div class="card small">The Admin can see and change everything, set everyone's permissions, hand out invites and change Settings. This can't be lowered. The Admin is the phone whose key is built into the app.</div>
+      <div class="group">${[...Object.values(AREAS), ...Object.values(PAY_AREAS)].map((a) => `<div class="row"><span class="grow">${a}</span><span class="meta">Change</span></div>`).join('')}</div>`;
     return;
   }
   const s = await data.get('staff', id);
@@ -111,14 +111,27 @@ export async function personView(id) {
       return `<div class="row"><span class="grow">${a}</span>
         <div class="segmented" style="margin:0;width:170px;flex:none">${opts.map((o) => `<button type="button" data-k="${k}" data-v="${o}" class="${cur === o ? 'on' : ''}" ${edit ? '' : 'disabled'}>${names[o]}</button>`).join('')}</div></div>`;
     }).join('')}</div>
+    <div class="section-label">Pay and hours · set by the Admin</div>
+    <div class="group">${Object.entries(PAY_AREAS).map(([k, a]) => {
+      const cur = level(k, s);
+      return s.role === 'manager' ? `<div class="row"><span class="grow">${a}</span>
+        <div class="segmented" style="margin:0;width:170px;flex:none">${opts.map((o) => `<button type="button" data-k="${k}" data-v="${o}" class="${cur === o ? 'on' : ''}" ${isHost() ? '' : 'disabled'}>${names[o]}</button>`).join('')}</div></div>`
+        : `<div class="row"><span class="grow">${a}</span><span class="meta">Managers only</span></div>`;
+    }).join('')}</div>
+    <p class="muted small">${s.role === 'manager' ? (isHost() ? 'Only you, the Admin, can change these. See lets a manager look; Change lets them fix punches or set rates.' : 'Only the Admin can change these.') : 'Staff and chefs only ever see their own hours, never anyone else\'s or any pay rates.'}</p>
     ${edit && s.perms ? '<button class="btn plain block" id="reset" type="button">Reset to role defaults</button>' : ''}
     <p class="muted small">Starting point for ${esc(ROLES[s.role] || 'Staff')}: ${Object.entries(ROLE_DEFAULTS[s.role] || ROLE_DEFAULTS.staff).filter(([, v]) => v === 'change').map(([k]) => AREAS[k]).join(', ') || 'see only'} can be changed.</p>`;
   $$('[data-k]', view).forEach((b) => {
     b.onclick = async () => {
+      if (b.dataset.k in PAY_AREAS && !isHost()) return;
       s.perms = { ...(s.perms || {}), [b.dataset.k]: b.dataset.v };
       await data.put('staff', s);
       personView(id);
     };
   });
-  $('#reset')?.addEventListener('click', async () => { delete s.perms; await data.put('staff', s); toast('Back to role defaults'); personView(id); });
+  $('#reset')?.addEventListener('click', async () => {
+    // Pay and hours settings stay unless the Admin resets them.
+    const keep = !isHost() && s.perms ? Object.fromEntries(Object.entries(s.perms).filter(([k]) => k in PAY_AREAS)) : null;
+    if (keep && Object.keys(keep).length) { s.perms = keep; await data.put('staff', s); toast('Back to role defaults'); personView(id); return; }
+    delete s.perms; await data.put('staff', s); toast('Back to role defaults'); personView(id); });
 }
