@@ -5,6 +5,7 @@ import * as data from './data.js';
 import { $, $$, esc, view, LS, sheet, toast, setTitle, setChrome, fmtDate, session, isWide, chip, searchBox } from './ui.js';
 import { canChange, canSee } from './perms.js';
 import { printButtons, wirePrint } from './pdf.js';
+import { loungeButton } from './lounge.js';
 
 const CATEGORIES = ['Rub', 'Sauce', 'Dressing', 'Marinade', 'Other'];
 const all = async () => (await data.list('recipe')).sort(data.byName);
@@ -30,6 +31,7 @@ export async function recipesView() {
   const keys = Object.keys(groups).sort((a, b) => (order.indexOf(a) + 99) % 99 - (order.indexOf(b) + 99) % 99);
   // One section open at a time, like Stock count (RRA-047). Kept per tab.
   const openKey = (recipesView.open || {})[kind];
+  const lounge = await loungeButton(); // RRA-054: one tap to the lounge
   const costs = canSee('costs');
   const nameOf = (id) => list.find((x) => x.id === id)?.name;
   // Tablet and computer (RRA-051): wide tables with every section open.
@@ -45,7 +47,7 @@ export async function recipesView() {
         ${groups[g].map((r) => `<tr data-href="#/recipe/${r.id}"><td><span class="link">${esc(r.name)}</span></td><td>${chip('Sub recipe', 'purple')}</td>
           <td>${esc(r.yield || '—')}</td><td>${esc(r.storage || '—')}</td><td class="num">${list.filter((x) => (x.uses || []).includes(r.id)).length || '—'}</td></tr>`).join('')}</tbody>`).join('')}`}
     </table></div>`;
-  view.innerHTML = `
+  view.innerHTML = `${lounge}
     <div class="segmented" role="tablist">
       <button data-k="dish" class="${kind === 'dish' ? 'on' : ''}" type="button">Dishes</button>
       <button data-k="house" class="${kind === 'house' ? 'on' : ''}" type="button">House recipes</button>

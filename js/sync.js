@@ -15,7 +15,7 @@ import { b64uEnc, b64uDec, importTeamKey } from './crypto.js';
 import { teamKeyBytes, ensureTeamKey } from './access.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
-const COLLS = ['recipe', 'stock', 'vendor', 'staff', 'prepitem', 'prepday', 'post', 'week', 'swap', 'event', 'waste', 'settings'];
+const COLLS = ['recipe', 'stock', 'vendor', 'staff', 'prepitem', 'prepday', 'post', 'week', 'swap', 'event', 'waste', 'punch', 'prepsaved', 'settings'];
 const te = new TextEncoder();
 const td = new TextDecoder();
 

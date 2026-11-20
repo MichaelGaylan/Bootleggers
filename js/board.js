@@ -21,7 +21,7 @@ export async function unreadPosts() {
 }
 
 export async function boardView() {
-  setChrome({ tab: 'board' });
+  setChrome({ tab: 'lounge', back: true });
   setTitle('Message board');
   const ch = LS.get('boardChannel', 'all');
   const posts = (await data.list('post')).filter((p) => (ch === 'all' ? true : p.channel === ch) && (p.channel !== 'managers' || inManagers())).sort((a, b) => b.at - a.at);

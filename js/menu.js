@@ -4,7 +4,7 @@
 
 import * as data from './data.js';
 import * as store from './store.js';
-import { STARTER_STOCK, REPLACED_STOCK } from './starter-stock.js';
+import { STARTER_STOCK, REPLACED_STOCK, NON_FOOD } from './starter-stock.js';
 
 export const MENU_VERSION = '2026-11-19';
 
@@ -119,4 +119,19 @@ export async function applyVendors({ shared = false, host = false } = {}) {
     if (!have.has(key(name))) await data.put('vendor', { name, carries, deadline: '', contact: '', preset: true });
   }
   await store.put('vendor-presets', { version: VENDOR_PRESET_VERSION, at: Date.now() });
+}
+
+// Non-food supplies (RRA-058): adds the starter supplies to a list made
+// before they existed. Runs once, on the Host phone when data is shared.
+const SUPPLIES_VERSION = 1;
+export async function applySupplies({ shared = false, host = false } = {}) {
+  if (shared && !host) return;
+  if (((await store.get('supplies'))?.version || 0) >= SUPPLIES_VERSION) return;
+  const have = new Set((await data.list('stock')).map((s) => key(s.name)));
+  for (const g of STARTER_STOCK.filter((x) => NON_FOOD.includes(x.group))) {
+    for (const [name, unit] of g.items) {
+      if (!have.has(key(name))) await data.put('stock', { name, unit: unit || 'each', group: g.group, par: 0, onHand: 0, vendor: '', price: '' });
+    }
+  }
+  await store.put('supplies', { version: SUPPLIES_VERSION, at: Date.now() });
 }

@@ -27,14 +27,14 @@ export const roleOf = (st) => ROLE_GROUPS.find((g) => g.pos.includes(st?.positio
 const roleByKey = (k) => ROLE_GROUPS.find((g) => g.k === k) || ROLE_GROUPS[ROLE_GROUPS.length - 1];
 const isOff = (v) => /^(off|time ?off|pto|vac)/i.test(String(v || '').trim());
 // A shift pill: role letter badge and times, or TIME OFF.
-const pill = (v, g) => (isOff(v) ? '<span class="spill off">TIME OFF</span>'
+export const pill = (v, g) => (isOff(v) ? '<span class="spill off">TIME OFF</span>'
   : `<span class="spill c-${g.c}"><i>${g.l}</i><span>${esc(v)}</span></span>`);
 const initials = (n) => String(n || '?').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 
 const label = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString([], { month: 'short', day: 'numeric' }); };
 
 export async function scheduleView() {
-  setChrome({ tab: 'more', back: true });
+  setChrome({ tab: 'lounge', back: true });
   const change = canChange('schedule');
   const wk = scheduleView.week || data.weekStart();
   const staff = await staffList();

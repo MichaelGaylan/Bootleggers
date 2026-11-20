@@ -16,8 +16,9 @@ import { prepView } from './prep.js';
 import { scheduleView, staffView, ensureStaffFor, staffList, schedulePrintView } from './schedule.js';
 import { eventsView, eventView } from './events.js';
 import { costsView } from './costs.js';
+import { loungeView, timesheetView, timesheetsView, canTime } from './lounge.js';
 import { settingsView, listView, rolesView, personView } from './settings.js';
-import { applyMenu, applyVendors } from './menu.js';
+import { applyMenu, applyVendors, applySupplies } from './menu.js';
 
 import { $, $$, esc, view, dlg, LS, isIOS, standalone, toast, copy, share, pasteInto, sheet, setTitle, setChrome, fmtDate, session, wideMQ } from './ui.js';
 
@@ -174,8 +175,10 @@ function renderSide() {
     canSee('stock') ? link('stock', 'Stock count') : '',
     canSee('stock') ? link('needed', 'Needed') : '',
     canSee('orders') ? link('orders', 'Order guides') : '',
-    canSee('board') ? link('board', 'Board', '<i id="side-badge" class="sbadge" hidden></i>') : '',
-    canSee('schedule') ? link('schedule', 'Schedule') : '',
+    link('lounge', 'Employee lounge', '<i id="side-badge" class="sbadge" hidden></i>'),
+    canSee('board') ? link('board', '<span class="sub-l">Bulletin board</span>') : '',
+    canSee('schedule') ? link('schedule', '<span class="sub-l">Schedule</span>') : '',
+    canTime() ? link('timesheets', '<span class="sub-l">Time sheets</span>') : link('timesheet', '<span class="sub-l">My time sheet</span>'),
     canSee('events') ? link('events', 'Events (BEOs)') : '',
     canSee('costs') ? link('costs', 'Costs and waste') : '',
     '<hr>',
@@ -657,6 +660,9 @@ const routes = {
   orders: () => ordersView(),
   vendors: () => vendorsView(),
   board: () => boardView(),
+  lounge: () => loungeView(),
+  timesheet: () => timesheetView(),
+  timesheets: () => timesheetsView(),
   notices: () => boardView(),
   schedule: () => scheduleView(),
   'schedule-print': (arg) => schedulePrintView(arg),
@@ -692,7 +698,10 @@ async function route() {
   const [, name = 'recipes', arg] = location.hash.match(/^#\/([^/]+)\/?(.*)$/) || [];
   session.staff = await staffList(); // permissions (RRA-002) read this
   renderSide();
-  (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
+  const at = location.hash;
+  await (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
+  // A slow screen can finish after a quicker tap: show what the address says.
+  if (location.hash !== at && !dlg.open) route();
 }
 
 $('#btn-back').onclick = () => (history.length > 1 ? history.back() : (location.hash = '#/recipes'));
@@ -737,6 +746,7 @@ async function boot() {
   }
   await applyMenu({ shared: sync.enabled(), host: profile.role === 'owner' });
   await applyVendors({ shared: sync.enabled(), host: profile.role === 'owner' });
+  await applySupplies({ shared: sync.enabled(), host: profile.role === 'owner' });
   await noticeGate();
   await homeTip();
   if (incoming && access.parse(incoming)?.kind === 'req') { location.hash = '#/team'; return teamView(incoming); }

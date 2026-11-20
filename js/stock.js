@@ -4,7 +4,7 @@
 import * as data from './data.js';
 import { $, $$, esc, view, LS, sheet, toast, setTitle, setChrome, copy, fmtDate, session, isWide, chip, searchBox } from './ui.js';
 import { canChange, canSee } from './perms.js';
-import { STOCK_STATUS } from './starter-stock.js';
+import { STOCK_STATUS, STOCK_TABS, isFood } from './starter-stock.js';
 import { printButtons, wirePrint } from './pdf.js';
 
 const items = async () => (await data.list('stock')).sort((a, b) => (a.group || '').localeCompare(b.group || '') || data.byName(a, b));
@@ -37,7 +37,10 @@ export async function stockView(forceEdit) {
   const list = (await items()).map((s) => dirty[s.id] || s);
   const vs = await vendors();
   const q = (stockView.q || '').toLowerCase();
-  const shown = list.filter((s) => !q || `${s.name} ${s.group} ${s.vendor}`.toLowerCase().includes(q));
+  // Tabs for food and each kind of supply (RRA-058). A search looks through all of them.
+  const cat = LS.get('stockCat', 'all');
+  const inCat = (s, c) => c === 'all' || (c === 'food' ? isFood(s.group) : s.group === c);
+  const shown = list.filter((s) => (q ? `${s.name} ${s.group} ${s.vendor}`.toLowerCase().includes(q) : inCat(s, cat)));
   const groups = {};
   for (const s of shown) (groups[s.group || 'Other'] ||= []).push(s);
   const last = list.reduce((m, s) => (s.countedAt > (m?.countedAt || 0) ? s : m), null);
@@ -51,7 +54,7 @@ export async function stockView(forceEdit) {
       ${Object.entries(groups).map(([g, its]) => `<tbody><tr class="band"><td colspan="${costs ? 8 : 7}">${esc(g)} <span class="muted">· ${its.length}${its.filter(isLow).length ? ` · ${its.filter(isLow).length} low` : ''}</span></td></tr>
         ${its.map((s) => `<tr data-id="${s.id}">
           <td>${editing ? `<button class="rm" type="button" data-rm="${s.id}" aria-label="Remove ${esc(s.name)}">−</button> <span class="link" data-edit="${s.id}">${esc(s.name)}</span>` : esc(s.name)}</td>
-          <td>${chip('Ingredient', 'blue')}</td>
+          <td>${isFood(s.group) ? chip('Ingredient', 'blue') : chip('Supply', 'gray')}</td>
           <td>${esc(s.unit)}</td>
           <td class="num">${!editing && change ? `<span class="stepper"><button type="button" data-d="-1">−</button><b>${esc(s.onHand)}</b><button type="button" data-d="1">+</button></span>` : esc(s.onHand)}</td>
           <td class="num">${+s.par ? esc(s.par) : '—'}</td>
@@ -68,6 +71,7 @@ export async function stockView(forceEdit) {
       ${!editing && change ? `<div class="fab-row"><button class="btn fab" id="save" type="button">Save count<span id="save-n"></span></button></div>` : ''}
       ${searchBox('q', 'Search stock', stockView.q)}
     </div>
+    <div class="cat-tabs" role="tablist">${STOCK_TABS.map(([k, l]) => { const n = list.filter((s) => inCat(s, k) && isLow(s)).length; return `<button type="button" data-cat="${esc(k)}" class="${!q && cat === k ? 'on' : ''}">${esc(l)}${n ? ` <i>${n}</i>` : ''}</button>`; }).join('')}</div>
     ${wide ? wideTable() : Object.entries(groups).map(([g, its]) => `
       <button class="acc-head${q || stockView.open === g ? ' open' : ''}" type="button" data-g="${esc(g)}"><span class="grow">${esc(g)}</span>
         <span class="meta">${its.filter(isLow).length ? `${chip(`${its.filter(isLow).length} low`, 'orange')} ` : ''}${its.length}</span></button>
@@ -84,6 +88,7 @@ export async function stockView(forceEdit) {
     <p class="muted small center">${editing ? 'Tap an item to change its par, unit or vendor. Tap the red button to remove one you no longer stock.'
       : last?.countedAt ? `Last counted by ${esc(last.countedBy)}, ${fmtDate(last.countedAt)}` : 'Not counted yet.'}</p>`;
   wireTabs();
+  $$('[data-cat]', view).forEach((b) => { b.onclick = () => { LS.set('stockCat', b.dataset.cat); stockView.q = ''; stockView(); }; });
   // One section open at a time (RRA-041); a search opens every match.
   $$('.acc-head', view).forEach((h) => {
     h.onclick = () => {

@@ -9,6 +9,10 @@ export const WHATS_NEW = [
   {
     version: '0.5.0', build: '2026.11.20-1', date: '2026-11-20',
     lines: [
+      'New Employee lounge: the time clock, your week of shifts, today\'s tasks and the bulletin board in one place. One tap from the first screen, and it replaces the Board tab.',
+      'Time clock: clock in and out in the lounge. Managers and the Host get Time sheets with everyone\'s hours by week, can fix a missed punch, and can print or send them for payroll.',
+      'Stock has tabs at the top: Food and bar, Cleaning, Paper and to-go, Smallwares, and Linens and uniforms, with starter items in each.',
+      'Prep: in Edit, tap an item to change it. Saved items at the bottom put an item back on the list with one tap.',
       'Tablets and computers get their own layout: a sidebar with every section, all sections open, and stock and dishes as wide tables.',
       'Colored chips everywhere: In stock green, Low stock orange, Ingredient blue, Sub recipe purple.',
       'The schedule is grouped by role with colored bands and shift pills. Tablets show the whole week; phones show one day at a time with a day picker. Time off and open shifts are new.',

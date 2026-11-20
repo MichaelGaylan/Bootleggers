@@ -14,6 +14,12 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 
 ## 🟣 Done
 ### 0.5.0 · build 2026.11.20-1
+- [x] RRA-058 · Stock: tabs at the top for food and non-food supplies (All, Food and bar, Cleaning and chemicals, Paper and to-go, Smallwares, Linens and uniforms), with starter items in each new section. Compared with the reference list (Gaylan's image, 2026-11-20); Equipment inventory is not included · Feature · M
+- [x] RRA-053 · Employee lounge: one section for staff that holds the bulletin board (Board messages), the schedule and tasks. Messaging and the schedule live in the lounge · Feature · L
+- [x] RRA-054 · One-tap Employee lounge button on the landing page, for every employee · UX · S
+- [x] RRA-055 · Time clock and time sheets: employees clock in and out in the app (one tap from the lounge) and see their own hours. Managers and the Host get a Time sheets page compiling everyone's hours (daily punches, weekly totals per employee, fix a missed punch), printable and as a PDF or copy to send for payroll · Feature · L
+- [x] RRA-056 · Prep: tap an item already on the list to change it (name, amount, station) · UX · S
+- [x] RRA-057 · Prep: a closable "Saved items" list at the bottom of the page with items used before; one tap puts one back on the list without retyping (confirmed by Gaylan 2026-11-20) · UX · M
 - [x] RRA-049 · Stock items (Edit list): after removing an item, stay on the edit page for more removals instead of going back to Stock count · Bug · S
 - [x] RRA-050 · Stock count: after searching and changing a count, Save clears the search and shows the full list again; also an X in the search bar to clear it · UX · S
 - [x] RRA-051 · Tablet and computer layout (reference: /mnt/project-files/references/rra-051-tablet-layout.png). Phones stay as they are. On wide screens: a left sidebar listing every section (Recipes, Prep, Stock, Board, Schedule, Settings...) instead of bottom tabs; sections shown open instead of collapsed; stock and dishes as wide tables (item, type, unit, on hand, par, status, vendor/price). Colored chips like the reference: In stock (green), Low stock (orange), Ingredient (blue) vs Sub recipe / house recipe (purple), used on phones too · UX · L

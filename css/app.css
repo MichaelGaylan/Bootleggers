@@ -481,3 +481,69 @@ dialog.sheet[open] { animation: rise 0.28s cubic-bezier(.2,.8,.2,1); display: fl
   .wsched th.who-h { width: 150px; }
   .wsched .who .av { display: none; }
 }
+
+/* ---------- Employee lounge (RRA-053..055), prep saved items (RRA-057) ---------- */
+.lounge-btn { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin: 0 0 12px; border-radius: var(--radius); color: #fff;
+  background: linear-gradient(135deg, #8944ab, #0a84ff); box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+.lounge-btn b { display: block; font-size: 1.02rem; }
+.lounge-btn small { display: block; opacity: .9; font-size: .8rem; }
+.lounge-btn .grow { flex: 1; min-width: 0; }
+.lounge-btn .chev { font-size: 1.5rem; opacity: .85; }
+.lounge-ic { width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,.2); display: grid; place-items: center; flex: none; }
+.lounge-ic svg { width: 22px; height: 22px; }
+.lounge .card { margin: 0 0 12px; }
+.clock-card .clock-top { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.clock-card .clock-top > div { flex: 1; }
+.clock-state { font-size: 1.25rem; font-weight: 700; }
+.clock-card.on .clock-state { color: var(--c-green); }
+.clock-btn { width: auto; min-width: 120px; height: 48px; border-radius: 999px; background: var(--c-green); color: #fff; font-weight: 700; }
+.clock-btn.out { background: var(--c-orange); }
+.clock-card .row { padding-left: 0; padding-right: 0; border-top: .5px solid var(--sep); }
+.l-card { display: block; color: var(--text); }
+.l-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.l-head a { font-size: .88rem; font-weight: 600; }
+.l-card .row { padding-left: 0; padding-right: 0; }
+.myweek { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.myweek > div { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 2px; border-radius: 8px; font-size: .72rem; min-width: 0; }
+.myweek > div.today { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.myweek > div > span { color: var(--text-2); font-weight: 600; }
+.myweek em { font-style: normal; color: var(--text-2); padding: 4px 0; }
+.myweek .spill { flex-direction: column; font-size: .7rem; }
+.myweek .spill i { padding: 1px 0; text-align: center; }
+.myweek .spill > span { padding: 3px 4px; }
+.bar { height: 8px; border-radius: 4px; background: var(--card-2); overflow: hidden; margin-bottom: 6px; }
+.bar i { display: block; height: 100%; background: var(--c-green); }
+.l-post { display: block; padding: 8px 0; border-top: .5px solid var(--sep); color: var(--text); font-size: .92rem; }
+.l-post .who { display: block; color: var(--text-2); font-size: .76rem; }
+.l-post.notice b { color: var(--c-purple); }
+.l-quick { display: flex; gap: 8px; margin-top: 8px; }
+.l-quick input { flex: 1; min-width: 0; }
+.l-quick .btn { width: auto; padding: 0 16px; }
+.ts-total { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.ts-total b { font-size: 1.6rem; }
+.row .chev { color: var(--text-2); font-size: 1.3rem; }
+.sub-l { padding-left: 14px; font-size: .92rem; }
+.saved { margin: 18px 0 8px; }
+.saved summary { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-radius: var(--radius); background: var(--card); font-weight: 600; cursor: pointer; list-style: none; }
+.saved summary::-webkit-details-marker { display: none; }
+.saved summary::after { content: "›"; font-size: 1.3rem; color: var(--text-2); transition: transform .15s; }
+.saved[open] summary::after { transform: rotate(90deg); }
+.saved summary .grow { flex: 1; }
+.saved > p { margin: 8px 16px 0; }
+.saved .row[data-saved] { cursor: pointer; }
+.saved .row.on-list .title { color: var(--text-2); }
+.saved .plus { color: var(--accent); font-weight: 600; }
+@media (min-width: 768px) {
+  .lounge { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+  .lounge .card { margin: 0; }
+  .lounge-btn { max-width: 560px; }
+}
+
+/* Stock tabs: food and supplies (RRA-058) */
+.cat-tabs { display: flex; gap: 6px; overflow-x: auto; margin: 2px -16px 4px; padding: 4px 16px 6px; scrollbar-width: none; }
+.cat-tabs::-webkit-scrollbar { display: none; }
+.cat-tabs button { flex: none; border: 1px solid var(--sep); background: var(--card); color: var(--text); border-radius: 999px; padding: 7px 14px; font: inherit; font-size: .88rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.cat-tabs button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.cat-tabs i { font-style: normal; display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 9px; background: color-mix(in srgb, var(--c-orange) 22%, transparent); color: var(--c-orange); font-size: .75rem; }
+.cat-tabs button.on i { background: rgba(255,255,255,.25); color: #fff; }
+@media (min-width: 768px) { .cat-tabs { margin: 2px 0 6px; padding: 4px 0 6px; flex-wrap: wrap; } }
