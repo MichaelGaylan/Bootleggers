@@ -3,7 +3,7 @@
 import * as data from './data.js';
 import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session, isWide } from './ui.js';
 import { canChange, myStaff, isHost, canTime, level } from './perms.js';
-import { ROLES, myEcdhPublic } from './access.js';
+import { ROLES, myEcdhPublic, myPublicKey } from './access.js';
 import { printButtons, wirePrint } from './pdf.js';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -219,9 +219,10 @@ async function staffDialog(existing) {
     title: existing ? 'Staff member' : 'Add staff', right: 'Save',
     body: `<label class="field"><span>Name</span><input type="text" id="st-n" value="${esc(s.name)}" placeholder="Name as it appears on their invite"></label>
       <label class="field"><span>Position</span><select id="st-p">${POSITIONS.map((p) => `<option ${p === s.position ? 'selected' : ''}>${p}</option>`).join('')}</select></label>
-      <label class="field"><span>App role</span><select id="st-r">${['staff', 'chef', 'manager'].map((r) => `<option value="${r}" ${r === s.role ? 'selected' : ''}>${ROLES[r]}</option>`).join('')}</select></label>
+      ${s.dev ? `<div class="field"><span>App role</span><div style="padding:10px 0"><b>${esc(ROLES[s.role] || 'Staff')}</b> <a href="#/person/${s.id}" class="small">Change role ›</a></div></div>`
+        : `<label class="field"><span>App role</span><select id="st-r">${['staff', 'chef', 'manager'].map((r) => `<option value="${r}" ${r === s.role ? 'selected' : ''}>${ROLES[r]}</option>`).join('')}</select></label>`}
       ${seeRate ? `<label class="field"><span>Hourly rate (only managers the Admin allows see this)</span><input type="text" inputmode="decimal" id="st-rate" value="${esc(rate)}" placeholder="$ per hour"${canChange('payrates') ? '' : ' readonly'}></label>` : ''}`,
-    onMount: (api) => { api.onRight = () => { const n = $('#st-n', api.el).value.trim(); if (!n) return; Object.assign(s, { name: n, position: $('#st-p', api.el).value, role: $('#st-r', api.el).value }); if ($('#st-rate', api.el)) rate = $('#st-rate', api.el).value.trim().replace('$', ''); api.close(true); }; },
+    onMount: (api) => { api.onRight = () => { const n = $('#st-n', api.el).value.trim(); if (!n) return; Object.assign(s, { name: n, position: $('#st-p', api.el).value, role: $('#st-r', api.el)?.value || s.role }); if ($('#st-rate', api.el)) rate = $('#st-rate', api.el).value.trim().replace('$', ''); api.close(true); }; },
   });
   if (!ok) return;
   await data.put('staff', s);
@@ -234,9 +235,10 @@ export async function ensureStaffFor(profile) {
   if (!profile || profile.role === 'owner') return;
   const staff = await staffList();
   const ek = await myEcdhPublic(); // so a manager's fix to my hours reaches this phone
+  const dev = await myPublicKey(); // so the Admin can change my role (RRA-066)
   const mine = staff.find((s) => (s.iid && s.iid === profile.iid)) || staff.find((s) => s.name === profile.name);
-  if (mine) { if (mine.ek !== ek) await data.put('staff', { ...mine, ek }); return; }
-  await data.put('staff', { name: profile.name, position: profile.role === 'manager' ? 'Manager' : profile.role === 'chef' ? 'Chef' : 'Line cook', role: profile.role, iid: profile.iid, ek });
+  if (mine) { if (mine.ek !== ek || mine.dev !== dev || mine.iid !== profile.iid) await data.put('staff', { ...mine, ek, dev, iid: profile.iid }); return; }
+  await data.put('staff', { name: profile.name, position: profile.role === 'manager' ? 'Manager' : profile.role === 'chef' ? 'Chef' : 'Line cook', role: profile.role, iid: profile.iid, ek, dev });
 }
 
 // ------------------------------------------------- print several weeks (RRA-042)

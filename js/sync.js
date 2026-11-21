@@ -30,6 +30,19 @@ let db = null;
 let key = null;
 let connecting = null;
 let inboxFn = null;
+let lastSnap = null;
+// This phone just got a pay key (RRA-066): open the hours and rates it
+// skipped before, from what the shared data already holds.
+export async function reopenPrivate() {
+  if (!lastSnap) return;
+  for (const d of lastSnap.docs) {
+    const r = d.data();
+    if (!PRIVATE.includes(r.c) || r.d) continue;
+    const mine = await localDoc(r.c, r.i);
+    if (mine && (mine.updated || 0) >= r.u) continue;
+    try { const doc = await openPrivate(r); if (doc) await data.applyRemote(r.c, r.i, doc); } catch { /* not ours */ }
+  }
+}
 export const onInbox = (fn) => { inboxFn = fn; };
 
 // One Firebase connection per page, used by sync and by the request inbox.
@@ -137,6 +150,7 @@ export async function start(profile, onStatus = () => {}) {
     });
     let first = true;
     fs.onSnapshot(fs.collection(db, 'teams', 'bootleggers', 'docs'), async (snap) => {
+      lastSnap = snap;
       const seen = new Set();
       for (const ch of snap.docChanges()) {
         const r = ch.doc.data();

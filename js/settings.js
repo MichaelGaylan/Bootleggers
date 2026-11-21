@@ -1,9 +1,9 @@
 // Settings (RRA-029) and roles and permissions (RRA-002).
 
 import * as data from './data.js';
-import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session } from './ui.js';
-import { AREAS, PAY_AREAS, ROLE_DEFAULTS, level, canChange, isHost } from './perms.js';
-import { ROLES, can as canAccess } from './access.js';
+import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session, THEMES, getTheme, setTheme } from './ui.js';
+import { AREAS, PAY_AREAS, ROLE_DEFAULTS, level, canChange, canSee, isHost } from './perms.js';
+import { ROLES, can as canAccess, canChangeRole, makeRoleChange, rotatePayKey } from './access.js';
 import { staffList } from './schedule.js';
 import { INACTIVITY_DAYS } from './config.js';
 import * as sync from './sync.js';
@@ -18,8 +18,13 @@ export async function settingsView() {
     stock: (await data.list('stock')).length,
   };
   const edit = canChange('settings');
+  const full = canSee('settings') || isHost();
+  const theme = getTheme();
   view.innerHTML = `
-    <div class="section-label">People</div>
+    <div class="section-label">Appearance · this device</div>
+    <div class="segmented" id="theme" role="radiogroup" aria-label="Appearance">${Object.entries(THEMES).map(([k, v]) => `<button type="button" role="radio" aria-checked="${k === theme}" data-theme-opt="${k}" class="${k === theme ? 'on' : ''}">${v}</button>`).join('')}</div>
+    <p class="muted small">Match device follows your phone's or iPad's own light and dark setting. The moon button at the top switches between light and dark in one tap. This choice is saved on this device only.</p>
+    ${full ? `<div class="section-label">People</div>
     <div class="group">
       <a class="row" href="#/staff"><span class="grow">Staff</span><span class="meta">${counts.staff}</span></a>
       <a class="row" href="#/roles"><span class="grow">Roles and permissions</span></a>
@@ -41,7 +46,8 @@ export async function settingsView() {
       <a class="row" href="#/about"><span class="grow">About</span></a>
       <a class="row" href="#/report"><span class="grow">Report a problem</span></a>
     </div>
-    <p class="muted small center">${edit ? 'You can change Settings.' : 'Only the Admin, and people the Admin allows, can change Settings.'}</p>`;
+    <p class="muted small center">${edit ? 'You can change Settings.' : 'Only the Admin, and people the Admin allows, can change Settings.'}</p>` : ''}`;
+  $$('[data-theme-opt]', view).forEach((b) => { b.onclick = () => { setTheme(b.dataset.themeOpt); settingsView(); }; });
   $('#popups')?.addEventListener('click', async () => { if (!edit) return; s.popups = s.popups === false; await data.saveSettings(s); settingsView(); });
   $('#target')?.addEventListener('click', async () => {
     const v = await sheet({
@@ -74,18 +80,36 @@ export async function listView(key) {
   $$('[data-rm]', view).forEach((b) => { b.onclick = async () => { s[key] = arr.filter((_, i) => i !== +b.dataset.rm); await data.saveSettings(s); listView(key); }; });
 }
 
+// After a manager is moved down (RRA-066): a new pay key for the Admin
+// devices and the remaining managers, then every hour and rate sealed again.
+async function newPayKeyAfterDemotion(exceptId) {
+  const set = await data.settings();
+  const { pk, payBox } = await rotatePayKey(set);
+  await data.saveSettings({ ...set, payPub: pk.pub, payBox });
+  for (const m of (await staffList()).filter((x) => x.role === 'manager' && x.id !== exceptId && x.dev)) {
+    await data.put('staff', { ...m, grant: await makeRoleChange(session.profile, m, 'manager'), grantRole: 'manager' });
+  }
+  for (const c of ['punch', 'payrate']) for (const d of await data.list(c)) await data.put(c, d);
+  localStorage.removeItem('blg.backupAt'); // the old Admin backup has the old pay key
+  toast('New pay key made. Make a new Admin backup.');
+}
+
 // ------------------------------------------------------------ roles (RRA-002)
 
 export async function rolesView() {
   setChrome({ tab: 'more', back: true });
   setTitle('Roles and permissions');
   const staff = await staffList();
+  const set = await data.settings();
   view.innerHTML = `
     <div class="group">
       <a class="row" href="#/person/host"><span class="grow"><span class="title">Admin</span><span class="sub">App administrator · full control</span></span></a>
       ${staff.map((s) => `<a class="row" href="#/person/${s.id}"><span class="grow"><span class="title">${esc(s.name)}</span><span class="sub">${esc(ROLES[s.role] || 'Staff')}${s.perms ? ' · custom' : ''}</span></span></a>`).join('')}
     </div>
-    <p class="muted small">The Admin is above every other role, and nobody can lower or remove it. Everyone else starts from their role. Tap a person to change what they can see or change.</p>`;
+    <p class="muted small">The Admin is above every other role, and nobody can lower or remove it. Everyone else starts from their role. Tap a person to change their role or what they can see or change.</p>
+    ${isHost() ? `<div class="group"><div class="row"><span class="grow">Managers can move people between Staff and Chef</span><button class="toggle ${set.mgrRoles !== false ? 'on' : ''}" id="mgr-roles" type="button" aria-label="Managers can move people between Staff and Chef"></button></div></div>
+    <p class="muted small">Only you can make someone a Manager or move a Manager down.</p>` : ''}`;
+  $('#mgr-roles')?.addEventListener('click', async () => { set.mgrRoles = set.mgrRoles === false; await data.saveSettings(set); rolesView(); });
 }
 
 export async function personView(id) {
@@ -104,8 +128,15 @@ export async function personView(id) {
   setTitle(s.name);
   const opts = ['none', 'see', 'change'];
   const names = { none: 'No', see: 'See', change: 'Change' };
+  const set = await data.settings();
+  const mgrMay = set.mgrRoles !== false;
+  const roleOpts = ['staff', 'chef', 'manager'].filter((r) => r !== s.role && canChangeRole(session.profile, s, r, mgrMay));
+  const pending = s.grant && s.grantRole && s.grantRole === s.role && !s.grantSeen;
   view.innerHTML = `
     <p><span class="chip">${esc(ROLES[s.role] || 'Staff')}</span> ${s.perms ? '<span class="chip warn">Custom</span>' : ''}</p>
+    ${roleOpts.length ? '<button class="btn tonal block" id="role" type="button">Change role</button>' : ''}
+    ${!s.dev && (isHost() || session.profile.role === 'manager') ? '<p class="muted small">Change role works once this person has opened the app on their phone.</p>' : ''}
+    ${pending ? `<p class="muted small">Sent: ${esc(s.name)}'s phone switches to ${esc(ROLES[s.role])} the next time it opens the app.</p>` : ''}
     <div class="group">${Object.entries(AREAS).map(([k, a]) => {
       const cur = level(k, s);
       return `<div class="row"><span class="grow">${a}</span>
@@ -121,6 +152,28 @@ export async function personView(id) {
     <p class="muted small">${s.role === 'manager' ? (isHost() ? 'Only you, the Admin, can change these. See lets a manager look; Change lets them fix punches or set rates.' : 'Only the Admin can change these.') : 'Staff and chefs only ever see their own hours, never anyone else\'s or any pay rates.'}</p>
     ${edit && s.perms ? '<button class="btn plain block" id="reset" type="button">Reset to role defaults</button>' : ''}
     <p class="muted small">Starting point for ${esc(ROLES[s.role] || 'Staff')}: ${Object.entries(ROLE_DEFAULTS[s.role] || ROLE_DEFAULTS.staff).filter(([, v]) => v === 'change').map(([k]) => AREAS[k]).join(', ') || 'see only'} can be changed.</p>`;
+  $('#role')?.addEventListener('click', async () => {
+    const to = await sheet({
+      title: `Change ${s.name}'s role`, right: 'Change',
+      body: `<p class="small">Now: <b>${esc(ROLES[s.role] || 'Staff')}</b></p>
+        <div class="group">${roleOpts.map((r, i) => `<label class="row"><input type="radio" name="to" value="${r}" ${i === 0 ? 'checked' : ''}> <span class="grow">${ROLES[r]}</span></label>`).join('')}</div>
+        <p class="muted small">${s.role === 'manager' ? 'Moving a manager down takes away hours, pay rates and inviting. The app also makes a new pay key and gives it only to the remaining managers.' : 'Their phone gets the new role and its permissions the next time it opens the app. Custom permissions you set for this person are cleared.'}${roleOpts.includes('manager') ? ' A new manager also gets the pay key for hours and pay rates, with the access you set below.' : ''}</p>`,
+      onMount: (api) => { api.onRight = () => api.close($('input[name=to]:checked', api.el)?.value); },
+    });
+    if (!to) return;
+    const from = s.role;
+    try {
+      const grant = await makeRoleChange(session.profile, s, to, mgrMay);
+      const next = { ...s, role: to, grant, grantRole: to };
+      delete next.grantSeen; delete next.perms;
+      if (to === 'manager') next.position = 'Manager';
+      else if (from === 'manager' && next.position === 'Manager') next.position = to === 'chef' ? 'Chef' : 'Line cook';
+      await data.put('staff', next);
+      if (from === 'manager' && isHost()) await newPayKeyAfterDemotion(next.id);
+      toast(`${s.name} is now ${ROLES[to]}`);
+    } catch (e) { toast(e.message); }
+    personView(id);
+  });
   $$('[data-k]', view).forEach((b) => {
     b.onclick = async () => {
       if (b.dataset.k in PAY_AREAS && !isHost()) return;

@@ -2,10 +2,30 @@
 // Bump VERSION and BUILD on every release, and add one line to WHATS_NEW.
 
 export const APP_NAME = 'Bootleggers Kitchen';
-export const VERSION = '0.5.1';
-export const BUILD = '2026.11.21-1';
+export const VERSION = '0.5.4';
+export const BUILD = '2026.11.21-4';
 
 export const WHATS_NEW = [
+  {
+    version: '0.5.4', build: '2026.11.21-4', date: '2026-11-21',
+    lines: [
+      'Change role: in Roles and permissions, tap a person, then Change role to move them between Staff, Chef and Manager. Their phone switches to the new role and its permissions on its own, with no new invite.',
+      'A new manager gets hours and pay access from the same tap. Moving a manager down takes it away, and the app makes a new pay key for the remaining managers.',
+      'Night mode button: the moon at the top switches between light and dark in one tap.',
+    ],
+  },
+  {
+    version: '0.5.3', build: '2026.11.21-3', date: '2026-11-21',
+    lines: [
+      'Dark mode: choose Light, Dark or Match device in Settings, under Appearance. Each phone or iPad keeps its own choice, and everyone can now open Settings to set it.',
+    ],
+  },
+  {
+    version: '0.5.2', build: '2026.11.21-2', date: '2026-11-21',
+    lines: [
+      'Fix: the Admin setup screen on a second device (like an iPad) no longer gets stuck. It now offers Restore from an Admin backup, or Use an invite instead.',
+    ],
+  },
   {
     version: '0.5.1', build: '2026.11.21-1', date: '2026-11-21',
     lines: [

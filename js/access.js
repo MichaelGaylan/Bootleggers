@@ -292,6 +292,71 @@ export async function activate(code) {
   return profile;
 }
 
+// ----- Change role (RRA-066) -----
+// A role change is a new activation for the same phone (same iid and device
+// key) with the new role, signed by the Admin, or by a manager for Staff and
+// Chef. It travels in the person's staff record; their phone checks it and
+// switches role on its next sync. Making or unmaking a Manager is Admin only,
+// and a new Manager gets the pay key sealed to their phone.
+
+const signedByAdmin = (p) => ROOT_KEYS.includes(p.by) || (!!p.chain && parse(p.chain)?.payload?.role === 'owner' && parse(p.chain).payload.dev === p.by);
+
+export function canChangeRole(profile, staff, to, mgrMayChange = true) {
+  if (!profile || !staff?.dev || !staff?.iid || !ROLES[to] || to === 'owner') return false;
+  if (profile.role === 'owner') return true;
+  if (profile.role !== 'manager' || !mgrMayChange) return false;
+  return staff.role !== 'manager' && to !== 'manager';
+}
+
+export async function makeRoleChange(profile, staff, to, mgrMayChange = true) {
+  if (!canChangeRole(profile, staff, to, mgrMayChange)) throw new Error('You can\'t make that change.');
+  const payload = { iid: staff.iid, name: staff.name, role: to, dev: staff.dev, iat: Date.now(), by: await myPublicKey(), change: true };
+  if (profile.activation) payload.chain = profile.activation;
+  const pk = await store.get('paykey');
+  if (to === 'manager' && pk && staff.ek) payload.pk = await sealTo(staff.ek, new TextEncoder().encode(JSON.stringify(pk)));
+  return signToken('act', payload);
+}
+
+// On the person's own phone. Returns the new profile, or null if the grant
+// is not for this phone, is older than what it has, or isn't allowed.
+export async function applyRoleChange(profile, code) {
+  if (!profile || profile.role === 'owner' || !code) return null;
+  let p;
+  try { p = await check(code, 'act'); } catch { return null; }
+  if (!p.change || p.dev !== await myPublicKey() || p.iid !== profile.iid) return null;
+  const cur = parse(profile.activation)?.payload || {};
+  if ((p.iat || 0) <= (cur.iat || 0)) return null;
+  if ((p.role === 'manager' || profile.role === 'manager') && !signedByAdmin(p)) return null;
+  if (p.pk) {
+    try { await store.put('paykey', JSON.parse(new TextDecoder().decode(await openFrom((await store.ecdhKey()).privateKey, p.pk)))); } catch { /* no pay key: time sheets show a note */ }
+  }
+  if (p.role !== 'manager') await store.del('paykey'); // hours and pay leave this phone
+  const next = { ...profile, name: p.name || profile.name, role: p.role, activation: parse(code).raw };
+  await store.put('profile', next);
+  return next;
+}
+
+// New pay key after a manager is moved down (RRA-066). The Admin phone makes
+// it, seals it to each Admin device that has checked in and to each remaining
+// manager (through a role grant), then seals all hours and rates again.
+export async function rotatePayKey(settings) {
+  const pk = await newPayKey();
+  const boxes = {};
+  for (const ek of Object.values(settings.adminEks || {})) {
+    try { boxes[ek] = await sealTo(ek, new TextEncoder().encode(JSON.stringify(pk))); } catch { /* old entry */ }
+  }
+  await store.put('paykey', pk);
+  return { pk, payBox: { pub: pk.pub, at: Date.now(), boxes } };
+}
+
+// Another Admin device made a new pay key: take it if it was sealed to us.
+export async function adoptPayKey(payBox) {
+  const ek = await myEcdhPublic();
+  const box = payBox?.boxes?.[ek];
+  if (!box) return false;
+  try { await store.put('paykey', JSON.parse(new TextDecoder().decode(await openFrom((await store.ecdhKey()).privateKey, box)))); return true; } catch { return false; }
+}
+
 // Admin bootstrap: the first Admin key is created on the Admin's phone, then
 // added to ROOT_KEYS in config.js and published.
 export async function ownerSetup(name) {

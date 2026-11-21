@@ -13,6 +13,16 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 ## 🟡 Hold
 
 ## 🟣 Done
+### 0.5.4 · build 2026.11.21-4
+- [x] RRA-066 · Change role (promotions): the Admin (or a manager, for Staff and Chef, if the Admin allows) taps Change role on a person; a signed role change syncs to that person's phone, which switches role and permissions with no new invite. A new Manager gets the pay key in the same tap; moving a Manager down drops it and the Admin phone makes a new pay key for the remaining managers and Admin devices · Feature · L
+- [x] RRA-067 · Night mode button: a moon button in the top bar switches between light and dark in one tap (Settings → Appearance keeps Match device) · UX · S
+
+### 0.5.3 · build 2026.11.21-3
+- [x] RRA-065 · Dark mode: Light / Dark / Match device under Settings → Appearance, saved per device; everyone can open Settings for it (the rest of Settings stays limited). Status colors and chips have dark versions · Feature · S
+
+### 0.5.2 · build 2026.11.21-2
+- [x] RRA-064 · Bug: Admin setup on a second device (Gaylan's iPad) was a dead end with only Copy and Start over. Now it offers Restore from an Admin backup and Use an invite instead, and warns before making a second Admin key · Bug · S
+
 ### 0.5.1 · build 2026.11.21-1
 - [x] RRA-063 · What's new screen scrolls so long update notes can be read fully on phone and iPad; the Continue button always stays on screen. Shows every release since the phone's last update · UX · S
 

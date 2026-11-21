@@ -8,7 +8,7 @@ import * as access from './access.js';
 import * as store from './store.js';
 import * as data from './data.js';
 import * as sync from './sync.js';
-import { canSee, isHost } from './perms.js';
+import { canSee, isHost, myStaff } from './perms.js';
 import { recipesView, recipeView, printView } from './recipes.js';
 import { stockView, neededView, ordersView, vendorsView } from './stock.js';
 import { boardView, unreadPosts } from './board.js';
@@ -20,7 +20,7 @@ import { loungeView, timesheetView, timesheetsView, canTime } from './lounge.js'
 import { settingsView, listView, rolesView, personView } from './settings.js';
 import { applyMenu, applyVendors, applySupplies } from './menu.js';
 
-import { $, $$, esc, view, dlg, LS, isIOS, standalone, toast, copy, share, pasteInto, sheet, setTitle, setChrome, fmtDate, session, wideMQ } from './ui.js';
+import { $, $$, esc, view, dlg, LS, isIOS, standalone, toast, copy, share, pasteInto, sheet, setTitle, setChrome, fmtDate, session, wideMQ, THEMES, getTheme } from './ui.js';
 
 const NOTICE_VERSION = 1;
 
@@ -184,7 +184,7 @@ function renderSide() {
     canSee('events') ? link('events', 'Events (BEOs)') : '',
     canSee('costs') ? link('costs', 'Costs and waste') : '',
     '<hr>',
-    canSee('settings') || isHost() ? link('settings', 'Settings') : '',
+    link('settings', 'Settings'),
     access.can(profile, 'invite') ? link('team', 'Invite and approve', waiting.size ? `<span class="chip warn">${waiting.size}</span>` : '') : '',
     isHost() ? link('backup', 'Admin backup') : '',
     '<hr>',
@@ -214,7 +214,7 @@ function moreView() {
       ${canSee('costs') ? '<a class="row" href="#/costs"><span class="grow">Costs and waste</span></a>' : ''}
     </div>
     <div class="group">
-      ${canSee('settings') || isHost() ? '<a class="row" href="#/settings"><span class="grow">Settings</span></a>' : ''}
+      <a class="row" href="#/settings"><span class="grow">Settings</span><span class="meta">${esc(THEMES[getTheme()])}</span></a>
       ${access.can(profile, 'invite') ? `<a class="row" href="#/team"><span class="grow">Invite and approve phones</span>${waiting.size ? `<span class="chip warn">${waiting.size} waiting</span>` : ''}</a>` : ''}
       ${isHost() ? `<a class="row" href="#/backup"><span class="grow">Admin backup</span>${LS.get('backupAt', 0) ? '' : '<span class="chip warn">Not made yet</span>'}</a>` : ''}
     </div>
@@ -535,15 +535,26 @@ async function lockedView(incoming) {
   const expired = localStorage.getItem('blg.expiredNotice');
 
   if (ownerInfo && !ROOT_KEYS.includes(ownerInfo.pub)) {
+    // RRA-064: never a dead end. A second device (an iPad, say) gets in with
+    // an Admin backup or an invite; going back keeps this device's key.
     view.innerHTML = `
       <h2>Admin setup</h2>
-      <p>This phone made the Admin key below. The app opens for you once this key is added to the app and published.</p>
+      ${ROOT_KEYS.length ? `<div class="hint"><b>Already have an Admin phone?</b> This screen is only for replacing a lost Admin key. To use the app on another phone, iPad or computer, restore an Admin backup here, or get an invite from the Admin phone.</div>
+      <button class="btn block" id="restore" type="button">Restore from an Admin backup</button>
+      <button class="btn tonal block" id="back" type="button" style="margin-top:8px">Use an invite instead</button>
+      <div class="section-label" style="margin-top:24px">New Admin key</div>` : ''}
+      <p>This device made the Admin key below. The app opens for you once this key is added to the app and published.</p>
       <div class="card mono small">${esc(ownerInfo.pub)}</div>
-      <button class="btn block" id="copy" type="button">Copy Admin key</button>
-      <p class="muted small">The key is public: it lets other phones check that invites really come from you. The secret half never leaves this phone.</p>
-      <button class="btn plain block" id="restart" type="button">Start over</button>`;
+      <button class="btn ${ROOT_KEYS.length ? 'plain' : ''} block" id="copy" type="button">Copy Admin key</button>
+      <p class="muted small">The key is public: it lets other devices check that invites really come from you. The secret half never leaves this device.</p>
+      ${ROOT_KEYS.length ? '' : '<button class="btn plain block" id="back" type="button">Go back</button>'}`;
     $('#copy').onclick = () => copy(ownerInfo.pub, 'Admin key copied');
-    $('#restart').onclick = async () => { await store.wipe(); location.reload(); };
+    $('#back').onclick = async () => { await store.del('owner-setup'); lockedView(incoming); };
+    $('#restore')?.addEventListener('click', async () => {
+      const p = await restoreSheet();
+      if (!p) return;
+      profile = p; localStorage.removeItem('blg.expiredNotice'); toast('Welcome back, Admin'); boot();
+    });
     return;
   }
 
@@ -639,7 +650,7 @@ async function lockedView(incoming) {
   $('#owner')?.addEventListener('click', async () => {
     const name = await sheet({
       title: 'Admin setup', right: 'Create key',
-      body: `<p>This makes the Admin key on this phone. Only do this once, on the Admin's own phone${isIOS ? ' (open the app from the home screen first)' : ''}.</p>
+      body: `${ROOT_KEYS.length ? `<p class="hint"><b>The app already has an Admin.</b> To use it on another phone, iPad or computer, tap Cancel and use <b>Restore from an Admin backup</b> instead. Only make a new key if the Admin phone lost its key and there is no backup.</p>` : ''}<p>This makes the Admin key on this phone. Only do this once, on the Admin's own phone${isIOS ? ' (open the app from the home screen first)' : ''}.</p>
         <label class="field"><span>Your name</span><input type="text" id="o-name" value="Admin"></label>`,
       onMount: (api) => { api.onRight = () => api.close($('#o-name', api.el).value.trim() || 'Admin'); },
     });
@@ -695,10 +706,47 @@ function debounceRoute() {
   }, 400);
 }
 
+// Change role (RRA-066): the Admin or a manager left a new role for this phone
+// in its staff record. Check it, switch, and say so.
+async function checkRoleGrant() {
+  const me = myStaff();
+  if (!me?.grant || !profile || profile.role === 'owner') return;
+  const next = await access.applyRoleChange(profile, me.grant);
+  if (!next) return;
+  const from = profile.role;
+  profile = next; session.profile = next;
+  await data.put('staff', { ...me, grantSeen: Date.now(), role: next.role });
+  if (access.can(profile, 'invite')) sync.onInbox(onRequest); else if (from === 'manager') sync.onInbox(null);
+  if (next.role === 'manager') await sync.reopenPrivate();
+  if (from === 'manager' && next.role !== 'manager') {
+    // Others' hours and every pay rate leave this phone (only here, not for the team).
+    for (const r of await data.list('payrate')) await data.applyRemote('payrate', r.id, null);
+    for (const p of await data.list('punch')) if (p.staffId !== me.id) await data.applyRemote('punch', p.id, null);
+  }
+  if (from !== next.role) {
+    sheet({ title: 'Your role changed', left: null, right: 'OK', body: `<p>You're now <b>${esc(access.ROLES[next.role])}</b>. The app has updated what you can see and change.</p>` });
+  }
+}
+
+// Admin devices check in so a new pay key can reach all of them (RRA-066).
+async function adminPayKeyCheck() {
+  if (profile?.role !== 'owner') return;
+  const s = await data.settings(); const ek = await access.myEcdhPublic(); const dev = await access.myPublicKey();
+  let pk = await access.payKeyInfo();
+  if (s.payBox && s.payPub && pk?.pub !== s.payPub && s.payBox.pub === s.payPub) { if (await access.adoptPayKey(s.payBox)) pk = await access.payKeyInfo(); }
+  const next = { ...s };
+  let dirty = false;
+  if ((s.adminEks || {})[dev] !== ek) { next.adminEks = { ...(s.adminEks || {}), [dev]: ek }; dirty = true; }
+  if (pk && !s.payPub) { next.payPub = pk.pub; dirty = true; }
+  if (dirty) await data.saveSettings(next);
+}
+
 async function route() {
   if (!profile) return;
   const [, name = 'recipes', arg] = location.hash.match(/^#\/([^/]+)\/?(.*)$/) || [];
   session.staff = await staffList(); // permissions (RRA-002) read this
+  await checkRoleGrant();
+  if (isHost()) await adminPayKeyCheck();
   renderSide();
   const at = location.hash;
   await (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
@@ -742,7 +790,8 @@ async function boot() {
   // The Admin phone makes the pay key and shares its public half (RRA-055).
   if (profile.role === 'owner' && await access.ensurePayKey(profile)) {
     const s = await data.settings(); const pk = await access.payKeyInfo();
-    if (s.payPub !== pk.pub) await data.saveSettings({ ...s, payPub: pk.pub });
+    // A newer pay key made on another Admin device wins (RRA-066).
+    if (s.payPub !== pk.pub && !(s.payBox && s.payBox.pub === s.payPub)) await data.saveSettings({ ...s, payPub: pk.pub });
   }
   if (!boot.wired) {
     boot.wired = true;
