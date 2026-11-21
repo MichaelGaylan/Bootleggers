@@ -24,6 +24,8 @@
       d.classList.add(/Android/.test(ua) ? 'android' : 'ios');
       if (ios) d.classList.add('is-ios');
       if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) d.classList.add('standalone');
+      // Appearance (RRA-065): Light, Dark or Match device, saved on this device.
+      try { var t = JSON.parse(localStorage.getItem('blg.theme')); if (t === 'light' || t === 'dark') d.dataset.theme = t; } catch (e) {}
     })();
   </script>
 </head>

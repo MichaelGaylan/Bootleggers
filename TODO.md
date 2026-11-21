@@ -13,6 +13,9 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 ## 🟡 Hold
 
 ## 🟣 Done
+### 0.5.3 · build 2026.11.21-3
+- [x] RRA-065 · Dark mode: Light / Dark / Match device under Settings → Appearance, saved per device; everyone can open Settings for it (the rest of Settings stays limited). Status colors and chips have dark versions · Feature · S
+
 ### 0.5.2 · build 2026.11.21-2
 - [x] RRA-064 · Bug: Admin setup on a second device (Gaylan's iPad) was a dead end with only Copy and Start over. Now it offers Restore from an Admin backup and Use an invite instead, and warns before making a second Admin key · Bug · S
 

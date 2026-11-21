@@ -1,8 +1,8 @@
 // Settings (RRA-029) and roles and permissions (RRA-002).
 
 import * as data from './data.js';
-import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session } from './ui.js';
-import { AREAS, PAY_AREAS, ROLE_DEFAULTS, level, canChange, isHost } from './perms.js';
+import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session, THEMES, getTheme, setTheme } from './ui.js';
+import { AREAS, PAY_AREAS, ROLE_DEFAULTS, level, canChange, canSee, isHost } from './perms.js';
 import { ROLES, can as canAccess } from './access.js';
 import { staffList } from './schedule.js';
 import { INACTIVITY_DAYS } from './config.js';
@@ -18,8 +18,13 @@ export async function settingsView() {
     stock: (await data.list('stock')).length,
   };
   const edit = canChange('settings');
+  const full = canSee('settings') || isHost();
+  const theme = getTheme();
   view.innerHTML = `
-    <div class="section-label">People</div>
+    <div class="section-label">Appearance · this device</div>
+    <div class="segmented" id="theme" role="radiogroup" aria-label="Appearance">${Object.entries(THEMES).map(([k, v]) => `<button type="button" role="radio" aria-checked="${k === theme}" data-theme-opt="${k}" class="${k === theme ? 'on' : ''}">${v}</button>`).join('')}</div>
+    <p class="muted small">Match device follows your phone's or iPad's own light and dark setting. This choice is saved on this device only.</p>
+    ${full ? `<div class="section-label">People</div>
     <div class="group">
       <a class="row" href="#/staff"><span class="grow">Staff</span><span class="meta">${counts.staff}</span></a>
       <a class="row" href="#/roles"><span class="grow">Roles and permissions</span></a>
@@ -41,7 +46,8 @@ export async function settingsView() {
       <a class="row" href="#/about"><span class="grow">About</span></a>
       <a class="row" href="#/report"><span class="grow">Report a problem</span></a>
     </div>
-    <p class="muted small center">${edit ? 'You can change Settings.' : 'Only the Admin, and people the Admin allows, can change Settings.'}</p>`;
+    <p class="muted small center">${edit ? 'You can change Settings.' : 'Only the Admin, and people the Admin allows, can change Settings.'}</p>` : ''}`;
+  $$('[data-theme-opt]', view).forEach((b) => { b.onclick = () => { setTheme(b.dataset.themeOpt); settingsView(); }; });
   $('#popups')?.addEventListener('click', async () => { if (!edit) return; s.popups = s.popups === false; await data.saveSettings(s); settingsView(); });
   $('#target')?.addEventListener('click', async () => {
     const v = await sheet({

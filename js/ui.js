@@ -10,6 +10,21 @@ export const LS = {
   set: (k, v) => localStorage.setItem('blg.' + k, JSON.stringify(v)),
 };
 export const isIOS = document.documentElement.classList.contains('is-ios');
+
+// Appearance (RRA-065): 'auto' (match device), 'light' or 'dark', per device.
+export const THEMES = { light: 'Light', dark: 'Dark', auto: 'Match device' };
+export function getTheme() { const t = LS.get('theme', 'auto'); return t in THEMES ? t : 'auto'; }
+export function applyTheme(t = getTheme()) {
+  const d = document.documentElement;
+  if (t === 'auto') d.removeAttribute('data-theme'); else d.dataset.theme = t;
+  // The status bar color follows the choice too.
+  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
+    const dark = t === 'auto' ? m.media.includes('dark') : t === 'dark';
+    m.content = dark ? '#000000' : '#f2f2f7';
+  });
+}
+export function setTheme(t) { LS.set('theme', t); applyTheme(t); }
+applyTheme();
 export const standalone = document.documentElement.classList.contains('standalone');
 // Tablet and computer layout (RRA-051): a sidebar and wide tables from 768px (iPad upright and up).
 export const wideMQ = matchMedia('(min-width: 768px)');

@@ -2,10 +2,16 @@
 // Bump VERSION and BUILD on every release, and add one line to WHATS_NEW.
 
 export const APP_NAME = 'Bootleggers Kitchen';
-export const VERSION = '0.5.2';
-export const BUILD = '2026.11.21-2';
+export const VERSION = '0.5.3';
+export const BUILD = '2026.11.21-3';
 
 export const WHATS_NEW = [
+  {
+    version: '0.5.3', build: '2026.11.21-3', date: '2026-11-21',
+    lines: [
+      'Dark mode: choose Light, Dark or Match device in Settings, under Appearance. Each phone or iPad keeps its own choice, and everyone can now open Settings to set it.',
+    ],
+  },
   {
     version: '0.5.2', build: '2026.11.21-2', date: '2026-11-21',
     lines: [

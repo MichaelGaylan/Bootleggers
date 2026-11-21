@@ -20,7 +20,7 @@ import { loungeView, timesheetView, timesheetsView, canTime } from './lounge.js'
 import { settingsView, listView, rolesView, personView } from './settings.js';
 import { applyMenu, applyVendors, applySupplies } from './menu.js';
 
-import { $, $$, esc, view, dlg, LS, isIOS, standalone, toast, copy, share, pasteInto, sheet, setTitle, setChrome, fmtDate, session, wideMQ } from './ui.js';
+import { $, $$, esc, view, dlg, LS, isIOS, standalone, toast, copy, share, pasteInto, sheet, setTitle, setChrome, fmtDate, session, wideMQ, THEMES, getTheme } from './ui.js';
 
 const NOTICE_VERSION = 1;
 
@@ -184,7 +184,7 @@ function renderSide() {
     canSee('events') ? link('events', 'Events (BEOs)') : '',
     canSee('costs') ? link('costs', 'Costs and waste') : '',
     '<hr>',
-    canSee('settings') || isHost() ? link('settings', 'Settings') : '',
+    link('settings', 'Settings'),
     access.can(profile, 'invite') ? link('team', 'Invite and approve', waiting.size ? `<span class="chip warn">${waiting.size}</span>` : '') : '',
     isHost() ? link('backup', 'Admin backup') : '',
     '<hr>',
@@ -214,7 +214,7 @@ function moreView() {
       ${canSee('costs') ? '<a class="row" href="#/costs"><span class="grow">Costs and waste</span></a>' : ''}
     </div>
     <div class="group">
-      ${canSee('settings') || isHost() ? '<a class="row" href="#/settings"><span class="grow">Settings</span></a>' : ''}
+      <a class="row" href="#/settings"><span class="grow">Settings</span><span class="meta">${esc(THEMES[getTheme()])}</span></a>
       ${access.can(profile, 'invite') ? `<a class="row" href="#/team"><span class="grow">Invite and approve phones</span>${waiting.size ? `<span class="chip warn">${waiting.size} waiting</span>` : ''}</a>` : ''}
       ${isHost() ? `<a class="row" href="#/backup"><span class="grow">Admin backup</span>${LS.get('backupAt', 0) ? '' : '<span class="chip warn">Not made yet</span>'}</a>` : ''}
     </div>
