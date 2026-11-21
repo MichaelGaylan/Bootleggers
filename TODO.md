@@ -11,6 +11,7 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 ## 🔵 Build list
 - [ ] RRA-075 · Messages by hierarchy: pick who a message goes to (Everyone, Kitchen staff, Chefs, Managers, or one person). Each person sees only Everyone posts, posts they sent, and posts sent to their group or to them, so staff never see chef-to-manager or manager-to-chef messages. Today the Kitchen channel is open to all and Managers is open to chefs too, and every phone receives every post (only hidden on screen). Seal non-Everyone posts to the recipients' phones (like the pay key) so other phones can't open them. Replies go to the same people. Anyone, any role, can post to Everyone and everyone sees it; group and one-person messages stay private (confirmed by Gaylan) (Gaylan, 2026-11-21) · Feature · M
 - [ ] RRA-076 · Employee lounge: show the person's job position (e.g. Line cook, Chef, Manager; Admin for the Admin) on the right side of the "Employee lounge" title, as a colored chip in their role color (Gaylan, 2026-11-21) · UX · S
+- [ ] RRA-077 · Prep: the "All prep done" pop-up shows for 3 seconds, then goes away (today it stays up much longer because it carries the Undo button) (Gaylan, 2026-11-21) · UX · S
 
 ## 🟡 Hold
 
