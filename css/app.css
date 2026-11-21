@@ -612,3 +612,10 @@ html[data-theme="dark"] { --c-green: #30d158; --c-orange: #ff9f0a; --c-blue: #40
 @media (min-width: 768px) { .cat-tabs { margin: 2px 0 6px; padding: 4px 0 6px; flex-wrap: wrap; } }
 .ts-row { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 4px; }
 .ts-row > div { display: flex; flex-direction: column; }
+
+/* RRA-076: job position beside the lounge title. */
+.pos-chip .chip { font-size: .8rem; padding: 3px 11px; }
+/* RRA-075: private messages. */
+.msg .who { display: block; }
+.msg.private { border-left: 3px solid var(--c-purple); }
+svg.lock { width: 11px; height: 11px; vertical-align: -1px; }

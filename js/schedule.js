@@ -1,7 +1,7 @@
 // Staff scheduling (RRA-009) and the staff list (Settings → Staff).
 
 import * as data from './data.js';
-import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session, isWide } from './ui.js';
+import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session, isWide, LS } from './ui.js';
 import { canChange, myStaff, isHost, canTime, level } from './perms.js';
 import { ROLES, myEcdhPublic, myPublicKey } from './access.js';
 import { printButtons, wirePrint } from './pdf.js';
@@ -31,6 +31,126 @@ export const pill = (v, g) => (isOff(v) ? '<span class="spill off">TIME OFF</spa
   : `<span class="spill c-${g.c}"><i>${g.l}</i><span>${esc(v)}</span></span>`);
 const initials = (n) => String(n || '?').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 
+// Hours in a shift like 10-6, 8-2, 4-cl or 10:30-4. Close (cl) counts as 11 PM;
+// a start before 7 is in the afternoon (4-cl is 4 PM to close).
+export function shiftHours(v) {
+  if (!v || isOff(v)) return 0;
+  const m = String(v).toLowerCase().match(/(\d{1,2})(?::(\d\d))?\s*(?:am?|pm?)?\s*[-–to ]+\s*(cl\w*|\d{1,2})(?::(\d\d))?/);
+  if (!m) return 0;
+  let a = +m[1] + (+m[2] || 0) / 60;
+  if (a < 7) a += 12;
+  let b = m[3].startsWith('cl') ? 23 : +m[3] + (+m[4] || 0) / 60;
+  while (b <= a) b += 12;
+  const h = b - a;
+  return h > 0 && h <= 16 ? h : 0;
+}
+
+// RRA-078: why a swap can't simply go through. The person covering already
+// works that day, has time off, or would go over 40 hours that week.
+export function swapConflicts(r, week) {
+  if (!r?.to || !week) return [];
+  const out = [];
+  const theirs = week.shifts?.[r.to] || [];
+  const v = theirs[r.dayIndex];
+  if (isOff(v)) out.push(`${r.toName || 'They'} has time off that day`);
+  else if (v) out.push(`${r.toName || 'They'} already works that day (${v})`);
+  const shift = week.shifts?.[r.from]?.[r.dayIndex] || '';
+  const total = theirs.reduce((t, x, i) => t + (i === r.dayIndex ? 0 : shiftHours(x)), 0) + shiftHours(shift);
+  if (total > 40) out.push(`${r.toName || 'They'} would work ${Math.round(total * 10) / 10} hours that week (over 40)`);
+  return out;
+}
+
+async function approveSwap(r) {
+  const w = (await data.get('week', r.week)) || { id: r.week, shifts: {} };
+  w.shifts ||= {};
+  if (r.to) {
+    w.shifts[r.to] ||= Array(7).fill('');
+    w.shifts[r.to][r.dayIndex] = w.shifts[r.from]?.[r.dayIndex] || '';
+    if (w.shifts[r.from]) w.shifts[r.from][r.dayIndex] = '';
+    await data.put('week', w);
+  }
+  r.status = 'approved'; r.decidedBy = session.profile?.name; await data.put('swap', r);
+  toast(r.to ? 'Swap approved and the schedule updated' : 'Approved. Assign the cover on the schedule.');
+}
+async function declineSwap(r) { r.status = 'declined'; r.decidedBy = session.profile?.name; await data.put('swap', r); toast('Swap declined'); }
+
+// Ask the requester a private question about their swap (uses RRA-075).
+async function askAboutSwap(r) {
+  const q = await sheet({
+    title: `Ask ${r.fromName}`, right: 'Send',
+    body: `<p class="muted small" style="margin-top:0">Only ${esc(r.fromName)} and you see this. It goes to their message board as a private message.</p>
+      <textarea id="sq" style="min-height:80px" placeholder="e.g. Can you cover Thursday instead?"></textarea>`,
+    onMount: (api) => { api.onRight = () => { const t = $('#sq', api.el).value.trim(); if (t) api.close(t); }; },
+  });
+  if (!q) return false;
+  const { sendPost } = await import('./board.js');
+  await sendPost({ text: `About your swap request (${r.day}): ${q}`, to: { kind: 'person', person: r.from }, about: { swap: r.id } });
+  r.question = { at: Date.now(), by: session.profile?.name }; await data.put('swap', r);
+  toast(`Question sent to ${r.fromName}`);
+  return true;
+}
+
+// The pop-up a manager sees when they open the app and a swap request
+// conflicts: Approve, Deny or Ask a question.
+export async function swapConflictPopup(r, conflicts) {
+  const act = await sheet({
+    title: 'Swap request conflict', left: 'Later', right: null,
+    body: `<p style="margin-top:0"><b>${esc(r.fromName)}</b> asks <b>${esc(r.toName)}</b> to cover <b>${esc(r.day)}</b>.${r.note ? `<br><span class="muted">"${esc(r.note)}"</span>` : ''}</p>
+      <div class="hint small" style="color:var(--danger)">${conflicts.map((c) => esc(c)).join('<br>')}</div>
+      ${r.question ? `<p class="muted small">You asked a question ${esc(new Date(r.question.at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }))}.</p>` : ''}
+      <div class="btn-row" style="margin-top:12px;flex-wrap:wrap">
+        <button class="btn" type="button" data-a="ok">Approve</button>
+        <button class="btn danger" type="button" data-a="no">Deny</button>
+        <button class="btn tonal" type="button" data-a="ask">Ask a question</button>
+      </div>`,
+    onMount: (api) => { $$('[data-a]', api.el).forEach((b) => { b.onclick = () => api.close(b.dataset.a); }); },
+  });
+  if (act === 'ok') await approveSwap(r);
+  else if (act === 'no') await declineSwap(r);
+  else if (act === 'ask') await askAboutSwap(r);
+  return act;
+}
+
+// On opening the app: managers get the conflicting swap requests they
+// haven't dealt with; the requester gets a manager's question about theirs.
+const laterThisVisit = new Set();
+export async function swapPopups() {
+  const seen = new Set(LS.get('swapSeen', []));
+  const mark = (k) => { seen.add(k); LS.set('swapSeen', [...seen].slice(-200)); };
+  if (canChange('schedule')) {
+    for (const r of (await data.list('swap')).filter((s) => s.status === 'asked' && s.to).sort((a, b) => a.at - b.at)) {
+      // Later: ask again next time the app opens. Asked a question: wait for the answer on the board.
+      const key = `c:${r.id}`;
+      if (seen.has(key) || laterThisVisit.has(r.id)) continue;
+      const c = swapConflicts(r, await data.get('week', r.week));
+      if (!c.length) continue;
+      laterThisVisit.add(r.id);
+      if (await swapConflictPopup(r, c) === 'ask') mark(key);
+      return true;
+    }
+  }
+  const { canSeePost, sentByMe, myId } = await import('./audience.js');
+  const me = myId();
+  for (const p of (await data.list('post')).filter((x) => x.about?.swap && x.to?.person === me && !sentByMe(x) && canSeePost(x))) {
+    const key = `q:${p.id}`;
+    if (seen.has(key)) continue;
+    mark(key);
+    const reply = await sheet({
+      title: 'Question about your swap', left: 'Later', right: 'Reply',
+      body: `<p style="margin-top:0"><b>${esc(p.by)}</b> asks:</p><div class="msg private" style="margin:0">${esc(p.text)}</div>
+        <textarea id="sr" style="min-height:70px;margin-top:10px" placeholder="Your answer (only you and ${esc(p.by)} see it)"></textarea>`,
+      onMount: (api) => { api.onRight = () => { const t = $('#sr', api.el).value.trim(); if (t) api.close(t); }; },
+    });
+    if (reply) {
+      p.replies = [...(p.replies || []), { by: session.profile.name, byId: me, at: Date.now(), text: reply }];
+      await data.put('post', p);
+      toast('Reply sent');
+    }
+    return true;
+  }
+  return false;
+}
+
 const label = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString([], { month: 'short', day: 'numeric' }); };
 
 export async function scheduleView() {
@@ -41,6 +161,8 @@ export async function scheduleView() {
   const week = (await data.get('week', wk)) || { id: wk, shifts: {}, published: false };
   const me = myStaff();
   const swaps = (await data.list('swap')).filter((s) => s.status === 'asked').sort((a, b) => a.at - b.at);
+  const conflictsOf = {};
+  for (const r of swaps) conflictsOf[r.id] = swapConflicts(r, r.week === wk ? week : await data.get('week', r.week));
   setTitle('Schedule', change ? `<button class="btn plain small" id="pub" type="button">${week.published ? 'Unpublish' : 'Publish'}</button>` : '');
   const visible = change || week.published;
   week.open ||= Array.from({ length: 7 }, () => []);
@@ -74,8 +196,8 @@ export async function scheduleView() {
     ${visible && staff.length ? (isWide() ? weekGrid() : dayList()) : visible ? '' : '<div class="empty">This week isn\'t published yet.</div>'}
     ${!staff.length ? `<div class="empty">No staff yet.${change ? ' Add people below.' : ''}</div>` : ''}
     ${swaps.length ? `<div class="section-label">Swap requests</div><div class="group">${swaps.map((r) => `
-      <div class="row" data-swap="${r.id}"><span class="grow"><span class="title">${esc(r.fromName)} asks ${esc(r.toName || 'anyone')} to cover</span><span class="sub">${esc(r.day)}${r.note ? ' · ' + esc(r.note) : ''}</span></span>
-      ${change ? '<button class="btn small" data-ok type="button">OK</button><button class="btn danger small" data-no type="button">No</button>' : '<span class="chip warn">Waiting</span>'}</div>`).join('')}</div>` : ''}
+      <div class="row" data-swap="${r.id}"><span class="grow"><span class="title">${esc(r.fromName)} asks ${esc(r.toName || 'anyone')} to cover${conflictsOf[r.id].length ? ' <span class="chip warn">Conflict</span>' : ''}</span><span class="sub">${esc(r.day)}${r.note ? ' · ' + esc(r.note) : ''}${conflictsOf[r.id].map((c) => `<br><span style="color:var(--danger)">${esc(c)}</span>`).join('')}</span></span>
+      ${change ? `${conflictsOf[r.id].length ? '<button class="btn tonal small" data-q type="button">Ask</button>' : ''}<button class="btn small" data-ok type="button">OK</button><button class="btn danger small" data-no type="button">No</button>` : '<span class="chip warn">Waiting</span>'}</div>`).join('')}</div>` : ''}
     <div class="group" style="margin-top:14px">
       ${me && week.published ? '<button class="row nav" id="ask" type="button"><span class="grow">Ask for a shift swap</span></button>' : ''}
       ${change ? `<a class="row" href="#/staff"><span class="grow">Add or remove staff</span><span class="meta">${staff.length}</span></a>` : ''}
@@ -170,19 +292,9 @@ export async function scheduleView() {
   });
   $$('[data-swap]', view).forEach((row) => {
     const r = swaps.find((x) => x.id === row.dataset.swap);
-    $('[data-ok]', row)?.addEventListener('click', async () => {
-      const w = (await data.get('week', r.week)) || { id: r.week, shifts: {} };
-      if (r.to) {
-        w.shifts[r.to] ||= Array(7).fill('');
-        w.shifts[r.to][r.dayIndex] = w.shifts[r.from]?.[r.dayIndex] || '';
-        if (w.shifts[r.from]) w.shifts[r.from][r.dayIndex] = '';
-        await data.put('week', w);
-      }
-      r.status = 'approved'; await data.put('swap', r);
-      toast(r.to ? 'Swap approved and the schedule updated' : 'Approved. Assign the cover on the schedule.');
-      scheduleView();
-    });
-    $('[data-no]', row)?.addEventListener('click', async () => { r.status = 'declined'; await data.put('swap', r); scheduleView(); });
+    $('[data-ok]', row)?.addEventListener('click', async () => { await approveSwap(r); scheduleView(); });
+    $('[data-no]', row)?.addEventListener('click', async () => { await declineSwap(r); scheduleView(); });
+    $('[data-q]', row)?.addEventListener('click', async () => { await askAboutSwap(r); scheduleView(); });
   });
 }
 

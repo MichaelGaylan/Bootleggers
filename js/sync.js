@@ -14,6 +14,7 @@ import * as store from './store.js';
 import { b64uEnc, b64uDec, importTeamKey, sealTo, openFrom } from './crypto.js';
 import { teamKeyBytes, ensureTeamKey, payPrivate } from './access.js';
 import { level, myStaff } from './perms.js';
+import { isPrivate, recipientKeys } from './audience.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const COLLS = ['recipe', 'stock', 'vendor', 'staff', 'prepitem', 'prepday', 'post', 'week', 'swap', 'event', 'waste', 'punch', 'payrate', 'prepsaved', 'settings'];
@@ -118,8 +119,36 @@ async function openPrivate(r) {
   return null;
 }
 
+// Private messages (RRA-075): sealed to each recipient's phone, not the team key.
+async function sealMessage(doc) {
+  const bytes = te.encode(JSON.stringify(doc));
+  const keys = recipientKeys(doc, await data.list('staff'), await data.settings());
+  const mine = await exportMyEk();
+  if (mine && !keys.includes(mine)) keys.push(mine);
+  const k = {};
+  for (const ek of keys) { try { k[ek] = await sealTo(ek, bytes); } catch { /* old key */ } }
+  return { iv: 'mk1', ct: JSON.stringify({ k }) };
+}
+let myEk = null;
+async function exportMyEk() {
+  if (!myEk) { try { const { myEcdhPublic } = await import('./access.js'); myEk = await myEcdhPublic(); } catch { return null; } }
+  return myEk;
+}
+async function openMessage(r) {
+  let box;
+  try { box = JSON.parse(r.ct); } catch { return null; }
+  const ek = await exportMyEk();
+  const mine = box.k?.[ek];
+  if (!mine) return null; // not for this phone
+  try { return JSON.parse(td.decode(await openFrom((await store.ecdhKey()).privateKey, mine))); } catch { return null; }
+}
+
 async function push(coll, doc) {
   if (!db) return;
+  if (coll === 'post' && isPrivate(doc)) {
+    await fs.setDoc(fs.doc(db, 'teams', 'bootleggers', 'docs', docPath(coll, doc.id)), { c: coll, i: doc.id, u: doc.updated || Date.now(), d: false, ...(await sealMessage(doc)) });
+    return;
+  }
   if (PRIVATE.includes(coll)) {
     const pbox = await sealPrivate(coll, doc);
     if (pbox) await fs.setDoc(fs.doc(db, 'teams', 'bootleggers', 'docs', docPath(coll, doc.id)), { c: coll, i: doc.id, u: doc.updated || Date.now(), d: false, ...pbox });
@@ -161,6 +190,11 @@ export async function start(profile, onStatus = () => {}) {
         if (mine && (mine.updated || 0) >= r.u) continue; // ours is as new or newer
         try {
           if (r.c === 'settings') { if (!r.d) await data.applyRemoteSettings(await open(r)); }
+          else if (r.iv === 'mk1') {
+            // A private message: opens only on the phones it was sealed to.
+            const doc = r.d ? null : await openMessage(r);
+            if (r.d || doc) await data.applyRemote(r.c, r.i, doc);
+          }
           else if (PRIVATE.includes(r.c)) {
             // Someone else's hours and pay never open on a staff phone.
             const doc = r.d ? null : await openPrivate(r);

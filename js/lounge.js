@@ -8,7 +8,8 @@ import * as data from './data.js';
 import { $, $$, esc, view, LS, sheet, toast, setTitle, setChrome, session, copy, isWide, chip } from './ui.js';
 import { canChange, canSee, myStaff, isHost, canTime } from './perms.js';
 import { payKeyInfo } from './access.js';
-import { unreadPosts } from './board.js';
+import { unreadPosts, sendPost } from './board.js';
+import { canSeePost, isPrivate } from './audience.js';
 import { staffList, roleOf, pill } from './schedule.js';
 import { printButtons, wirePrint } from './pdf.js';
 
@@ -56,8 +57,10 @@ export async function loungeButton() {
 
 export async function loungeView() {
   setChrome({ tab: 'lounge' });
-  setTitle('Employee lounge');
   const me = myStaff();
+  // RRA-076: this person's job position, in their role color.
+  setTitle('Employee lounge', isHost() ? `<span class="pos-chip">${chip('Admin', 'purple')}</span>`
+    : me?.position ? `<span class="pos-chip">${chip(me.position, roleOf(me).c)}</span>` : '');
   const all = await punches();
   const wk = data.weekStart();
   const open = me ? openPunch(all, me.id) : null;
@@ -66,7 +69,7 @@ export async function loungeView() {
   const todayIdx = (new Date().getDay() + 6) % 7;
   const myShifts = me && (week.published || canChange('schedule')) ? week.shifts?.[me.id] || [] : [];
   const unread = await unreadPosts();
-  const posts = canSee('board') ? (await data.list('post')).filter((p) => p.channel !== 'managers').sort((a, b) => b.at - a.at).slice(0, 3) : [];
+  const posts = canSee('board') ? (await data.list('post')).filter(canSeePost).sort((a, b) => b.at - a.at).slice(0, 3) : [];
   const notices = (session.notices || []).slice(0, 1);
   const items = await data.list('prepitem');
   const done = (await data.get('prepday', data.today()))?.done || {};
@@ -94,7 +97,7 @@ export async function loungeView() {
 
     ${canSee('board') ? `<div class="card l-card"><div class="l-head"><b>Bulletin board</b><a href="#/board">${unread ? `${chip(`${unread} new`, 'orange')} ` : ''}Open <span class="chev-i">›</span></a></div>
       ${notices.map((n) => `<div class="l-post notice"><span class="who">${esc(n.from || 'Management')} · notice</span><b>${esc(n.title)}</b></div>`).join('')}
-      ${posts.map((p) => `<a class="l-post" href="#/board"><span class="who">${esc(p.by)} · ${new Date(p.at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>${esc(p.text.slice(0, 140))}</a>`).join('') || (notices.length ? '' : '<p class="muted small">No posts yet.</p>')}
+      ${posts.map((p) => `<a class="l-post" href="#/board"><span class="who">${esc(p.by)} · ${new Date(p.at).toLocaleDateString([], { month: 'short', day: 'numeric' })}${isPrivate(p) ? ' · 🔒 Private' : ''}</span>${esc(p.text.slice(0, 140))}</a>`).join('') || (notices.length ? '' : '<p class="muted small">No posts yet.</p>')}
       ${canChange('board') ? `<div class="l-quick"><input type="text" id="l-post" placeholder="Write to everyone"><button class="btn small" id="l-send" type="button">Post</button></div>` : ''}</div>` : ''}
 
     ${canTime() ? `<div class="card l-card"><div class="l-head"><b>Time sheets</b><a href="#/timesheets">Everyone's hours <span class="chev-i">›</span></a></div>
@@ -105,7 +108,7 @@ export async function loungeView() {
   $('#l-send')?.addEventListener('click', async () => {
     const text = $('#l-post').value.trim();
     if (!text) return;
-    await data.put('post', { text, by: session.profile.name, at: Date.now(), channel: 'all', replies: [] });
+    await sendPost({ text, to: { kind: 'all' } });
     toast('Posted to everyone');
     loungeView();
   });

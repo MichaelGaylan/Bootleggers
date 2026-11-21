@@ -9,14 +9,16 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
-- [ ] RRA-075 · Messages by hierarchy: pick who a message goes to (Everyone, Kitchen staff, Chefs, Managers, or one person). Each person sees only Everyone posts, posts they sent, and posts sent to their group or to them, so staff never see chef-to-manager or manager-to-chef messages. Today the Kitchen channel is open to all and Managers is open to chefs too, and every phone receives every post (only hidden on screen). Seal non-Everyone posts to the recipients' phones (like the pay key) so other phones can't open them. Replies go to the same people. Anyone, any role, can post to Everyone and everyone sees it; group and one-person messages stay private (confirmed by Gaylan) (Gaylan, 2026-11-21) · Feature · M
-- [ ] RRA-076 · Employee lounge: show the person's job position (e.g. Line cook, Chef, Manager; Admin for the Admin) on the right side of the "Employee lounge" title, as a colored chip in their role color (Gaylan, 2026-11-21) · UX · S
-- [ ] RRA-077 · Prep: the "All prep done" pop-up (with Undo) shows for 4 seconds, then goes away (Gaylan changed 3 to 4) (today it stays up much longer because it carries the Undo button) (Gaylan, 2026-11-21) · UX · S
-- [ ] RRA-078 · Schedule swaps: check each swap request for a conflict (the person covering already works that day, has time off, or would go over 40 hours that week). A conflicting request pops up for managers when they open the app, with Approve, Deny, or Ask a question: a private follow-up to the person who asked (uses the private messages from RRA-075). The requester gets a pop-up with the answer or question and can reply (Gaylan, 2026-11-21) · Feature · M
 
 ## 🟡 Hold
 
 ## 🟣 Done
+### 0.5.6 · build 2026.11.21-6
+- [x] RRA-075 · Messages by hierarchy: pick who a message goes to (Everyone, Kitchen staff, Chefs, Managers, or one person). Each person sees only Everyone posts, posts they sent, and posts sent to their group or to them, so staff never see chef-to-manager or manager-to-chef messages. Today the Kitchen channel is open to all and Managers is open to chefs too, and every phone receives every post (only hidden on screen). Seal non-Everyone posts to the recipients' phones (like the pay key) so other phones can't open them. Replies go to the same people. Anyone, any role, can post to Everyone and everyone sees it; group and one-person messages stay private (confirmed by Gaylan) (Gaylan, 2026-11-21) · Feature · M
+- [x] RRA-076 · Employee lounge: show the person's job position (e.g. Line cook, Chef, Manager; Admin for the Admin) on the right side of the "Employee lounge" title, as a colored chip in their role color (Gaylan, 2026-11-21) · UX · S
+- [x] RRA-077 · Prep: the "All prep done" pop-up (with Undo) shows for 4 seconds, then goes away (Gaylan changed 3 to 4) (today it stays up much longer because it carries the Undo button) (Gaylan, 2026-11-21) · UX · S
+- [x] RRA-078 · Schedule swaps: check each swap request for a conflict (the person covering already works that day, has time off, or would go over 40 hours that week). A conflicting request pops up for managers when they open the app, with Approve, Deny, or Ask a question: a private follow-up to the person who asked (uses the private messages from RRA-075). The requester gets a pop-up with the answer or question and can reply (Gaylan, 2026-11-21) · Feature · M
+
 ### 0.5.5 · build 2026.11.21-5
 - [x] RRA-068 · Invites, requests and activations: show the code on its own in a box with a "Copy code only" button, separate from the message text and link, so it pastes cleanly. Keep "Send" for the full message (Gaylan, 2026-11-21) · UX · S
 - [x] RRA-069 · Bigger back (return) buttons everywhere: a larger tap target at the top left (Gaylan, 2026-11-21) · UX · S

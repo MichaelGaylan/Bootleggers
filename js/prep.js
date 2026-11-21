@@ -98,7 +98,7 @@ async function render() {
           toast('All prep done! The list is cleared for the next shift.', {
             label: 'Undo',
             run: async () => { for (const i of cleared) await data.put('prepitem', i); render(); },
-          });
+          }, 4000); // RRA-077: up for 4 seconds
         }
         render();
       };

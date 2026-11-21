@@ -56,7 +56,7 @@ export const searchBox = (id, placeholder, value) => `<div class="search"><input
 
 // ---------------------------------------------------------------- helpers
 
-export function toast(msg, action) {
+export function toast(msg, action, ms) {
   const t = $('#toast');
   t.innerHTML = `<span>${esc(msg)}</span>`;
   if (action) {
@@ -67,7 +67,7 @@ export function toast(msg, action) {
   }
   t.hidden = false;
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => { t.hidden = true; }, action ? 12000 : 3000);
+  toast.timer = setTimeout(() => { t.hidden = true; }, ms || (action ? 12000 : 3000));
 }
 
 export async function copy(text, done = 'Copied') {

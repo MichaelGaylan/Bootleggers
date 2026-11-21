@@ -13,7 +13,7 @@ import { recipesView, recipeView, printView } from './recipes.js';
 import { stockView, neededView, ordersView, vendorsView } from './stock.js';
 import { boardView, unreadPosts } from './board.js';
 import { prepView } from './prep.js';
-import { scheduleView, staffView, ensureStaffFor, staffList, schedulePrintView } from './schedule.js';
+import { scheduleView, staffView, ensureStaffFor, staffList, schedulePrintView, swapPopups } from './schedule.js';
 import { eventsView, eventView } from './events.js';
 import { costsView } from './costs.js';
 import { loungeView, timesheetView, timesheetsView, canTime } from './lounge.js';
@@ -765,6 +765,8 @@ async function route() {
   renderSide();
   const at = location.hash;
   await (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
+  // RRA-078: swap conflicts for managers, and a manager's question for the requester.
+  if (location.hash === at && !dlg.open && await swapPopups().catch(() => false) && location.hash === at) (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
   // A slow screen can finish after a quicker tap: show what the address says.
   if (location.hash !== at && !dlg.open) route();
 }
