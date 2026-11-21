@@ -20,7 +20,10 @@ const when = (t) => {
 
 export async function unreadPosts() {
   const seen = LS.get('boardSeen', 0);
-  return (await data.list('post')).filter((p) => p.at > seen && !sentByMe(p) && canSeePost(p)).length;
+  // A new reply from someone else counts too (RRA-081).
+  const me = myId();
+  const last = (p) => Math.max(sentByMe(p) ? 0 : p.at, ...(p.replies || []).filter((r) => (r.byId ? r.byId !== me : r.by !== session.profile?.name)).map((r) => r.at));
+  return (await data.list('post')).filter((p) => canSeePost(p) && last(p) > seen).length;
 }
 
 export async function boardView() {
@@ -87,6 +90,7 @@ export async function boardView() {
       if (!text) return;
       p.replies = [...(p.replies || []), { by: session.profile.name, byId: myId(), at: Date.now(), text }];
       await data.put('post', p);
+      if (p.about?.swap && p.to?.person === myId()) { const { recordSwapAnswer } = await import('./schedule.js'); await recordSwapAnswer(p.about.swap, text); }
       boardView();
     };
   });

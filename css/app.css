@@ -619,3 +619,16 @@ html[data-theme="dark"] { --c-green: #30d158; --c-orange: #ff9f0a; --c-blue: #40
 .msg .who { display: block; }
 .msg.private { border-left: 3px solid var(--c-purple); }
 svg.lock { width: 11px; height: 11px; vertical-align: -1px; }
+
+/* RRA-080 to 083: swaps. */
+.lounge-btn .swap-badge { background: var(--c-orange); color: #fff; font-weight: 700; font-size: .78rem; border-radius: 999px; padding: 3px 9px; margin-right: 6px; white-space: nowrap; }
+.swap-row { flex-wrap: wrap; transition: background-color .6s; }
+.swap-row.focus { background: color-mix(in srgb, var(--c-orange) 22%, transparent); }
+.swap-acts { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.swap-flag { margin-top: 6px; padding: 8px 10px; border-radius: 10px; background: color-mix(in srgb, var(--c-orange) 14%, transparent); border-left: 3px solid var(--c-orange); font-size: .85rem; color: var(--text); }
+.chip.flag { background: color-mix(in srgb, var(--c-orange) 20%, transparent); color: var(--text); }
+.chip.danger { background: color-mix(in srgb, var(--danger) 20%, transparent); color: var(--text); }
+.danger-text { color: var(--danger); }
+.swap-row > .grow { flex: 1 1 100%; min-width: 0; }
+.swap-row .sub, .swap-row .title { white-space: normal; overflow: visible; text-overflow: clip; }
+.swap-row .swap-acts { width: 100%; justify-content: flex-start; margin-top: 8px; }

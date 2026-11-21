@@ -692,7 +692,7 @@ const routes = {
   timesheet: () => timesheetView(),
   timesheets: () => timesheetsView(),
   notices: () => boardView(),
-  schedule: () => scheduleView(),
+  schedule: (arg) => scheduleView(arg),
   'schedule-print': (arg) => schedulePrintView(arg),
   staff: () => staffView(),
   events: () => eventsView(),
@@ -766,7 +766,7 @@ async function route() {
   const at = location.hash;
   await (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
   // RRA-078: swap conflicts for managers, and a manager's question for the requester.
-  if (location.hash === at && !dlg.open && await swapPopups().catch(() => false) && location.hash === at) (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
+  if (location.hash === at && !dlg.open && $('#splash').hidden && await swapPopups().catch(() => false) && location.hash === at) (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
   // A slow screen can finish after a quicker tap: show what the address says.
   if (location.hash !== at && !dlg.open) route();
 }

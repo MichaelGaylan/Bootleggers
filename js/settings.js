@@ -3,6 +3,7 @@
 import * as data from './data.js';
 import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session, THEMES, getTheme, setTheme } from './ui.js';
 import { AREAS, PAY_AREAS, ROLE_DEFAULTS, level, canChange, canSee, isHost } from './perms.js';
+import { PAY_PRESETS, payRules, rulesText } from './lounge.js';
 import { ROLES, can as canAccess, canChangeRole, makeRoleChange, rotatePayKey } from './access.js';
 import { staffList } from './schedule.js';
 import { INACTIVITY_DAYS } from './config.js';
@@ -20,10 +21,14 @@ export async function settingsView() {
   const edit = canChange('settings');
   const full = canSee('settings') || isHost();
   const theme = getTheme();
+  const seePay = level('payrates') !== 'none';
+  const rules = payRules(s);
   view.innerHTML = `
     <div class="section-label">Appearance · this device</div>
     <div class="segmented" id="theme" role="radiogroup" aria-label="Appearance">${Object.entries(THEMES).map(([k, v]) => `<button type="button" role="radio" aria-checked="${k === theme}" data-theme-opt="${k}" class="${k === theme ? 'on' : ''}">${v}</button>`).join('')}</div>
     <p class="muted small">Match device follows your phone's or iPad's own light and dark setting. The moon button at the top switches between light and dark in one tap. This choice is saved on this device only.</p>
+    ${seePay ? `<div class="section-label">Pay</div>
+    <div class="group"><button class="row nav" id="payrules" type="button"><span class="grow"><span class="title">Pay rules</span><span class="sub">${esc(PAY_PRESETS[rules.preset]?.name || 'Custom')}: ${esc(rulesText(rules))}</span></span></button></div>` : ''}
     ${full ? `<div class="section-label">People</div>
     <div class="group">
       <a class="row" href="#/staff"><span class="grow">Staff</span><span class="meta">${counts.staff}</span></a>
@@ -48,6 +53,38 @@ export async function settingsView() {
     </div>
     <p class="muted small center">${edit ? 'You can change Settings.' : 'Only the Admin, and people the Admin allows, can change Settings.'}</p>` : ''}`;
   $$('[data-theme-opt]', view).forEach((b) => { b.onclick = () => { setTheme(b.dataset.themeOpt); settingsView(); }; });
+  // RRA-085: pay rules for time sheets. The Admin, and managers allowed to change pay.
+  $('#payrules')?.addEventListener('click', async () => {
+    const can = canChange('payrates');
+    const num = (id, label, v, hint = '') => `<label class="field"><span>${label}</span><input type="text" inputmode="decimal" id="${id}" value="${v || ''}" placeholder="${hint}"${can ? '' : ' readonly'}></label>`;
+    const next = await sheet({
+      title: 'Pay rules', right: can ? 'Save' : null, left: can ? 'Cancel' : 'Close',
+      body: `<p class="muted small" style="margin-top:0">How time sheets count overtime and pay. Check your state's rules; this isn't legal or tax advice.</p>
+        <label class="field"><span>State rules</span><select id="pr-preset"${can ? '' : ' disabled'}>${Object.entries(PAY_PRESETS).map(([k, p]) => `<option value="${k}"${k === rules.preset ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}<option value="custom"${rules.preset === 'custom' ? ' selected' : ''}>Custom</option></select></label>
+        ${num('pr-w', 'Weekly overtime after (hours a week)', rules.weeklyAfter, '40')}
+        ${num('pr-x', 'Overtime rate (times the hourly rate)', rules.otX, '1.5')}
+        ${num('pr-d', 'Daily overtime after (hours a day, blank for none)', rules.dailyAfter || '', 'none')}
+        ${num('pr-dd', 'Double time after (hours a day, blank for none)', rules.doubleAfter || '', 'none')}
+        ${num('pr-dx', 'Double time rate (times the hourly rate)', rules.doubleX, '2')}
+        <p class="muted small">The pay week runs Monday to Sunday, the same as the schedule.</p>`,
+      onMount: (api) => {
+        const fill = (p) => { $('#pr-w', api.el).value = p.weeklyAfter; $('#pr-x', api.el).value = p.otX; $('#pr-d', api.el).value = p.dailyAfter || ''; $('#pr-dd', api.el).value = p.doubleAfter || ''; $('#pr-dx', api.el).value = p.doubleX; };
+        $('#pr-preset', api.el).onchange = (e) => { if (PAY_PRESETS[e.target.value]) fill(PAY_PRESETS[e.target.value]); };
+        $$('input', api.el).forEach((i) => { i.oninput = () => { $('#pr-preset', api.el).value = 'custom'; }; });
+        api.onRight = () => {
+          const v = (id) => +String($(id, api.el).value).replace(/[^\d.]/g, '') || 0;
+          const r = { preset: $('#pr-preset', api.el).value, weeklyAfter: v('#pr-w') || 40, otX: v('#pr-x') || 1.5, dailyAfter: v('#pr-d'), doubleAfter: v('#pr-dd'), doubleX: v('#pr-dx') || 2 };
+          if (r.otX < 1 || r.doubleX < 1) { toast('Rates must be 1× or more'); return; }
+          if (r.doubleAfter && r.dailyAfter && r.doubleAfter <= r.dailyAfter) { toast('Double time must start after daily overtime'); return; }
+          api.close(r);
+        };
+      },
+    });
+    if (!next || !can) return;
+    await data.saveSettings({ ...(await data.settings()), payRules: next });
+    toast('Pay rules saved');
+    settingsView();
+  });
   $('#popups')?.addEventListener('click', async () => { if (!edit) return; s.popups = s.popups === false; await data.saveSettings(s); settingsView(); });
   $('#target')?.addEventListener('click', async () => {
     const v = await sheet({

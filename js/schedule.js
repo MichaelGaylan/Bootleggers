@@ -2,6 +2,7 @@
 
 import * as data from './data.js';
 import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session, isWide, LS } from './ui.js';
+const chipHtml = (t, k) => `<span class="chip${k ? ' ' + k : ''}">${esc(t)}</span>`;
 import { canChange, myStaff, isHost, canTime, level } from './perms.js';
 import { ROLES, myEcdhPublic, myPublicKey } from './access.js';
 import { printButtons, wirePrint } from './pdf.js';
@@ -61,6 +62,8 @@ export function swapConflicts(r, week) {
 }
 
 async function approveSwap(r) {
+  const cur = await data.get('swap', r.id);
+  if (cur && cur.status !== 'asked') { toast(cur.status === 'withdrawn' ? `${r.fromName} removed this request.` : 'Already decided.'); return; }
   const w = (await data.get('week', r.week)) || { id: r.week, shifts: {} };
   w.shifts ||= {};
   if (r.to) {
@@ -90,60 +93,106 @@ async function askAboutSwap(r) {
   return true;
 }
 
-// The pop-up a manager sees when they open the app and a swap request
-// conflicts: Approve, Deny or Ask a question.
+// RRA-081: the requester's answer to a manager's question, kept on the swap
+// request so every approver sees it (flag), not only the one who asked.
+export async function recordSwapAnswer(swapId, text) {
+  const r = await data.get('swap', swapId);
+  if (!r || r.status !== 'asked') return;
+  r.answer = { text, at: Date.now(), by: session.profile?.name };
+  await data.put('swap', r);
+}
+const when = (ms) => new Date(ms).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+const answerHtml = (r) => (r.answer ? `<div class="swap-flag">🚩 <b>Reply received</b> from ${esc(r.answer.by || r.fromName)} · ${esc(when(r.answer.at))}<br>"${esc(r.answer.text)}"</div>` : '');
+
+// The pop-up an approver sees when they open the app: a swap request that
+// conflicts, or one whose requester answered a question. Approve, Deny or Ask.
 export async function swapConflictPopup(r, conflicts) {
   const act = await sheet({
-    title: 'Swap request conflict', left: 'Later', right: null,
-    body: `<p style="margin-top:0"><b>${esc(r.fromName)}</b> asks <b>${esc(r.toName)}</b> to cover <b>${esc(r.day)}</b>.${r.note ? `<br><span class="muted">"${esc(r.note)}"</span>` : ''}</p>
-      <div class="hint small" style="color:var(--danger)">${conflicts.map((c) => esc(c)).join('<br>')}</div>
-      ${r.question ? `<p class="muted small">You asked a question ${esc(new Date(r.question.at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }))}.</p>` : ''}
+    title: r.answer && !conflicts.length ? 'Swap request: reply received' : 'Swap request conflict', left: 'Later', right: null,
+    body: `<p style="margin-top:0"><b>${esc(r.fromName)}</b> asks <b>${esc(r.toName || 'anyone')}</b> to cover <b>${esc(r.day)}</b>.${r.note ? `<br><span class="muted">"${esc(r.note)}"</span>` : ''}</p>
+      ${conflicts.length ? `<div class="hint small" style="color:var(--danger)">${conflicts.map((c) => esc(c)).join('<br>')}</div>` : ''}
+      ${r.question ? `<p class="muted small">${esc(r.question.by || 'A manager')} asked a question ${esc(when(r.question.at))}.</p>` : ''}
+      ${answerHtml(r)}
       <div class="btn-row" style="margin-top:12px;flex-wrap:wrap">
         <button class="btn" type="button" data-a="ok">Approve</button>
         <button class="btn danger" type="button" data-a="no">Deny</button>
         <button class="btn tonal" type="button" data-a="ask">Ask a question</button>
-      </div>`,
-    onMount: (api) => { $$('[data-a]', api.el).forEach((b) => { b.onclick = () => api.close(b.dataset.a); }); },
+      </div>
+      <a class="small" href="#/schedule/${r.id}" data-a="go">Open the request ›</a>`,
+    onMount: (api) => { $$('[data-a]', api.el).forEach((b) => { b.onclick = (e) => { e.preventDefault(); api.close(b.dataset.a); }; }); },
   });
   if (act === 'ok') await approveSwap(r);
   else if (act === 'no') await declineSwap(r);
   else if (act === 'ask') await askAboutSwap(r);
+  else if (act === 'go') location.hash = `#/schedule/${r.id}`;
   return act;
 }
 
-// On opening the app: managers get the conflicting swap requests they
-// haven't dealt with; the requester gets a manager's question about theirs.
+// Who can approve swaps, and the swaps that need this phone's attention (RRA-080).
+const canApprove = () => canChange('schedule');
+const mySwapSeen = () => new Set(LS.get('swapSeen', []));
+export async function swapBadge() {
+  const all = await data.list('swap');
+  const me = myStaff();
+  const seen = mySwapSeen();
+  let n = 0;
+  if (canApprove()) n += all.filter((s) => s.status === 'asked').length;
+  if (me) n += all.filter((s) => s.from === me.id && (s.status === 'asked' ? !canApprove() : (s.status === 'approved' || s.status === 'declined') && !seen.has(`d:${s.id}:${s.status}`))).length;
+  return n;
+}
+
+// On opening the app: approvers get conflicting swap requests and answers
+// to questions; the requester gets a manager's question, and the decision.
 const laterThisVisit = new Set();
 export async function swapPopups() {
-  const seen = new Set(LS.get('swapSeen', []));
-  const mark = (k) => { seen.add(k); LS.set('swapSeen', [...seen].slice(-200)); };
-  if (canChange('schedule')) {
-    for (const r of (await data.list('swap')).filter((s) => s.status === 'asked' && s.to).sort((a, b) => a.at - b.at)) {
-      // Later: ask again next time the app opens. Asked a question: wait for the answer on the board.
-      const key = `c:${r.id}`;
-      if (seen.has(key) || laterThisVisit.has(r.id)) continue;
-      const c = swapConflicts(r, await data.get('week', r.week));
-      if (!c.length) continue;
-      laterThisVisit.add(r.id);
-      if (await swapConflictPopup(r, c) === 'ask') mark(key);
+  const seen = mySwapSeen();
+  const mark = (k) => { seen.add(k); LS.set('swapSeen', [...seen].slice(-300)); };
+  const swaps = (await data.list('swap')).sort((a, b) => a.at - b.at);
+  if (canApprove()) {
+    for (const r of swaps.filter((s) => s.status === 'asked')) {
+      // Later: ask again next time the app opens. Asked a question: wait for the answer.
+      const key = r.answer ? `a:${r.id}:${r.answer.at}` : `c:${r.id}`;
+      if (seen.has(key) || seen.has(`c:${r.id}`) && !r.answer || laterThisVisit.has(key)) continue;
+      const c = r.to ? swapConflicts(r, await data.get('week', r.week)) : [];
+      if (!c.length && !r.answer) continue;
+      laterThisVisit.add(key);
+      const act = await swapConflictPopup(r, c);
+      if (act === 'ask' || act === 'go' || r.answer) mark(key);
+      if (act === 'ask') mark(`c:${r.id}`);
       return true;
     }
   }
+  const me = myStaff();
+  // RRA-079: the decision on my swap request.
+  for (const r of swaps.filter((s) => me && s.from === me.id && (s.status === 'approved' || s.status === 'declined'))) {
+    const key = `d:${r.id}:${r.status}`;
+    if (seen.has(key)) continue;
+    const ok = r.status === 'approved';
+    const go = await sheet({
+      title: ok ? 'Swap approved' : 'Swap declined', left: 'OK', right: 'Open',
+      body: `<p style="margin-top:0;font-size:1.05rem">${ok ? '✅' : '⛔'} Your swap request for <b>${esc(r.day)}</b>${r.toName ? ` with ${esc(r.toName)}` : ''} was <b>${ok ? 'approved' : 'declined'}</b>${r.decidedBy ? ` by ${esc(r.decidedBy)}` : ''}.</p>
+        <p class="muted small">${ok ? (r.to ? 'The schedule has been updated.' : 'A manager will put the cover on the schedule.') : 'Your shift stays on the schedule. Talk to a manager if you still need the day.'}</p>`,
+    });
+    mark(key); // only once they've seen and closed it
+    if (go) location.hash = `#/schedule/${r.id}`;
+    return true;
+  }
   const { canSeePost, sentByMe, myId } = await import('./audience.js');
-  const me = myId();
-  for (const p of (await data.list('post')).filter((x) => x.about?.swap && x.to?.person === me && !sentByMe(x) && canSeePost(x))) {
+  const mid = myId();
+  for (const p of (await data.list('post')).filter((x) => x.about?.swap && x.to?.person === mid && !sentByMe(x) && canSeePost(x))) {
     const key = `q:${p.id}`;
     if (seen.has(key)) continue;
-    mark(key);
     const reply = await sheet({
       title: 'Question about your swap', left: 'Later', right: 'Reply',
       body: `<p style="margin-top:0"><b>${esc(p.by)}</b> asks:</p><div class="msg private" style="margin:0">${esc(p.text)}</div>
-        <textarea id="sr" style="min-height:70px;margin-top:10px" placeholder="Your answer (only you and ${esc(p.by)} see it)"></textarea>`,
+        <textarea id="sr" style="min-height:70px;margin-top:10px" placeholder="Your answer (the managers deciding on your swap see it)"></textarea>`,
       onMount: (api) => { api.onRight = () => { const t = $('#sr', api.el).value.trim(); if (t) api.close(t); }; },
     });
+    mark(key);
     if (reply) {
-      p.replies = [...(p.replies || []), { by: session.profile.name, byId: me, at: Date.now(), text: reply }];
+      p.replies = [...(p.replies || []), { by: session.profile.name, byId: mid, at: Date.now(), text: reply }];
       await data.put('post', p);
+      await recordSwapAnswer(p.about.swap, reply);
       toast('Reply sent');
     }
     return true;
@@ -153,16 +202,21 @@ export async function swapPopups() {
 
 const label = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString([], { month: 'short', day: 'numeric' }); };
 
-export async function scheduleView() {
+export async function scheduleView(focus) {
   setChrome({ tab: 'lounge', back: true });
+  // RRA-082: #/schedule/<swap id> opens the week of that request and scrolls to it.
+  const focusSwap = focus ? await data.get('swap', focus) : null;
+  if (focusSwap?.week) scheduleView.week = focusSwap.week;
   const change = canChange('schedule');
   const wk = scheduleView.week || data.weekStart();
   const staff = await staffList();
   const week = (await data.get('week', wk)) || { id: wk, shifts: {}, published: false };
   const me = myStaff();
-  const swaps = (await data.list('swap')).filter((s) => s.status === 'asked').sort((a, b) => a.at - b.at);
+  // Waiting requests, plus my own decided ones from this week on (RRA-079), and the one asked for.
+  const swaps = (await data.list('swap')).filter((s) => s.status === 'asked' || (me && s.from === me.id && s.status !== 'withdrawn' && s.week >= data.weekStart()) || s.id === focus).sort((a, b) => a.at - b.at);
   const conflictsOf = {};
-  for (const r of swaps) conflictsOf[r.id] = swapConflicts(r, r.week === wk ? week : await data.get('week', r.week));
+  for (const r of swaps) conflictsOf[r.id] = r.status === 'asked' ? swapConflicts(r, r.week === wk ? week : await data.get('week', r.week)) : [];
+  const STATUS = { approved: chipHtml('Approved', 'ok'), declined: chipHtml('Declined', 'danger'), withdrawn: chipHtml('Removed', '') };
   setTitle('Schedule', change ? `<button class="btn plain small" id="pub" type="button">${week.published ? 'Unpublish' : 'Publish'}</button>` : '');
   const visible = change || week.published;
   week.open ||= Array.from({ length: 7 }, () => []);
@@ -196,8 +250,10 @@ export async function scheduleView() {
     ${visible && staff.length ? (isWide() ? weekGrid() : dayList()) : visible ? '' : '<div class="empty">This week isn\'t published yet.</div>'}
     ${!staff.length ? `<div class="empty">No staff yet.${change ? ' Add people below.' : ''}</div>` : ''}
     ${swaps.length ? `<div class="section-label">Swap requests</div><div class="group">${swaps.map((r) => `
-      <div class="row" data-swap="${r.id}"><span class="grow"><span class="title">${esc(r.fromName)} asks ${esc(r.toName || 'anyone')} to cover${conflictsOf[r.id].length ? ' <span class="chip warn">Conflict</span>' : ''}</span><span class="sub">${esc(r.day)}${r.note ? ' · ' + esc(r.note) : ''}${conflictsOf[r.id].map((c) => `<br><span style="color:var(--danger)">${esc(c)}</span>`).join('')}</span></span>
-      ${change ? `${conflictsOf[r.id].length ? '<button class="btn tonal small" data-q type="button">Ask</button>' : ''}<button class="btn small" data-ok type="button">OK</button><button class="btn danger small" data-no type="button">No</button>` : '<span class="chip warn">Waiting</span>'}</div>`).join('')}</div>` : ''}
+      <div class="row swap-row${r.id === focus ? ' focus' : ''}" id="swap-${r.id}" data-swap="${r.id}"><span class="grow"><span class="title">${esc(r.fromName)} asks ${esc(r.toName || 'anyone')} to cover${conflictsOf[r.id].length ? ' <span class="chip warn">Conflict</span>' : ''}${r.answer && r.status === 'asked' && (change || (me && r.from === me.id)) ? ' <span class="chip flag">🚩 Reply</span>' : ''}</span><span class="sub">${esc(r.day)}${r.note ? ' · ' + esc(r.note) : ''}${conflictsOf[r.id].map((c) => `<br><span style="color:var(--danger)">${esc(c)}</span>`).join('')}</span>
+        ${(change || (me && r.from === me.id)) && r.status === 'asked' ? answerHtml(r) : ''}</span>
+      <span class="swap-acts">${r.status !== 'asked' ? STATUS[r.status] || ''
+        : `${change ? `<button class="btn tonal small" data-q type="button">Ask</button><button class="btn small" data-ok type="button">OK</button><button class="btn danger small" data-no type="button">No</button>` : '<span class="chip warn">Waiting</span>'}${me && r.from === me.id ? '<button class="btn plain small danger-text" data-rmswap type="button">Remove</button>' : ''}`}</span></div>`).join('')}</div>` : ''}
     <div class="group" style="margin-top:14px">
       ${me && week.published ? '<button class="row nav" id="ask" type="button"><span class="grow">Ask for a shift swap</span></button>' : ''}
       ${change ? `<a class="row" href="#/staff"><span class="grow">Add or remove staff</span><span class="meta">${staff.length}</span></a>` : ''}
@@ -295,7 +351,21 @@ export async function scheduleView() {
     $('[data-ok]', row)?.addEventListener('click', async () => { await approveSwap(r); scheduleView(); });
     $('[data-no]', row)?.addEventListener('click', async () => { await declineSwap(r); scheduleView(); });
     $('[data-q]', row)?.addEventListener('click', async () => { await askAboutSwap(r); scheduleView(); });
+    // RRA-083: the requester can take back a request until it is approved.
+    $('[data-rmswap]', row)?.addEventListener('click', async () => {
+      const ok = await sheet({ title: 'Remove swap request?', right: 'Remove', body: `<p>Take back your request for <b>${esc(r.day)}</b>? Your shift stays on the schedule.</p>` });
+      if (!ok) return;
+      const cur = await data.get('swap', r.id);
+      if (cur?.status === 'approved') { toast('Already approved, so it can\'t be removed. Talk to a manager.'); scheduleView(); return; }
+      await data.put('swap', { ...cur, status: 'withdrawn', withdrawnAt: Date.now() });
+      toast('Swap request removed');
+      scheduleView();
+    });
   });
+  if (focus) {
+    const el = document.getElementById(`swap-${focus}`);
+    if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); setTimeout(() => el.classList.remove('focus'), 3500); }
+  }
 }
 
 // ------------------------------------------------------------ staff (Settings)
@@ -307,8 +377,9 @@ export async function staffView() {
   const change = canChange('schedule') || canChange('settings');
   view.innerHTML = `
     <div class="group">${staff.map((s) => `<div class="row">${change ? `<button class="rm" type="button" data-rm="${s.id}" aria-label="Remove ${esc(s.name)}">−</button>` : ''}
-      <span class="grow"${change ? ` data-edit="${s.id}" style="cursor:pointer"` : ''}><span class="title">${esc(s.name)}</span><span class="sub">${esc(s.position || '')} · ${esc(ROLES[s.role] || 'Staff')}</span></span></div>`).join('') || '<div class="row muted">No staff yet.</div>'}</div>
+      <span class="grow"${change ? ` data-edit="${s.id}" style="cursor:pointer"` : ''}><span class="title">${esc(s.name)}</span><span class="sub">${esc(s.position || '')} · ${esc(ROLES[s.role] || 'Staff')}${s.dev ? '' : ` ${chipHtml('Not linked', 'warn')}`}</span></span></div>`).join('') || '<div class="row muted">No staff yet.</div>'}</div>
     ${change ? '<button class="btn tonal block" id="add" type="button">+ Add staff</button>' : ''}
+    <p class="muted small">Not linked: this person hasn't opened the app on their phone yet, so Change role isn't available for them.</p>
     <p class="muted small">Staff appear on the schedule. To give someone the app on their phone, send an invite from Settings → Invite and approve phones. Removing someone takes them off the schedule${isHost() ? '; to end their app access now, also withdraw their invite' : ''}.</p>`;
   $('#add')?.addEventListener('click', () => staffDialog());
   $$('[data-edit]', view).forEach((el) => { el.onclick = () => staffDialog(staff.find((s) => s.id === el.dataset.edit)); });
@@ -331,12 +402,15 @@ async function staffDialog(existing) {
     title: existing ? 'Staff member' : 'Add staff', right: 'Save',
     body: `<label class="field"><span>Name</span><input type="text" id="st-n" value="${esc(s.name)}" placeholder="Name as it appears on their invite"></label>
       <label class="field"><span>Position</span><select id="st-p">${POSITIONS.map((p) => `<option ${p === s.position ? 'selected' : ''}>${p}</option>`).join('')}</select></label>
-      ${s.dev ? `<div class="field"><span>App role</span><div style="padding:10px 0"><b>${esc(ROLES[s.role] || 'Staff')}</b> <a href="#/person/${s.id}" class="small">Change role ›</a></div></div>`
-        : `<label class="field"><span>App role</span><select id="st-r">${['staff', 'chef', 'manager'].map((r) => `<option value="${r}" ${r === s.role ? 'selected' : ''}>${ROLES[r]}</option>`).join('')}</select></label>`}
+      ${!existing ? '<p class="muted small">Their app role comes from the invite you send them (Settings → Invite and approve phones).</p>'
+        : s.dev ? `<div class="field"><span>App role</span><div style="padding:10px 0"><b>${esc(ROLES[s.role] || 'Staff')}</b> <button class="btn plain small" id="st-role" type="button">Change role ›</button></div></div>`
+        : `<div class="field"><span>App role</span><div style="padding:10px 0"><b>${esc(ROLES[s.role] || 'Staff')}</b> ${chipHtml('Not linked', 'warn')}</div>
+          <p class="muted small" style="margin:0">Change role unlocks once ${esc(s.name)} opens the app on their phone (after an invite). Until then their role comes from their invite.</p></div>`}
       ${seeRate ? `<label class="field"><span>Hourly rate (only managers the Admin allows see this)</span><input type="text" inputmode="decimal" id="st-rate" value="${esc(rate)}" placeholder="$ per hour"${canChange('payrates') ? '' : ' readonly'}></label>` : ''}`,
-    onMount: (api) => { api.onRight = () => { const n = $('#st-n', api.el).value.trim(); if (!n) return; Object.assign(s, { name: n, position: $('#st-p', api.el).value, role: $('#st-r', api.el)?.value || s.role }); if ($('#st-rate', api.el)) rate = $('#st-rate', api.el).value.trim().replace('$', ''); api.close(true); }; },
+    onMount: (api) => { $('#st-role', api.el)?.addEventListener('click', () => api.close('role')); api.onRight = () => { const n = $('#st-n', api.el).value.trim(); if (!n) return; Object.assign(s, { name: n, position: $('#st-p', api.el).value }); if ($('#st-rate', api.el)) rate = $('#st-rate', api.el).value.trim().replace('$', ''); api.close(true); }; },
   });
   if (!ok) return;
+  if (ok === 'role') { location.hash = `#/person/${s.id}`; return; }
   await data.put('staff', s);
   if (seeRate && canChange('payrates') && String(rate) !== String(pay?.rate ?? '')) await data.put('payrate', { id: s.id, staffId: s.id, rate: rate === '' ? '' : +rate || 0 });
   staffView();

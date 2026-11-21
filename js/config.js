@@ -2,10 +2,22 @@
 // Bump VERSION and BUILD on every release, and add one line to WHATS_NEW.
 
 export const APP_NAME = 'Bootleggers Kitchen';
-export const VERSION = '0.5.6';
-export const BUILD = '2026.11.21-6';
+export const VERSION = '0.5.7';
+export const BUILD = '2026.11.21-7';
 
 export const WHATS_NEW = [
+  {
+    version: '0.5.7', build: '2026.11.21-7', date: '2026-11-21',
+    lines: [
+      'Swap requests: you get a pop-up when yours is approved or declined, and you can Remove your own request until it is approved.',
+      'A swap badge (⇄) on the Employee lounge button shows requests waiting for managers, and updates on your own requests.',
+      'When someone answers a question about their swap, the request gets a 🚩 Reply received flag with the answer, for every manager who can approve it.',
+      'Tapping a swap request takes you straight to it on the schedule.',
+      'More → Staff: Change role opens properly, and people whose phone isn\'t linked yet are marked Not linked.',
+      'New Settings → Pay rules: set overtime hours and rates, daily overtime and double time, with state presets.',
+      'Recipe archive: add a sauce, a drink or any menu item without ingredients. Each section has its own + Add button.',
+    ],
+  },
   {
     version: '0.5.6', build: '2026.11.21-6', date: '2026-11-21',
     lines: [
