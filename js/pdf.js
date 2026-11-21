@@ -98,11 +98,16 @@ export const printButtons = () => `
     <button class="btn" id="print" type="button">Print</button>
     <button class="btn tonal" id="pdf" type="button">Save or share PDF</button>
   </div>
-  <p class="muted small center no-print">If Print doesn't open (some phones block it in the app), use Save or share PDF and print from the share sheet.</p>`;
+  <p class="muted small center no-print">${document.documentElement.classList.contains('is-ios') && document.documentElement.classList.contains('standalone') ? 'Print opens the share sheet: tap Print there.' : "If Print doesn't open, use Save or share PDF and print from the share sheet."}</p>`;
 
 // Wires the buttons. getLines() returns the PDF lines when asked.
+// RRA-071/072: the iPhone and iPad home screen app blocks window.print() and
+// asks "blocked from automatically printing". There, Print opens the share
+// sheet with the PDF instead, which has Print in it.
+const blocksPrint = () => document.documentElement.classList.contains('is-ios') && document.documentElement.classList.contains('standalone');
 export function wirePrint({ title, getLines, mono = false, $ }) {
   $('#print')?.addEventListener('click', () => {
+    if (blocksPrint()) { sharePdf(title, getLines(), { mono }); return; }
     try { window.print(); } catch { sharePdf(title, getLines(), { mono }); }
   });
   $('#pdf')?.addEventListener('click', () => sharePdf(title, getLines(), { mono }));

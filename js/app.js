@@ -469,11 +469,13 @@ async function teamView(incoming) {
       title: 'Invite ready', left: null, right: 'Done',
       body: `<p>Send this to <b>${esc(name)}</b> by text message. It works once, only on the first phone that's approved.</p>
         <button class="btn block" id="s" type="button">Send invite</button>
-        <button class="btn plain block" id="c" type="button" style="margin-top:6px">Copy invite</button>
-        <p class="muted small">Next: when they open it, their request shows up under “Waiting for you” and you get a note. Keep using the app meanwhile.</p>`,
+        <button class="btn plain block" id="c" type="button" style="margin-top:6px">Copy whole message</button>
+        ${codeBox(code, 'Invite')}
+        <p class="muted small">The code alone works too: they paste it on the Invite only screen. Next: when they open it, their request shows up under “Waiting for you” and you get a note. Keep using the app meanwhile.</p>`,
       onMount: ({ el }) => {
         $('#s', el).onclick = () => share('Bootleggers Kitchen invite', text);
         $('#c', el).onclick = () => copy(text, 'Invite copied');
+        wireCodeBox(el, code, 'Invite');
       },
     });
     teamView();
@@ -509,15 +511,26 @@ async function teamView(incoming) {
       title: 'Approved', left: null, right: 'Done',
       body: `<p>Send this activation back to <b>${esc(req.invite.name)}</b>. It only works on their phone.</p>
         <button class="btn block" id="s" type="button">Send activation</button>
-        <button class="btn plain block" id="c" type="button" style="margin-top:6px">Copy activation</button>`,
+        <button class="btn plain block" id="c" type="button" style="margin-top:6px">Copy whole message</button>
+        ${codeBox(code, 'Activation')}`,
       onMount: ({ el }) => {
         $('#s', el).onclick = () => share('Bootleggers Kitchen activation', text);
         $('#c', el).onclick = () => copy(text, 'Activation copied');
+        wireCodeBox(el, code, 'Activation');
       },
     });
     teamView();
   };
 }
+
+// The code by itself (RRA-068): shown in a box with its own copy button, so it
+// pastes cleanly without the message text or link around it.
+const codeBox = (code, what) => `<div class="code-box">
+    <div class="code-label">${esc(what)} code</div>
+    <div class="code-text mono" id="code-only">${esc(code)}</div>
+    <button class="btn tonal block" id="copy-code" type="button">Copy code only</button>
+  </div>`;
+const wireCodeBox = (el, code, what) => { const b = $('#copy-code', el); if (b) b.onclick = () => copy(code, `${what} code copied`); };
 
 // --------------------------------------------- locked screens (RRA-018)
 
@@ -567,6 +580,7 @@ async function lockedView(incoming) {
         : `<p><b>Step 1.</b> Send your request to ${pending.restore ? 'a manager or the Admin' : 'the manager who invited you'}.</p>
           <p id="auto" class="small muted"></p>
           <button class="btn block" id="send" type="button">Send request</button>`}
+      <details class="code-more"><summary>Request code only</summary>${codeBox(pending.request, 'Request')}</details>
       <p style="margin-top:18px"><b>Step 2.</b> Your manager will ask for this code. Read it to them:</p>
       <div class="code-big">${esc(pending.deviceCode)}</div>
       <p style="margin-top:18px"><b>Step 3.</b> Paste the activation your manager sends back.</p>
@@ -579,6 +593,7 @@ async function lockedView(incoming) {
       <button class="btn plain block" id="restart" type="button">${pending.restore ? 'Start again' : 'Use a different invite'}</button>`;
     const req = `Bootleggers Kitchen request from ${pending.name}. Paste this in the app under More → Invite and approve staff:\n${pending.request}`;
     $('#send').onclick = () => share('Bootleggers Kitchen request', req);
+    wireCodeBox(view, pending.request, 'Request');
     if (pending.rk && !pending.posted && sync.enabled()) {
       $('#auto').textContent = 'Sending your request to your manager’s phone…';
       access.sealRequest(pending)
@@ -666,7 +681,7 @@ const routes = {
   recipes: () => recipesView(),
   recipe: (id) => recipeView(id),
   print: (id) => printView(id),
-  prep: () => prepView(),
+  prep: (arg) => prepView(arg),
   stock: () => stockView(false),
   'stock-items': () => stockView(true),
   needed: () => neededView(),

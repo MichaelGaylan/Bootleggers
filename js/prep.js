@@ -16,8 +16,15 @@ async function remember(it) {
   await data.put('prepsaved', { ...(ex || {}), name: it.name, amount: it.amount || '', station: it.station || '' });
 }
 
-export async function prepView() {
-  setChrome({ tab: 'prep' });
+// From the lounge (RRA-070): #/prep/lounge shows a back button to the lounge.
+let fromLounge = false;
+export function prepView(from) {
+  fromLounge = from === 'lounge';
+  return render();
+}
+
+async function render() {
+  setChrome({ tab: 'prep', back: fromLounge });
   const change = canChange('prep');
   const settings = await data.settings();
   const stations = settings.stations || [];
@@ -58,7 +65,7 @@ export async function prepView() {
         <span class="grow"><span class="title">${esc(x.name)}</span><span class="sub">${esc([x.amount, x.station].filter(Boolean).join(' · '))}</span></span>
         <span class="meta">${onList.has(savedKey(x.name)) ? 'On the list' : '<span class="plus">+ Add</span>'}</span></div>`).join('')}</div>
     </details>` : ''}`;
-  $('#edit')?.addEventListener('click', () => { editing = !editing; prepView(); });
+  $('#edit')?.addEventListener('click', () => { editing = !editing; render(); });
   $('#add')?.addEventListener('click', () => itemDialog(stations));
   $('#saved')?.addEventListener('toggle', (e) => LS.set('prepSavedOpen', e.target.open));
   $$('[data-saved]', view).forEach((row) => {
@@ -67,11 +74,11 @@ export async function prepView() {
       if (onList.has(savedKey(x.name))) { toast('Already on the list'); return; }
       await data.put('prepitem', { name: x.name, amount: x.amount, station: x.station || stations[0] || 'Other', order: Date.now() });
       toast(`Added ${x.name}`);
-      prepView();
+      render();
     };
   });
   $$('[data-unsave]', view).forEach((b) => {
-    b.onclick = async (e) => { e.stopPropagation(); await data.remove('prepsaved', b.dataset.unsave); prepView(); };
+    b.onclick = async (e) => { e.stopPropagation(); await data.remove('prepsaved', b.dataset.unsave); render(); };
   });
   // RRA-056: in Edit, tap an item to change it.
   if (editing) $$('.group .row[data-id]', view).forEach((row) => { row.onclick = () => itemDialog(stations, items.find((i) => i.id === row.dataset.id)); });
@@ -90,10 +97,10 @@ export async function prepView() {
           await data.put('prepday', done);
           toast('All prep done! The list is cleared for the next shift.', {
             label: 'Undo',
-            run: async () => { for (const i of cleared) await data.put('prepitem', i); prepView(); },
+            run: async () => { for (const i of cleared) await data.put('prepitem', i); render(); },
           });
         }
-        prepView();
+        render();
       };
     });
   }
@@ -102,7 +109,7 @@ export async function prepView() {
       e.stopPropagation();
       await data.remove('prepitem', b.dataset.rm);
       toast('Removed. It stays in Saved items.');
-      prepView();
+      render();
     };
   });
 }
@@ -120,5 +127,5 @@ async function itemDialog(stations, existing) {
   await data.put('prepitem', it);
   await remember(it);
   toast(existing ? 'Saved' : 'Added');
-  prepView();
+  render();
 }
