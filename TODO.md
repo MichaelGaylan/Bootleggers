@@ -10,6 +10,9 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 
 ## 🔵 Build list
 - [ ] RRA-068 · Invites, requests and activations: show the code on its own in a box with a "Copy code only" button, separate from the message text and link, so it pastes cleanly. Keep "Send" for the full message (Gaylan, 2026-11-21) · UX · S
+- [ ] RRA-069 · Bigger back (return) buttons everywhere: a larger tap target at the top left (Gaylan, 2026-11-21) · UX · S
+- [ ] RRA-070 · Today's prep opened from the Employee lounge: show a back button at the top that returns to the lounge (Gaylan, 2026-11-21) · UX · S
+- [ ] RRA-071 · Bug: Print on Time sheets does nothing. Find why (home screen app print block?) and fix, keeping Save or share PDF as the fallback (Gaylan, 2026-11-21) · Bug · S
 
 ## 🟡 Hold
 
