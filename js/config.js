@@ -2,10 +2,16 @@
 // Bump VERSION and BUILD on every release, and add one line to WHATS_NEW.
 
 export const APP_NAME = 'Bootleggers Kitchen';
-export const VERSION = '0.5.1';
-export const BUILD = '2026.11.21-1';
+export const VERSION = '0.5.2';
+export const BUILD = '2026.11.21-2';
 
 export const WHATS_NEW = [
+  {
+    version: '0.5.2', build: '2026.11.21-2', date: '2026-11-21',
+    lines: [
+      'Fix: the Admin setup screen on a second device (like an iPad) no longer gets stuck. It now offers Restore from an Admin backup, or Use an invite instead.',
+    ],
+  },
   {
     version: '0.5.1', build: '2026.11.21-1', date: '2026-11-21',
     lines: [

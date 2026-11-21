@@ -535,15 +535,26 @@ async function lockedView(incoming) {
   const expired = localStorage.getItem('blg.expiredNotice');
 
   if (ownerInfo && !ROOT_KEYS.includes(ownerInfo.pub)) {
+    // RRA-064: never a dead end. A second device (an iPad, say) gets in with
+    // an Admin backup or an invite; going back keeps this device's key.
     view.innerHTML = `
       <h2>Admin setup</h2>
-      <p>This phone made the Admin key below. The app opens for you once this key is added to the app and published.</p>
+      ${ROOT_KEYS.length ? `<div class="hint"><b>Already have an Admin phone?</b> This screen is only for replacing a lost Admin key. To use the app on another phone, iPad or computer, restore an Admin backup here, or get an invite from the Admin phone.</div>
+      <button class="btn block" id="restore" type="button">Restore from an Admin backup</button>
+      <button class="btn tonal block" id="back" type="button" style="margin-top:8px">Use an invite instead</button>
+      <div class="section-label" style="margin-top:24px">New Admin key</div>` : ''}
+      <p>This device made the Admin key below. The app opens for you once this key is added to the app and published.</p>
       <div class="card mono small">${esc(ownerInfo.pub)}</div>
-      <button class="btn block" id="copy" type="button">Copy Admin key</button>
-      <p class="muted small">The key is public: it lets other phones check that invites really come from you. The secret half never leaves this phone.</p>
-      <button class="btn plain block" id="restart" type="button">Start over</button>`;
+      <button class="btn ${ROOT_KEYS.length ? 'plain' : ''} block" id="copy" type="button">Copy Admin key</button>
+      <p class="muted small">The key is public: it lets other devices check that invites really come from you. The secret half never leaves this device.</p>
+      ${ROOT_KEYS.length ? '' : '<button class="btn plain block" id="back" type="button">Go back</button>'}`;
     $('#copy').onclick = () => copy(ownerInfo.pub, 'Admin key copied');
-    $('#restart').onclick = async () => { await store.wipe(); location.reload(); };
+    $('#back').onclick = async () => { await store.del('owner-setup'); lockedView(incoming); };
+    $('#restore')?.addEventListener('click', async () => {
+      const p = await restoreSheet();
+      if (!p) return;
+      profile = p; localStorage.removeItem('blg.expiredNotice'); toast('Welcome back, Admin'); boot();
+    });
     return;
   }
 
@@ -639,7 +650,7 @@ async function lockedView(incoming) {
   $('#owner')?.addEventListener('click', async () => {
     const name = await sheet({
       title: 'Admin setup', right: 'Create key',
-      body: `<p>This makes the Admin key on this phone. Only do this once, on the Admin's own phone${isIOS ? ' (open the app from the home screen first)' : ''}.</p>
+      body: `${ROOT_KEYS.length ? `<p class="hint"><b>The app already has an Admin.</b> To use it on another phone, iPad or computer, tap Cancel and use <b>Restore from an Admin backup</b> instead. Only make a new key if the Admin phone lost its key and there is no backup.</p>` : ''}<p>This makes the Admin key on this phone. Only do this once, on the Admin's own phone${isIOS ? ' (open the app from the home screen first)' : ''}.</p>
         <label class="field"><span>Your name</span><input type="text" id="o-name" value="Admin"></label>`,
       onMount: (api) => { api.onRight = () => api.close($('#o-name', api.el).value.trim() || 'Admin'); },
     });

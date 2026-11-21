@@ -13,6 +13,9 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 ## 🟡 Hold
 
 ## 🟣 Done
+### 0.5.2 · build 2026.11.21-2
+- [x] RRA-064 · Bug: Admin setup on a second device (Gaylan's iPad) was a dead end with only Copy and Start over. Now it offers Restore from an Admin backup and Use an invite instead, and warns before making a second Admin key · Bug · S
+
 ### 0.5.1 · build 2026.11.21-1
 - [x] RRA-063 · What's new screen scrolls so long update notes can be read fully on phone and iPad; the Continue button always stays on screen. Shows every release since the phone's last update · UX · S
 
