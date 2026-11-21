@@ -9,6 +9,7 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
+- [ ] RRA-081 · Fix (RRA-078): the requester's answer to a manager's swap question doesn't reach the manager in a way they notice. Today it is only added as a reply under the private message on the board, with no pop-up and no unread badge (a reply doesn't count as new). Show the answer on the swap request (Schedule and the conflict pop-up), pop it up for the manager who asked when they open the app, and count new replies as unread on the board (Gaylan, 2026-11-21) · Bug · S
 - [ ] RRA-079 · Swap declined: the person who asked gets a pop-up when a manager declines their swap request (and when one approves it), the next time they open the app (Gaylan, 2026-11-21) · Feature · S
 - [ ] RRA-080 · Home screen: show waiting swap requests as a badge on the right of the Employee lounge button, next to the arrow (shown to managers, the Admin and anyone else allowed to approve swaps, with the number waiting for a decision; and to the person who made the request, for their own requests that are waiting or answered) (Gaylan, 2026-11-21) · UX · S
 
