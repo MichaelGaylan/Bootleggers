@@ -2,10 +2,19 @@
 // Bump VERSION and BUILD on every release, and add one line to WHATS_NEW.
 
 export const APP_NAME = 'Bootleggers Kitchen';
-export const VERSION = '0.5.5';
-export const BUILD = '2026.11.21-5';
+export const VERSION = '0.5.6';
+export const BUILD = '2026.11.21-6';
 
 export const WHATS_NEW = [
+  {
+    version: '0.5.6', build: '2026.11.21-6', date: '2026-11-21',
+    lines: [
+      'Messages: pick who a post goes to: Everyone, Kitchen team, Chefs, Managers or one person. Group and one-person posts are private (🔒): only those people and you can open them. Anyone can still post to Everyone.',
+      'Your job position now shows next to Employee lounge, in your role color.',
+      'The "All prep done" pop-up goes away after 4 seconds.',
+      'Shift swaps are checked for conflicts (already working that day, time off, or over 40 hours). Managers get a pop-up to Approve, Deny or Ask a question, and the person who asked can answer right away.',
+    ],
+  },
   {
     version: '0.5.5', build: '2026.11.21-5', date: '2026-11-21',
     lines: [
