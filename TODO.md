@@ -15,6 +15,7 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-071 · Bug: Print on Time sheets does nothing. Find why (home screen app print block?) and fix, keeping Save or share PDF as the fallback (Gaylan, 2026-11-21) · Bug · S
 - [ ] RRA-072 · Bug: the Print buttons on the schedule (week and Print schedule) do nothing. Same cause as RRA-071 likely; fix both together (Gaylan, 2026-11-21). Clue (Gaylan's screenshot): the iPhone home screen app shows "This website has been blocked from automatically printing" (Ignore / Allow), though pdf.js calls window.print() straight from the tap. Plan: on iPhone/iPad home screen app, Print opens the PDF share sheet (which has Print) instead of window.print() · Bug · S
 - [ ] RRA-073 · Today's tasks bar (Employee lounge): the part still to do shows red, the done part green, filling in as items are checked off. Keep the auto-clear when everything is done (Gaylan, 2026-11-21) · UX · S
+- [ ] RRA-074 · Bigger open (›) buttons everywhere: larger chevrons and tap areas on rows and cards (home page lounge card, Full schedule ›, Open ›, list rows). Build with RRA-069 (Gaylan, 2026-11-21, screenshot) · UX · S
 
 ## 🟡 Hold
 
