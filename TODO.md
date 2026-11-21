@@ -13,6 +13,15 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 ## 🟡 Hold
 
 ## 🟣 Done
+### 0.5.5 · build 2026.11.21-5
+- [x] RRA-068 · Invites, requests and activations: show the code on its own in a box with a "Copy code only" button, separate from the message text and link, so it pastes cleanly. Keep "Send" for the full message (Gaylan, 2026-11-21) · UX · S
+- [x] RRA-069 · Bigger back (return) buttons everywhere: a larger tap target at the top left (Gaylan, 2026-11-21) · UX · S
+- [x] RRA-070 · Today's prep opened from the Employee lounge: show a back button at the top that returns to the lounge (Gaylan, 2026-11-21) · UX · S
+- [x] RRA-071 · Bug: Print on Time sheets does nothing. Find why (home screen app print block?) and fix, keeping Save or share PDF as the fallback (Gaylan, 2026-11-21) · Bug · S
+- [x] RRA-072 · Bug: the Print buttons on the schedule (week and Print schedule) do nothing. Same cause as RRA-071 likely; fix both together (Gaylan, 2026-11-21). Clue (Gaylan's screenshot): the iPhone home screen app shows "This website has been blocked from automatically printing" (Ignore / Allow), though pdf.js calls window.print() straight from the tap. Plan: on iPhone/iPad home screen app, Print opens the PDF share sheet (which has Print) instead of window.print() · Bug · S
+- [x] RRA-073 · Today's tasks bar (Employee lounge): the part still to do shows red, the done part green, filling in as items are checked off. Keep the auto-clear when everything is done (Gaylan, 2026-11-21) · UX · S
+- [x] RRA-074 · Bigger open (›) buttons everywhere: larger chevrons and tap areas on rows and cards (home page lounge card, Full schedule ›, Open ›, list rows). Build with RRA-069. Back and open buttons don't need to match; sizes at Claude's discretion (Gaylan, 2026-11-21, screenshot) · UX · S
+
 ### 0.5.4 · build 2026.11.21-4
 - [x] RRA-066 · Change role (promotions): the Admin (or a manager, for Staff and Chef, if the Admin allows) taps Change role on a person; a signed role change syncs to that person's phone, which switches role and permissions with no new invite. A new Manager gets the pay key in the same tap; moving a Manager down drops it and the Admin phone makes a new pay key for the remaining managers and Admin devices · Feature · L
 - [x] RRA-067 · Night mode button: a moon button in the top bar switches between light and dark in one tap (Settings → Appearance keeps Match device) · UX · S

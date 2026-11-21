@@ -82,22 +82,22 @@ export async function loungeView() {
     : `<p class="muted small" style="margin:0">${isHost() ? 'To use the time clock yourself, add your name in Settings → Staff (the same name as this phone).' : 'To use the time clock, ask a manager to add you in Settings → Staff with the same name as this phone.'}</p>`}
     </div>
 
-    ${canSee('schedule') ? `<div class="card l-card"><div class="l-head"><b>My week</b><a href="#/schedule">Full schedule ›</a></div>
+    ${canSee('schedule') ? `<div class="card l-card"><div class="l-head"><b>My week</b><a href="#/schedule">Full schedule <span class="chev-i">›</span></a></div>
       ${me ? `<div class="myweek">${DAYS.map((dn, i) => `<div class="${i === todayIdx ? 'today' : ''}"><span>${dn}</span>${myShifts[i] ? pill(myShifts[i], roleOf(me)) : '<em>Off</em>'}</div>`).join('')}</div>`
       : '<p class="muted small">Your shifts show here once you are on the staff list.</p>'}
       ${me && !week.published && !canChange('schedule') ? '<p class="muted small">This week isn\'t published yet.</p>' : ''}
       ${swaps ? `<a class="row nav" href="#/schedule"><span class="grow">Swap requests</span>${chip(`${swaps} waiting`, 'orange')}</a>` : ''}</div>` : ''}
 
-    ${canSee('prep') ? `<a class="card l-card l-link" href="#/prep"><div class="l-head"><b>Today's tasks</b><span class="chev">›</span></div>
-      <div class="bar"><i style="width:${items.length ? Math.round((nDone / items.length) * 100) : 0}%"></i></div>
+    ${canSee('prep') ? `<a class="card l-card l-link" href="#/prep/lounge"><div class="l-head"><b>Today's tasks</b><span class="chev">›</span></div>
+      <div class="bar${items.length ? ' todo' : ''}"><i style="width:${items.length ? Math.round((nDone / items.length) * 100) : 0}%"></i></div>
       <span class="muted small">${items.length ? `${nDone} of ${items.length} prep tasks done` : 'No prep tasks yet'}</span></a>` : ''}
 
-    ${canSee('board') ? `<div class="card l-card"><div class="l-head"><b>Bulletin board</b><a href="#/board">${unread ? `${chip(`${unread} new`, 'orange')} ` : ''}Open ›</a></div>
+    ${canSee('board') ? `<div class="card l-card"><div class="l-head"><b>Bulletin board</b><a href="#/board">${unread ? `${chip(`${unread} new`, 'orange')} ` : ''}Open <span class="chev-i">›</span></a></div>
       ${notices.map((n) => `<div class="l-post notice"><span class="who">${esc(n.from || 'Management')} · notice</span><b>${esc(n.title)}</b></div>`).join('')}
       ${posts.map((p) => `<a class="l-post" href="#/board"><span class="who">${esc(p.by)} · ${new Date(p.at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>${esc(p.text.slice(0, 140))}</a>`).join('') || (notices.length ? '' : '<p class="muted small">No posts yet.</p>')}
       ${canChange('board') ? `<div class="l-quick"><input type="text" id="l-post" placeholder="Write to everyone"><button class="btn small" id="l-send" type="button">Post</button></div>` : ''}</div>` : ''}
 
-    ${canTime() ? `<div class="card l-card"><div class="l-head"><b>Time sheets</b><a href="#/timesheets">Everyone's hours ›</a></div>
+    ${canTime() ? `<div class="card l-card"><div class="l-head"><b>Time sheets</b><a href="#/timesheets">Everyone's hours <span class="chev-i">›</span></a></div>
       <span class="muted small">${onClock.length ? `On the clock now: ${onClock.map((p) => esc(p.name)).join(', ')}` : 'Nobody is on the clock right now.'}</span></div>` : ''}
   </div>`;
   $('#clock')?.addEventListener('click', async () => { await clock(me, all); loungeView(); });

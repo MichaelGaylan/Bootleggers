@@ -2,10 +2,19 @@
 // Bump VERSION and BUILD on every release, and add one line to WHATS_NEW.
 
 export const APP_NAME = 'Bootleggers Kitchen';
-export const VERSION = '0.5.4';
-export const BUILD = '2026.11.21-4';
+export const VERSION = '0.5.5';
+export const BUILD = '2026.11.21-5';
 
 export const WHATS_NEW = [
+  {
+    version: '0.5.5', build: '2026.11.21-5', date: '2026-11-21',
+    lines: [
+      'Print works on iPhone and iPad: it opens the share sheet with the PDF, where you tap Print. No more "blocked from automatically printing".',
+      'Invites and activations show the code by itself with a Copy code only button, so it pastes cleanly.',
+      'Bigger back button at the top, and bigger open arrows (›) everywhere.',
+      'Today\'s tasks in the lounge: the bar is red for what\'s left and fills in green as tasks are done. Opening Today\'s prep from the lounge now has a back button.',
+    ],
+  },
   {
     version: '0.5.4', build: '2026.11.21-4', date: '2026-11-21',
     lines: [
