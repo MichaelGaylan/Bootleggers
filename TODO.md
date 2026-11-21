@@ -10,6 +10,7 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 
 ## 🔵 Build list
 - [ ] RRA-088 · Report a problem: besides the email, each report also lands in the app for the Admin and managers the Admin allows (a Problem reports list with a badge). They can reply right there; the reply reaches the person who reported it as a private message (RRA-075) with a pop-up, and they can answer back. Mark a report Fixed or Closed (Gaylan picked in-app over email replies, 2026-11-21) · Feature · M
+- [ ] RRA-089 · Message board: rewrite the management welcome notice (2026-11-18, in data/notifications.json) to title "Welcome to Bootleggers Message Board" and text "This is where your messages and notices from management will show up." Each person can remove a notice from their own board (and lounge), on their phone only (Gaylan, 2026-11-21) · UX · S
 
 ## 🟡 Hold
 
