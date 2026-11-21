@@ -9,6 +9,7 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
+- [ ] RRA-075 · Messages by hierarchy: pick who a message goes to (Everyone, Kitchen staff, Chefs, Managers, or one person). Each person sees only Everyone posts, posts they sent, and posts sent to their group or to them, so staff never see chef-to-manager or manager-to-chef messages. Today the Kitchen channel is open to all and Managers is open to chefs too, and every phone receives every post (only hidden on screen). Seal non-Everyone posts to the recipients' phones (like the pay key) so other phones can't open them. Replies go to the same people (Gaylan, 2026-11-21) · Feature · M
 
 ## 🟡 Hold
 
