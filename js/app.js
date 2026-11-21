@@ -8,7 +8,7 @@ import * as access from './access.js';
 import * as store from './store.js';
 import * as data from './data.js';
 import * as sync from './sync.js';
-import { canSee, isHost } from './perms.js';
+import { canSee, isHost, myStaff } from './perms.js';
 import { recipesView, recipeView, printView } from './recipes.js';
 import { stockView, neededView, ordersView, vendorsView } from './stock.js';
 import { boardView, unreadPosts } from './board.js';
@@ -706,10 +706,47 @@ function debounceRoute() {
   }, 400);
 }
 
+// Change role (RRA-066): the Admin or a manager left a new role for this phone
+// in its staff record. Check it, switch, and say so.
+async function checkRoleGrant() {
+  const me = myStaff();
+  if (!me?.grant || !profile || profile.role === 'owner') return;
+  const next = await access.applyRoleChange(profile, me.grant);
+  if (!next) return;
+  const from = profile.role;
+  profile = next; session.profile = next;
+  await data.put('staff', { ...me, grantSeen: Date.now(), role: next.role });
+  if (access.can(profile, 'invite')) sync.onInbox(onRequest); else if (from === 'manager') sync.onInbox(null);
+  if (next.role === 'manager') await sync.reopenPrivate();
+  if (from === 'manager' && next.role !== 'manager') {
+    // Others' hours and every pay rate leave this phone (only here, not for the team).
+    for (const r of await data.list('payrate')) await data.applyRemote('payrate', r.id, null);
+    for (const p of await data.list('punch')) if (p.staffId !== me.id) await data.applyRemote('punch', p.id, null);
+  }
+  if (from !== next.role) {
+    sheet({ title: 'Your role changed', left: null, right: 'OK', body: `<p>You're now <b>${esc(access.ROLES[next.role])}</b>. The app has updated what you can see and change.</p>` });
+  }
+}
+
+// Admin devices check in so a new pay key can reach all of them (RRA-066).
+async function adminPayKeyCheck() {
+  if (profile?.role !== 'owner') return;
+  const s = await data.settings(); const ek = await access.myEcdhPublic(); const dev = await access.myPublicKey();
+  let pk = await access.payKeyInfo();
+  if (s.payBox && s.payPub && pk?.pub !== s.payPub && s.payBox.pub === s.payPub) { if (await access.adoptPayKey(s.payBox)) pk = await access.payKeyInfo(); }
+  const next = { ...s };
+  let dirty = false;
+  if ((s.adminEks || {})[dev] !== ek) { next.adminEks = { ...(s.adminEks || {}), [dev]: ek }; dirty = true; }
+  if (pk && !s.payPub) { next.payPub = pk.pub; dirty = true; }
+  if (dirty) await data.saveSettings(next);
+}
+
 async function route() {
   if (!profile) return;
   const [, name = 'recipes', arg] = location.hash.match(/^#\/([^/]+)\/?(.*)$/) || [];
   session.staff = await staffList(); // permissions (RRA-002) read this
+  await checkRoleGrant();
+  if (isHost()) await adminPayKeyCheck();
   renderSide();
   const at = location.hash;
   await (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
@@ -753,7 +790,8 @@ async function boot() {
   // The Admin phone makes the pay key and shares its public half (RRA-055).
   if (profile.role === 'owner' && await access.ensurePayKey(profile)) {
     const s = await data.settings(); const pk = await access.payKeyInfo();
-    if (s.payPub !== pk.pub) await data.saveSettings({ ...s, payPub: pk.pub });
+    // A newer pay key made on another Admin device wins (RRA-066).
+    if (s.payPub !== pk.pub && !(s.payBox && s.payBox.pub === s.payPub)) await data.saveSettings({ ...s, payPub: pk.pub });
   }
   if (!boot.wired) {
     boot.wired = true;

@@ -29,6 +29,9 @@
   --field-bg: #ffffff;
   color-scheme: light dark;
 }
+/* RRA-067: moon button shows the moon by day and the sun at night. */
+#btn-night .i-sun, #btn-night.is-dark .i-moon { display: none; }
+#btn-night.is-dark .i-sun { display: block; }
 /* RRA-065: Light / Dark / Match device, chosen per device in Settings.
    html[data-theme] is set before first paint in index.html. */
 html[data-theme="light"] { color-scheme: light; }
