@@ -13,7 +13,7 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-069 · Bigger back (return) buttons everywhere: a larger tap target at the top left (Gaylan, 2026-11-21) · UX · S
 - [ ] RRA-070 · Today's prep opened from the Employee lounge: show a back button at the top that returns to the lounge (Gaylan, 2026-11-21) · UX · S
 - [ ] RRA-071 · Bug: Print on Time sheets does nothing. Find why (home screen app print block?) and fix, keeping Save or share PDF as the fallback (Gaylan, 2026-11-21) · Bug · S
-- [ ] RRA-072 · Bug: the Print buttons on the schedule (week and Print schedule) do nothing. Same cause as RRA-071 likely; fix both together (Gaylan, 2026-11-21) · Bug · S
+- [ ] RRA-072 · Bug: the Print buttons on the schedule (week and Print schedule) do nothing. Same cause as RRA-071 likely; fix both together (Gaylan, 2026-11-21). Clue (Gaylan's screenshot): the iPhone home screen app shows "This website has been blocked from automatically printing" (Ignore / Allow), though pdf.js calls window.print() straight from the tap. Plan: on iPhone/iPad home screen app, Print opens the PDF share sheet (which has Print) instead of window.print() · Bug · S
 
 ## 🟡 Hold
 
