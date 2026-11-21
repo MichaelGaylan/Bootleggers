@@ -9,6 +9,8 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
+- [ ] RRA-079 · Swap declined: the person who asked gets a pop-up when a manager declines their swap request (and when one approves it), the next time they open the app (Gaylan, 2026-11-21) · Feature · S
+- [ ] RRA-080 · Home screen: show waiting swap requests as a badge on the right of the Employee lounge button, next to the arrow (managers see requests to decide; staff see their own waiting or answered requests) (Gaylan, 2026-11-21) · UX · S
 
 ## 🟡 Hold
 
