@@ -2,9 +2,10 @@
 // print-friendly view with batch scaling (RRA-003) and plate cost (RRA-011).
 
 import * as data from './data.js';
-import { $, $$, esc, view, LS, sheet, toast, setTitle, setChrome, fmtDate, session } from './ui.js';
+import { $, $$, esc, view, LS, sheet, toast, setTitle, setChrome, fmtDate, session, isWide, chip, searchBox } from './ui.js';
 import { canChange, canSee } from './perms.js';
 import { printButtons, wirePrint } from './pdf.js';
+import { loungeButton } from './lounge.js';
 
 const CATEGORIES = ['Rub', 'Sauce', 'Dressing', 'Marinade', 'Other'];
 const all = async () => (await data.list('recipe')).sort(data.byName);
@@ -30,17 +31,33 @@ export async function recipesView() {
   const keys = Object.keys(groups).sort((a, b) => (order.indexOf(a) + 99) % 99 - (order.indexOf(b) + 99) % 99);
   // One section open at a time, like Stock count (RRA-047). Kept per tab.
   const openKey = (recipesView.open || {})[kind];
-  view.innerHTML = `
+  const lounge = await loungeButton(); // RRA-054: one tap to the lounge
+  const costs = canSee('costs');
+  const nameOf = (id) => list.find((x) => x.id === id)?.name;
+  // Tablet and computer (RRA-051): wide tables with every section open.
+  const wideTable = () => `<p class="muted small">Showing ${shown.length} of ${list.filter((r) => r.kind === kind).length} ${kind === 'dish' ? 'dishes' : 'house recipes'}</p>
+    <div class="wtable-wrap"><table class="wtable">${kind === 'dish'
+    ? `<thead><tr><th>Dish</th><th>Type</th><th>Uses</th><th class="num">Price</th>${costs ? '<th class="num">Plate cost</th>' : ''}</tr></thead>
+      ${keys.map((g) => `<tbody><tr class="band"><td colspan="${costs ? 5 : 4}">${esc(g)} <span class="muted">· ${groups[g].length}</span></td></tr>
+        ${groups[g].map((r) => `<tr data-href="#/recipe/${r.id}"><td><span class="link">${esc(r.name)}</span></td><td>${chip('Dish', 'gray')}</td>
+          <td>${(r.uses || []).map(nameOf).filter(Boolean).map((n) => chip(n, 'purple')).join(' ') || `<span class="muted small">${esc((r.ingredients || []).slice(0, 3).map((i) => i.item).join(', '))}</span>`}</td>
+          <td class="num">${r.price ? data.money(r.price) : '—'}</td>${costs ? `<td class="num">${plateCost(r) !== null ? data.money(plateCost(r)) : '—'}</td>` : ''}</tr>`).join('')}</tbody>`).join('')}`
+    : `<thead><tr><th>Recipe</th><th>Type</th><th>Yield</th><th>Storage</th><th>Used in</th></tr></thead>
+      ${keys.map((g) => `<tbody><tr class="band"><td colspan="5">${esc(g)} <span class="muted">· ${groups[g].length}</span></td></tr>
+        ${groups[g].map((r) => `<tr data-href="#/recipe/${r.id}"><td><span class="link">${esc(r.name)}</span></td><td>${chip('Sub recipe', 'purple')}</td>
+          <td>${esc(r.yield || '—')}</td><td>${esc(r.storage || '—')}</td><td class="num">${list.filter((x) => (x.uses || []).includes(r.id)).length || '—'}</td></tr>`).join('')}</tbody>`).join('')}`}
+    </table></div>`;
+  view.innerHTML = `${lounge}
     <div class="segmented" role="tablist">
       <button data-k="dish" class="${kind === 'dish' ? 'on' : ''}" type="button">Dishes</button>
       <button data-k="house" class="${kind === 'house' ? 'on' : ''}" type="button">House recipes</button>
     </div>
-    <div class="search"><input type="search" id="q" placeholder="Search names and ingredients" value="${esc(recipesView.q || '')}"></div>
-    ${keys.length ? keys.map((g) => `
+    ${searchBox('q', 'Search names and ingredients', recipesView.q)}
+    ${keys.length && isWide() ? wideTable() : keys.length ? keys.map((g) => `
       <button class="acc-head${q || openKey === g ? ' open' : ''}" type="button" data-g="${esc(g)}"><span class="grow">${esc(g)}</span><span class="meta">${groups[g].length}</span></button>
       <div class="group acc-body"${q || openKey === g ? '' : ' hidden'}>${groups[g].map((r) => `
         <a class="row" href="#/recipe/${r.id}">${r.photo ? `<img src="${r.photo}" alt="" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none">` : ''}
-        <span class="grow"><span class="title">${esc(r.name)}</span><span class="sub">${esc(subline(r, list))}</span></span>${r.kind === 'dish' && r.price ? `<span class="meta">${data.money(r.price)}</span>` : ''}</a>`).join('')}</div>`).join('')
+        <span class="grow"><span class="title">${esc(r.name)}${r.kind === 'house' ? ` ${chip('Sub recipe', 'purple')}` : ''}</span><span class="sub">${esc(subline(r, list))}</span></span>${r.kind === 'dish' && r.price ? `<span class="meta">${data.money(r.price)}</span>` : ''}</a>`).join('')}</div>`).join('')
     : `<div class="empty">${q ? 'Nothing matches that search.' : kind === 'dish'
       ? `No dishes yet.${edit ? '<br>Tap <b>UPLOAD</b> to add the first one.' : ''}`
       : `No house recipes yet.${edit ? '<br>Tap <b>NEW RECIPE</b> to add a rub, sauce or dressing.' : ''}`}</div>`}`;
@@ -53,7 +70,9 @@ export async function recipesView() {
       recipesView.open = { ...(recipesView.open || {}), [kind]: opening ? h.dataset.g : null };
     };
   });
+  $$('tr[data-href]', view).forEach((tr) => { tr.onclick = () => { location.hash = tr.dataset.href; }; });
   const qi = $('#q');
+  $('#q-x').onclick = () => { recipesView.q = ''; recipesView(); };
   qi.oninput = () => { recipesView.q = qi.value; clearTimeout(qi.t); qi.t = setTimeout(async () => { await recipesView(); const n = $('#q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 200); };
 }
 
@@ -80,17 +99,20 @@ export async function recipeView(id) {
   const edit = canChange('recipes');
   setTitle(r.name, edit ? '<button class="btn plain small" id="edit" type="button">Edit</button>' : '');
   $('#edit')?.addEventListener('click', () => recipeDialog(r));
+  // An ingredient line that names a house recipe gets a purple chip (RRA-051).
+  const house = list.filter((x) => x.kind === 'house' && x.id !== r.id && x.name.length > 3);
+  const subOf = (item) => house.find((h) => String(item || '').toLowerCase().includes(h.name.toLowerCase()));
   const cost = plateCost(r);
   const showCost = canSee('costs') && cost !== null;
   view.innerHTML = `
     <div class="recipe">
       ${r.photo ? `<img src="${r.photo}" alt="" style="width:100%;max-height:260px;object-fit:cover;border-radius:var(--radius);margin-bottom:8px">` : ''}
-      <p><span class="chip">${r.kind === 'house' ? esc(r.category || 'House recipe') : esc(r.section || 'Dish')}</span></p>
+      <p><span class="chip">${r.kind === 'house' ? esc(r.category || 'House recipe') : esc(r.section || 'Dish')}</span>${r.kind === 'house' ? ` ${chip('Sub recipe', 'purple')}` : ''}</p>
       ${r.kind === 'house' && (r.yield || r.storage) ? `<div class="facts">
         <div><b>Yield</b>${esc(r.yield || '—')}</div><div><b>Storage</b>${esc(r.storage || '—')}</div></div>` : ''}
-      ${uses.length ? `<h2>Uses house recipes</h2><div class="group">${uses.map((u) => `<a class="row" href="#/recipe/${u.id}"><span class="grow">${esc(u.name)}</span></a>`).join('')}</div>` : ''}
+      ${uses.length ? `<h2>Uses house recipes</h2><div class="group">${uses.map((u) => `<a class="row" href="#/recipe/${u.id}"><span class="grow">${esc(u.name)}</span>${chip('Sub recipe', 'purple')}</a>`).join('')}</div>` : ''}
       <h2>${r.kind === 'dish' ? 'Build' : 'Ingredients'}</h2>
-      <div class="card"><ul class="ing">${(r.ingredients || []).map((i) => `<li><span class="qty">${esc(i.qty)}</span><span style="flex:1">${esc(i.item)}</span>${canSee('costs') && i.cost ? `<span class="muted small">${data.money(i.cost)}</span>` : ''}</li>`).join('')}</ul></div>
+      <div class="card"><ul class="ing">${(r.ingredients || []).map((i) => `<li><span class="qty">${esc(i.qty)}</span><span style="flex:1">${esc(i.item)}${subOf(i.item) ? ` <a href="#/recipe/${subOf(i.item).id}">${chip('Sub recipe', 'purple')}</a>` : ''}</span>${canSee('costs') && i.cost ? `<span class="muted small">${data.money(i.cost)}</span>` : ''}</li>`).join('')}</ul></div>
       ${showCost ? `<div class="card small"><b>Plate cost ${data.money(cost)}</b>${r.price ? ` · menu price ${data.money(r.price)} · <b>food cost ${Math.round((cost / r.price) * 100)}%</b>` : ''}</div>` : ''}
       <h2>Step by step</h2>
       <div class="card"><ol class="steps">${(r.steps || []).map((s) => `<li>${esc(s)}</li>`).join('')}</ol></div>

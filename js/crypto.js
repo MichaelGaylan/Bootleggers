@@ -83,6 +83,13 @@ export async function unseal(key, rec) {
 
 const DH = { name: 'ECDH', namedCurve: 'P-256' };
 
+// Pay key (RRA-055): an ECDH pair whose private half is passed to managers.
+export async function newPayKey() {
+  const pair = await crypto.subtle.generateKey(DH, true, ['deriveKey']);
+  return { priv: b64uEnc(await crypto.subtle.exportKey('pkcs8', pair.privateKey)), pub: await exportPublic(pair.publicKey) };
+}
+export const importDhPrivate = (b64) => crypto.subtle.importKey('pkcs8', b64uDec(b64), DH, false, ['deriveKey']);
+
 export function newEcdhKey() {
   return crypto.subtle.generateKey(DH, false, ['deriveKey']);
 }
@@ -109,7 +116,7 @@ export async function openFrom(privateKey, box) {
 export const newTeamKeyBytes = () => crypto.getRandomValues(new Uint8Array(32));
 export const importTeamKey = (bytes) => crypto.subtle.importKey('raw', bytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
 
-// ----- Host backup (RRA-035) -----
+// ----- Admin backup (RRA-035) -----
 // A backup key is made extractable once, so it can be written into a
 // password-protected backup. On restore it is imported non-extractable again.
 

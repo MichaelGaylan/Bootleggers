@@ -6,7 +6,7 @@ No build step: it is plain HTML, CSS and JavaScript modules, served as static fi
 
 ## Layout
 - `index.html`, `css/app.css`: the app and its iOS/Android look (light and dark)
-- `js/config.js`: version, build, Host keys, expiry days, Report a problem key
+- `js/config.js`: version, build, Admin keys, expiry days, Report a problem key
 - `js/access.js`: invite, approval and activation codes; inactivity expiry
 - `js/crypto.js`, `js/store.js`: device keys and encrypted on-phone storage
 - `js/starter-stock.js`: the preinstalled starter stock list (draft)

@@ -11,11 +11,12 @@
 import { FIREBASE } from './config.js';
 import * as data from './data.js';
 import * as store from './store.js';
-import { b64uEnc, b64uDec, importTeamKey } from './crypto.js';
-import { teamKeyBytes, ensureTeamKey } from './access.js';
+import { b64uEnc, b64uDec, importTeamKey, sealTo, openFrom } from './crypto.js';
+import { teamKeyBytes, ensureTeamKey, payPrivate } from './access.js';
+import { level, myStaff } from './perms.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
-const COLLS = ['recipe', 'stock', 'vendor', 'staff', 'prepitem', 'prepday', 'post', 'week', 'swap', 'event', 'waste', 'settings'];
+const COLLS = ['recipe', 'stock', 'vendor', 'staff', 'prepitem', 'prepday', 'post', 'week', 'swap', 'event', 'waste', 'punch', 'payrate', 'prepsaved', 'settings'];
 const te = new TextEncoder();
 const td = new TextDecoder();
 
@@ -75,8 +76,42 @@ async function open(rec) {
   return JSON.parse(td.decode(pt));
 }
 
+// Hours and pay rates (RRA-055) are sealed to the pay key, not the team key:
+// only managers and the Admin can open them. A punch is also sealed to the
+// employee's own phone so a manager's fix reaches them.
+const PRIVATE = ['punch', 'payrate'];
+async function sealPrivate(coll, doc) {
+  const pub = (await data.settings()).payPub;
+  if (!pub) return null; // waits until the Admin phone has made the pay key
+  const bytes = te.encode(JSON.stringify(doc));
+  const box = { m: await sealTo(pub, bytes) };
+  if (coll === 'punch') { const st = await data.get('staff', doc.staffId); if (st?.ek) box.s = await sealTo(st.ek, bytes); }
+  return { iv: 'pk1', ct: JSON.stringify(box) };
+}
+async function openPrivate(r) {
+  let box;
+  try { box = JSON.parse(r.ct); } catch { return null; }
+  const priv = await payPrivate();
+  if (priv && box.m) {
+    try {
+      const doc = JSON.parse(td.decode(await openFrom(priv, box.m)));
+      // A manager the Admin set to No for this keeps none of it on the phone.
+      if (r.c === 'payrate' && level('payrates') === 'none') return null;
+      if (r.c === 'punch' && level('timesheets') === 'none' && doc.staffId !== myStaff()?.id) return null;
+      return doc;
+    } catch { /* not ours */ }
+  }
+  if (box.s) { try { return JSON.parse(td.decode(await openFrom((await store.ecdhKey()).privateKey, box.s))); } catch { /* not ours */ } }
+  return null;
+}
+
 async function push(coll, doc) {
   if (!db) return;
+  if (PRIVATE.includes(coll)) {
+    const pbox = await sealPrivate(coll, doc);
+    if (pbox) await fs.setDoc(fs.doc(db, 'teams', 'bootleggers', 'docs', docPath(coll, doc.id)), { c: coll, i: doc.id, u: doc.updated || Date.now(), d: false, ...pbox });
+    return;
+  }
   const box = await seal(doc);
   await fs.setDoc(fs.doc(db, 'teams', 'bootleggers', 'docs', docPath(coll, doc.id)), { c: coll, i: doc.id, u: doc.updated || Date.now(), d: false, ...box });
 }
@@ -112,7 +147,11 @@ export async function start(profile, onStatus = () => {}) {
         if (mine && (mine.updated || 0) >= r.u) continue; // ours is as new or newer
         try {
           if (r.c === 'settings') { if (!r.d) await data.applyRemoteSettings(await open(r)); }
-          else await data.applyRemote(r.c, r.i, r.d ? null : await open(r));
+          else if (PRIVATE.includes(r.c)) {
+            // Someone else's hours and pay never open on a staff phone.
+            const doc = r.d ? null : await openPrivate(r);
+            if (r.d || doc) await data.applyRemote(r.c, r.i, doc);
+          } else await data.applyRemote(r.c, r.i, r.d ? null : await open(r));
         } catch { set('error', 'Some shared data could not be opened with this phone\'s team key.'); }
       }
       if (first) {

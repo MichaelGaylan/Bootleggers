@@ -48,7 +48,7 @@ async function key(name, make) {
 }
 
 export const deviceKey = () => key('device', newDeviceKey);
-// Restoring a Host backup (RRA-035) replaces this phone's device key.
+// Restoring an Admin backup (RRA-035) replaces this phone's device key.
 export const setDeviceKey = (pair) => rawPut('keys', 'device', pair);
 export const ecdhKey = () => key('ecdh', newEcdhKey);
 

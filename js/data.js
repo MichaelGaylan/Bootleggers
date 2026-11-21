@@ -60,7 +60,7 @@ export async function applyRemoteSettings(s) {
 export const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
 
 // First run: load the starter stock list and sensible defaults. With shared
-// data on, only the Host phone seeds; other phones receive the team's data.
+// data on, only the Admin phone seeds; other phones receive the team's data.
 export async function seed({ shared = false, host = false } = {}) {
   if (await store.get('seeded')) return;
   if (shared && !host) { await store.put('seeded', { at: Date.now(), skipped: true }); return; }
