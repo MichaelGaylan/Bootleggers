@@ -47,6 +47,7 @@ export async function settingsView() {
       <div class="row"><span class="grow">Popups for new notices</span><button class="toggle ${s.popups !== false ? 'on' : ''}" id="popups" type="button" ${edit ? '' : 'disabled'} aria-label="Popups for new notices"></button></div>
       <div class="row"><span class="grow">Food cost target</span><span class="meta">${s.foodCostTarget || 30}%</span>${edit ? '<button class="btn plain small" id="target" type="button">Change</button>' : ''}</div>
       <div class="row"><span class="grow">Shared team data</span><span class="meta">${esc(syncLabel())}</span></div>
+      ${edit ? '<a class="row" href="#/dedupe"><span class="grow">Clean up duplicates</span></a>' : ''}
       <div class="row"><span class="grow">Lock after no use</span><span class="meta">${INACTIVITY_DAYS} days</span></div>
       <a class="row" href="#/about"><span class="grow">About</span></a>
       <a class="row" href="#/report"><span class="grow">Report a problem</span></a>
@@ -224,4 +225,27 @@ export async function personView(id) {
     const keep = !isHost() && s.perms ? Object.fromEntries(Object.entries(s.perms).filter(([k]) => k in PAY_AREAS)) : null;
     if (keep && Object.keys(keep).length) { s.perms = keep; await data.put('staff', s); toast('Back to role defaults'); personView(id); return; }
     delete s.perms; await data.put('staff', s); toast('Back to role defaults'); personView(id); });
+}
+
+// Duplicate clean-up (RRA-087): see what would merge, then merge in one tap.
+export async function dedupeView() {
+  setChrome({ tab: 'more', back: true });
+  setTitle('Clean up duplicates');
+  const { findDuplicates, countDuplicates, mergeDuplicates, AREA_LABELS } = await import('./dedupe.js');
+  const found = await findDuplicates();
+  const n = countDuplicates(found);
+  const edit = canChange('settings');
+  view.innerHTML = n ? `
+    <p class="muted small">Entries with the same name (stock in the same group, saved prep at the same station). The one with the most filled in is kept; anything only a copy had (count, par, vendor, price) is copied onto it, and links to vendors and house recipes move over. Then the copies are taken out for everyone.</p>
+    ${Object.entries(found).filter(([, gs]) => gs.length).map(([c, gs]) => `<div class="section-label">${esc(AREA_LABELS[c])} · ${gs.reduce((m, g) => m + g.length - 1, 0)} to remove</div>
+      <div class="group">${gs.map((g) => `<div class="row"><span class="grow"><span class="title">${esc(g[0].name)}</span><span class="sub">${g.length} copies${g[0].group ? ' · ' + esc(g[0].group) : ''}${g[0].section ? ' · ' + esc(g[0].section) : ''} → keep 1</span></span></div>`).join('')}</div>`).join('')}
+    ${edit ? `<button class="btn block" id="merge" type="button" style="margin-top:14px">Merge ${n} duplicate${n > 1 ? 's' : ''}</button>` : '<p class="muted small">Only the Admin, and people allowed to change Settings, can merge.</p>'}`
+    : '<div class="empty">No duplicates. Everything has one entry.</div>';
+  $('#merge')?.addEventListener('click', async () => {
+    const ok = await sheet({ title: 'Merge duplicates?', right: 'Merge', body: `<p>Take out <b>${n}</b> duplicate entries for the whole team? This can't be undone, but nothing filled in is lost.</p>` });
+    if (!ok) return;
+    const done = await mergeDuplicates(found);
+    toast(`Merged ${done} duplicate${done > 1 ? 's' : ''}`);
+    dedupeView();
+  });
 }

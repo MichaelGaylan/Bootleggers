@@ -16,6 +16,7 @@ export const WHATS_NEW = [
       'More → Staff: Change role opens properly, and people whose phone isn\'t linked yet are marked Not linked.',
       'New Settings → Pay rules: set overtime hours and rates, daily overtime and double time, with state presets.',
       'Recipe archive: add a sauce, a drink or any menu item without ingredients. Each section has its own + Add button.',
+      'Duplicates: Settings → Clean up duplicates merges repeated stock, recipes, vendors and saved prep in one tap, keeping counts, pars and prices. A second Admin device no longer adds the starter lists twice.',
     ],
   },
   {

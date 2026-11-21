@@ -25,6 +25,9 @@ let state = FIREBASE ? 'starting' : 'off';
 let detail = '';
 export const status = () => ({ state, detail });
 export const enabled = () => !!FIREBASE;
+// Resolves once this phone has the shared data (RRA-087), or false after ms.
+let syncedNow; const syncedOnce = new Promise((r) => { syncedNow = r; });
+export const whenSynced = (ms = 8000) => Promise.race([syncedOnce, new Promise((r) => setTimeout(() => r(false), ms))]);
 
 let fs = null;
 let db = null;
@@ -218,6 +221,7 @@ export async function start(profile, onStatus = () => {}) {
           }
         }
         await store.put('synced', { at: Date.now() });
+        syncedNow(true);
       }
       set('on');
     }, (err) => set('error', err.message));

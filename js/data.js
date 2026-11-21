@@ -64,6 +64,7 @@ export const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
 export async function seed({ shared = false, host = false } = {}) {
   if (await store.get('seeded')) return;
   if (shared && !host) { await store.put('seeded', { at: Date.now(), skipped: true }); return; }
+  if ((await list('stock')).length) { await store.put('seeded', { at: Date.now(), had: true }); return; }
   for (const g of STARTER_STOCK) {
     for (const [name, unit] of g.items) {
       await put('stock', { name, unit: unit || 'each', group: g.group, par: 0, onHand: 0, vendor: '', price: '' });
