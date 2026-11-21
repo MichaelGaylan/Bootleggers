@@ -8,7 +8,8 @@ import * as access from './access.js';
 import * as store from './store.js';
 import * as data from './data.js';
 import * as sync from './sync.js';
-import { canSee, isHost, myStaff } from './perms.js';
+import { canSee, canChange, isHost, myStaff } from './perms.js';
+import { findDuplicates, countDuplicates } from './dedupe.js';
 import { recipesView, recipeView, printView } from './recipes.js';
 import { stockView, neededView, ordersView, vendorsView } from './stock.js';
 import { boardView, unreadPosts } from './board.js';
@@ -17,7 +18,7 @@ import { scheduleView, staffView, ensureStaffFor, staffList, schedulePrintView, 
 import { eventsView, eventView } from './events.js';
 import { costsView } from './costs.js';
 import { loungeView, timesheetView, timesheetsView, canTime } from './lounge.js';
-import { settingsView, listView, rolesView, personView } from './settings.js';
+import { settingsView, listView, rolesView, personView, dedupeView } from './settings.js';
 import { applyMenu, applyVendors, applySupplies } from './menu.js';
 
 import { $, $$, esc, view, dlg, LS, isIOS, standalone, toast, copy, share, pasteInto, sheet, setTitle, setChrome, fmtDate, session, wideMQ, THEMES, getTheme } from './ui.js';
@@ -692,7 +693,7 @@ const routes = {
   timesheet: () => timesheetView(),
   timesheets: () => timesheetsView(),
   notices: () => boardView(),
-  schedule: () => scheduleView(),
+  schedule: (arg) => scheduleView(arg),
   'schedule-print': (arg) => schedulePrintView(arg),
   staff: () => staffView(),
   events: () => eventsView(),
@@ -702,6 +703,7 @@ const routes = {
   list: (k) => listView(k),
   roles: () => rolesView(),
   person: (id) => personView(id),
+  dedupe: () => dedupeView(),
   more: () => moreView(),
   about: () => aboutView(),
   whatsnew: () => whatsNewView(),
@@ -756,6 +758,17 @@ async function adminPayKeyCheck() {
   if (dirty) await data.saveSettings(next);
 }
 
+// RRA-087: offer the one-tap duplicate clean-up when there is something to merge.
+async function offerDedupe() {
+  if (dlg.open || !$('#splash').hidden) return setTimeout(offerDedupe, 4000);
+  const n = countDuplicates(await findDuplicates());
+  if (!n || LS.get('dedupeAsked', 0) === n) return;
+  LS.set('dedupeAsked', n);
+  const go = await sheet({ title: 'Duplicates found', right: 'Review', left: 'Later',
+    body: `<p>There are <b>${n}</b> duplicate entries in stock, recipes, vendors or saved prep. You can merge them in one tap and keep the counts, pars, vendors and prices.</p>` });
+  if (go) location.hash = '#/dedupe';
+}
+
 async function route() {
   if (!profile) return;
   const [, name = 'recipes', arg] = location.hash.match(/^#\/([^/]+)\/?(.*)$/) || [];
@@ -766,7 +779,7 @@ async function route() {
   const at = location.hash;
   await (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
   // RRA-078: swap conflicts for managers, and a manager's question for the requester.
-  if (location.hash === at && !dlg.open && await swapPopups().catch(() => false) && location.hash === at) (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
+  if (location.hash === at && !dlg.open && $('#splash').hidden && await swapPopups().catch(() => false) && location.hash === at) (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
   // A slow screen can finish after a quicker tap: show what the address says.
   if (location.hash !== at && !dlg.open) route();
 }
@@ -801,7 +814,6 @@ async function boot() {
     return lockedView(incoming);
   }
   access.touch();
-  await data.seed({ shared: sync.enabled(), host: profile.role === 'owner' });
   await ensureStaffFor(profile);
   await access.ensureTeamKey(profile);
   // The Admin phone makes the pay key and shares its public half (RRA-055).
@@ -817,9 +829,15 @@ async function boot() {
     data.onChange((coll, remote) => { if (remote) debounceRoute(); });
     data.onChange(() => updateBadge());
   }
-  await applyMenu({ shared: sync.enabled(), host: profile.role === 'owner' });
-  await applyVendors({ shared: sync.enabled(), host: profile.role === 'owner' });
-  await applySupplies({ shared: sync.enabled(), host: profile.role === 'owner' });
+  // RRA-087: add starter data only after the shared data has arrived, so a
+  // second Admin device (an iPad) never adds it all a second time.
+  if (!sync.enabled() || await sync.whenSynced()) {
+    await data.seed({ shared: sync.enabled(), host: profile.role === 'owner' });
+    await applyMenu({ shared: sync.enabled(), host: profile.role === 'owner' });
+    await applyVendors({ shared: sync.enabled(), host: profile.role === 'owner' });
+    await applySupplies({ shared: sync.enabled(), host: profile.role === 'owner' });
+    if (canChange('settings')) setTimeout(() => offerDedupe(), 1500);
+  }
   await noticeGate();
   await homeTip();
   if (incoming && access.parse(incoming)?.kind === 'req') { location.hash = '#/team'; return teamView(incoming); }

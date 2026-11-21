@@ -18,6 +18,7 @@ export async function recipesView() {
   const edit = canChange('recipes');
   setTitle(kind === 'dish' ? 'Recipe archive' : 'House recipes', edit ? `<button class="btn btn-new" id="new-recipe" type="button">${kind === 'dish' ? 'UPLOAD' : 'NEW RECIPE'}</button>` : '');
   $('#new-recipe')?.addEventListener('click', () => recipeDialog(null, kind));
+
   const list = await all();
   const settings = await data.settings();
   const q = (recipesView.q || '').toLowerCase();
@@ -38,7 +39,7 @@ export async function recipesView() {
   const wideTable = () => `<p class="muted small">Showing ${shown.length} of ${list.filter((r) => r.kind === kind).length} ${kind === 'dish' ? 'dishes' : 'house recipes'}</p>
     <div class="wtable-wrap"><table class="wtable">${kind === 'dish'
     ? `<thead><tr><th>Dish</th><th>Type</th><th>Uses</th><th class="num">Price</th>${costs ? '<th class="num">Plate cost</th>' : ''}</tr></thead>
-      ${keys.map((g) => `<tbody><tr class="band"><td colspan="${costs ? 5 : 4}">${esc(g)} <span class="muted">· ${groups[g].length}</span></td></tr>
+      ${keys.map((g) => `<tbody><tr class="band"><td colspan="${costs ? 5 : 4}">${esc(g)} <span class="muted">· ${groups[g].length}</span>${edit ? ` <button class="btn plain small" type="button" data-addto="${esc(g)}">+ Add</button>` : ''}</td></tr>
         ${groups[g].map((r) => `<tr data-href="#/recipe/${r.id}"><td><span class="link">${esc(r.name)}</span></td><td>${chip('Dish', 'gray')}</td>
           <td>${(r.uses || []).map(nameOf).filter(Boolean).map((n) => chip(n, 'purple')).join(' ') || `<span class="muted small">${esc((r.ingredients || []).slice(0, 3).map((i) => i.item).join(', '))}</span>`}</td>
           <td class="num">${r.price ? data.money(r.price) : '—'}</td>${costs ? `<td class="num">${plateCost(r) !== null ? data.money(plateCost(r)) : '—'}</td>` : ''}</tr>`).join('')}</tbody>`).join('')}`
@@ -57,7 +58,7 @@ export async function recipesView() {
       <button class="acc-head${q || openKey === g ? ' open' : ''}" type="button" data-g="${esc(g)}"><span class="grow">${esc(g)}</span><span class="meta">${groups[g].length}</span></button>
       <div class="group acc-body"${q || openKey === g ? '' : ' hidden'}>${groups[g].map((r) => `
         <a class="row" href="#/recipe/${r.id}">${r.photo ? `<img src="${r.photo}" alt="" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex:none">` : ''}
-        <span class="grow"><span class="title">${esc(r.name)}${r.kind === 'house' ? ` ${chip('Sub recipe', 'purple')}` : ''}</span><span class="sub">${esc(subline(r, list))}</span></span>${r.kind === 'dish' && r.price ? `<span class="meta">${data.money(r.price)}</span>` : ''}</a>`).join('')}</div>`).join('')
+        <span class="grow"><span class="title">${esc(r.name)}${r.kind === 'house' ? ` ${chip('Sub recipe', 'purple')}` : ''}</span><span class="sub">${esc(subline(r, list))}</span></span>${r.kind === 'dish' && r.price ? `<span class="meta">${data.money(r.price)}</span>` : ''}</a>`).join('')}${edit && kind === 'dish' ? `<button class="row nav add-to" type="button" data-addto="${esc(g)}"><span class="grow" style="color:var(--accent)">+ Add to ${esc(g)}</span></button>` : ''}</div>`).join('')
     : `<div class="empty">${q ? 'Nothing matches that search.' : kind === 'dish'
       ? `No dishes yet.${edit ? '<br>Tap <b>UPLOAD</b> to add the first one.' : ''}`
       : `No house recipes yet.${edit ? '<br>Tap <b>NEW RECIPE</b> to add a rub, sauce or dressing.' : ''}`}</div>`}`;
@@ -71,6 +72,8 @@ export async function recipesView() {
     };
   });
   $$('tr[data-href]', view).forEach((tr) => { tr.onclick = () => { location.hash = tr.dataset.href; }; });
+  // RRA-086: add a menu item (a sauce, a drink) straight into its section.
+  $$('[data-addto]', view).forEach((b) => { b.onclick = (e) => { e.stopPropagation(); recipeDialog(null, 'dish', b.dataset.addto); }; });
   const qi = $('#q');
   $('#q-x').onclick = () => { recipesView.q = ''; recipesView(); };
   qi.oninput = () => { recipesView.q = qi.value; clearTimeout(qi.t); qi.t = setTimeout(async () => { await recipesView(); const n = $('#q'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 200); };
@@ -209,9 +212,9 @@ async function photoFrom(file) {
   return c.toDataURL('image/jpeg', 0.72);
 }
 
-export async function recipeDialog(existing, kind = 'house') {
+export async function recipeDialog(existing, kind = 'house', section = null) {
   const settings = await data.settings();
-  const r = existing ? structuredClone(existing) : { kind, category: 'Sauce', section: (settings.sections || [])[0], ingredients: [{}, {}], steps: [], uses: [], comments: [] };
+  const r = existing ? structuredClone(existing) : { kind, category: 'Sauce', section: section || (settings.sections || [])[0], ingredients: [{}, {}], steps: [], uses: [], comments: [] };
   const house = (await all()).filter((x) => x.kind === 'house' && x.id !== r.id);
   const costs = canSee('costs');
   const ingRow = (i = {}) => `
@@ -234,7 +237,7 @@ export async function recipeDialog(existing, kind = 'house') {
         <label class="field"><span>Photo</span><input type="file" id="r-photo" accept="image/*"></label>
         ${r.photo ? `<div id="r-photo-prev"><img src="${r.photo}" alt="" style="width:120px;border-radius:8px"> <button type="button" class="btn plain small" id="r-photo-del">Remove photo</button></div>` : ''}
       </div>
-      <div class="field"><span class="muted small" style="margin-left:4px">Ingredients and quantities${costs ? ' (cost per plate is optional)' : ''}</span>
+      <div class="field"><span class="muted small" style="margin-left:4px">Ingredients and quantities${costs ? ' (cost per plate is optional)' : ''}<span class="dish-opt"> · optional for menu items like sauces and drinks</span></span>
         <div id="r-ings" style="margin-top:6px">${(r.ingredients.length ? r.ingredients : [{}]).map(ingRow).join('')}</div>
         <button class="btn plain small" id="r-add-ing" type="button">+ Add ingredient</button>
       </div>
@@ -262,6 +265,7 @@ export async function recipeDialog(existing, kind = 'house') {
         $('#house-only-2', el).hidden = k !== 'house';
         $('#dish-only', el).hidden = k !== 'dish';
         $('#dish-only-1', el).hidden = k !== 'dish';
+        $$('.dish-opt', el).forEach((x) => { x.hidden = k !== 'dish'; });
       };
       setKind(r.kind);
       $$('#r-kind button', el).forEach((b) => { b.onclick = () => setKind(b.dataset.k); });
@@ -274,7 +278,10 @@ export async function recipeDialog(existing, kind = 'house') {
         const name = $('#r-name', el).value.trim();
         const ingredients = $$('.ing-edit', el).map((row) => { const [q, i, c] = $$('input', row); return { qty: q.value.trim(), item: i.value.trim(), cost: c ? c.value.trim().replace('$', '') : undefined }; }).filter((i) => i.item);
         const steps = $('#r-steps', el).value.split('\n').map((s) => s.trim()).filter(Boolean);
-        const err = !name ? 'Give the recipe a name.' : !ingredients.length ? 'Add at least one ingredient.' : !steps.length ? 'Add the instructions.' : '';
+        // RRA-086: a dish (a menu item like a sauce or a drink) only needs a name;
+        // ingredients and instructions are optional. House recipes need both.
+        const isDish = r.kind === 'dish';
+        const err = !name ? 'Give it a name.' : !isDish && !ingredients.length ? 'Add at least one ingredient.' : !isDish && !steps.length ? 'Add the instructions.' : '';
         if (err) { $('#r-err', el).textContent = err; return; }
         const comment = $('#r-comment', el).value.trim();
         const house = r.kind === 'house';

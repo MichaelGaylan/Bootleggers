@@ -10,7 +10,7 @@ import { canChange, canSee, myStaff, isHost, canTime } from './perms.js';
 import { payKeyInfo } from './access.js';
 import { unreadPosts, sendPost } from './board.js';
 import { canSeePost, isPrivate } from './audience.js';
-import { staffList, roleOf, pill } from './schedule.js';
+import { staffList, roleOf, pill, swapBadge } from './schedule.js';
 import { printButtons, wirePrint } from './pdf.js';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -47,10 +47,11 @@ export async function loungeButton() {
   const me = myStaff();
   const open = me ? openPunch(await punches(), me.id) : null;
   const unread = await unreadPosts();
+  const swaps = canSee('schedule') ? await swapBadge() : 0; // RRA-080
   return `<a class="lounge-btn" href="#/lounge">
     <span class="lounge-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10h13v4a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM17 11h1.5a2.5 2.5 0 0 1 0 5H17M8 3c0 2 2 2 2 4M12 3c0 2 2 2 2 4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
     <span class="grow"><b>Employee lounge</b><small>${open ? `On the clock since ${t(open.in)}` : 'Clock in · board · schedule · time sheet'}</small></span>
-    ${unread ? `<i class="sbadge">${unread}</i>` : ''}<span class="chev">›</span></a>`;
+    ${swaps ? `<span class="swap-badge" title="Swap requests">⇄ ${swaps}</span>` : ''}${unread ? `<i class="sbadge">${unread}</i>` : ''}<span class="chev">›</span></a>`;
 }
 
 // ------------------------------------------------------------ lounge
@@ -74,7 +75,9 @@ export async function loungeView() {
   const items = await data.list('prepitem');
   const done = (await data.get('prepday', data.today()))?.done || {};
   const nDone = items.filter((i) => done[i.id]).length;
-  const swaps = canChange('schedule') ? (await data.list('swap')).filter((s) => s.status === 'asked').length : 0;
+  const swaps = canSee('schedule') ? await swapBadge() : 0;
+  const allSwaps = swaps ? (await data.list('swap')).filter((s) => s.status === 'asked' || (me && s.from === me.id)).sort((a, b) => b.at - a.at) : [];
+  const firstSwap = (canChange('schedule') ? allSwaps.find((s) => s.status === 'asked') : null) || allSwaps.find((s) => me && s.from === me.id && s.status !== 'withdrawn') || allSwaps[0];
   const onClock = canTime() ? all.filter((p) => !p.out) : [];
   view.innerHTML = `<div class="lounge">
     <div class="card clock-card${open ? ' on' : ''}">
@@ -89,7 +92,7 @@ export async function loungeView() {
       ${me ? `<div class="myweek">${DAYS.map((dn, i) => `<div class="${i === todayIdx ? 'today' : ''}"><span>${dn}</span>${myShifts[i] ? pill(myShifts[i], roleOf(me)) : '<em>Off</em>'}</div>`).join('')}</div>`
       : '<p class="muted small">Your shifts show here once you are on the staff list.</p>'}
       ${me && !week.published && !canChange('schedule') ? '<p class="muted small">This week isn\'t published yet.</p>' : ''}
-      ${swaps ? `<a class="row nav" href="#/schedule"><span class="grow">Swap requests</span>${chip(`${swaps} waiting`, 'orange')}</a>` : ''}</div>` : ''}
+      ${swaps ? `<a class="row nav" href="#/schedule${firstSwap ? '/' + firstSwap.id : ''}"><span class="grow">Swap requests</span>${chip(`${swaps} ${canChange('schedule') ? 'waiting' : 'update' + (swaps > 1 ? 's' : '')}`, 'orange')}</a>` : ''}</div>` : ''}
 
     ${canSee('prep') ? `<a class="card l-card l-link" href="#/prep/lounge"><div class="l-head"><b>Today's tasks</b><span class="chev">›</span></div>
       <div class="bar${items.length ? ' todo' : ''}"><i style="width:${items.length ? Math.round((nDone / items.length) * 100) : 0}%"></i></div>
@@ -116,20 +119,50 @@ export async function loungeView() {
 
 // ------------------------------------------------------------ time sheets
 
-// Pay (RRA-055): hours over 40 in the week are overtime at 1.5 times the rate.
-const OT_AFTER = 40;
+// Pay (RRA-055, RRA-085): overtime follows the pay rules in Settings. The
+// default is hours over 40 in the week at 1.5 times the rate. Some states add
+// daily overtime and double time.
+export const PAY_PRESETS = {
+  federal: { name: 'Federal (Georgia and most states)', weeklyAfter: 40, otX: 1.5, dailyAfter: 0, doubleAfter: 0, doubleX: 2 },
+  california: { name: 'California', weeklyAfter: 40, otX: 1.5, dailyAfter: 8, doubleAfter: 12, doubleX: 2 },
+  alaska: { name: 'Alaska', weeklyAfter: 40, otX: 1.5, dailyAfter: 8, doubleAfter: 0, doubleX: 2 },
+  colorado: { name: 'Colorado', weeklyAfter: 40, otX: 1.5, dailyAfter: 12, doubleAfter: 0, doubleX: 2 },
+};
+export function payRules(settings) {
+  const r = { preset: 'federal', ...PAY_PRESETS.federal, ...(settings?.payRules || {}) };
+  return { ...r, weeklyAfter: +r.weeklyAfter || 40, otX: +r.otX || 1.5, dailyAfter: +r.dailyAfter || 0, doubleAfter: +r.doubleAfter || 0, doubleX: +r.doubleX || 2 };
+}
+const times = (n) => `${+(+n).toFixed(2)}×`;
+export function rulesText(r) {
+  return [`overtime after ${r.weeklyAfter} h a week`, r.dailyAfter ? `or ${r.dailyAfter} h a day` : '', `at ${times(r.otX)}`, r.doubleAfter ? `· double time after ${r.doubleAfter} h a day at ${times(r.doubleX)}` : ''].filter(Boolean).join(' ');
+}
+let RULES = payRules(null);
+const loadRules = async () => { RULES = payRules(await data.settings()); return RULES; };
 const money = (n) => `$${(Math.round(n * 100) / 100).toFixed(2)}`;
-function pay(total, rate) {
-  const reg = Math.min(total, OT_AFTER); const ot = Math.max(0, total - OT_AFTER);
-  return { reg, ot, pay: rate ? reg * rate + ot * rate * 1.5 : null };
+// Split a week of punches into regular, overtime and double time hours.
+export function splitHours(ps, r = RULES) {
+  const byDay = {};
+  for (const p of ps) { const k = data.isoDate(new Date(p.in)); byDay[k] = (byDay[k] || 0) + punchHours(p); }
+  let reg = 0; let ot = 0; let dbl = 0;
+  for (const h of Object.values(byDay)) {
+    const d2 = r.doubleAfter ? Math.max(0, h - r.doubleAfter) : 0;
+    const d1 = r.dailyAfter ? Math.max(0, h - d2 - r.dailyAfter) : 0;
+    reg += h - d1 - d2; ot += d1; dbl += d2;
+  }
+  if (reg > r.weeklyAfter) { ot += reg - r.weeklyAfter; reg = r.weeklyAfter; }
+  return { reg, ot, dbl };
+}
+function pay(ps, rate) {
+  const { reg, ot, dbl } = splitHours(ps);
+  return { reg, ot: ot + dbl, otOnly: ot, dbl, pay: rate ? reg * rate + ot * rate * RULES.otX + dbl * rate * RULES.doubleX : null };
 }
 
 function personBlock(st, ps, wk, can, rate) {
   const edit = !!can?.time;
   const total = ps.reduce((s, p) => s + punchHours(p), 0);
-  const pp = pay(total, rate);
+  const pp = pay(ps, rate);
   return { total, ...pp, html: `<div class="group acc-body ts-body">${can?.rates ? `<button class="row nav" type="button" data-rate="${st.id}"><span class="grow"><span class="title">Hourly rate</span>
-      <span class="sub">${rate ? `${money(rate)} an hour · ${hrs(pp.reg)} regular${pp.ot ? ` + ${hrs(pp.ot)} overtime` : ''}` : 'Not set. Tap to add it.'}</span></span>
+      <span class="sub">${rate ? `${money(rate)} an hour · ${hrs(pp.reg)} regular${pp.otOnly ? ` + ${hrs(pp.otOnly)} overtime` : ''}${pp.dbl ? ` + ${hrs(pp.dbl)} double time` : ''}` : 'Not set. Tap to add it.'}</span></span>
       <span class="meta">${pp.pay !== null ? `<b>${money(pp.pay)}</b>` : ''}</span></button>` : ''}${ps.map((p) => `<div class="row"${edit ? ` data-punch="${p.id}"` : ''}>
       <span class="grow"><span class="title">${d(p.in)}</span><span class="sub">${t(p.in)} – ${p.out ? t(p.out) : 'on the clock'}${p.editedBy ? ` · fixed by ${esc(p.editedBy)}` : ''}</span></span>
       <span class="meta">${p.out ? hrs(punchHours(p)) : chip('Open', 'green')}</span></div>`).join('') || '<div class="row muted">No punches this week.</div>'}
@@ -137,13 +170,13 @@ function personBlock(st, ps, wk, can, rate) {
 }
 
 function lines(people, wk, rates, withPay) {
-  const out = [`Week of ${label(wk)} - ${label(addDays(wk, 6))}`, ...(withPay ? [`Overtime: hours over ${OT_AFTER} in the week at 1.5x the rate`] : []), ''];
+  const out = [`Week of ${label(wk)} - ${label(addDays(wk, 6))}`, ...(withPay ? [`Pay rules: ${rulesText(RULES)}`] : []), ''];
   let grand = 0; let grandPay = 0;
   for (const { st, ps } of people) {
     const total = ps.reduce((s, p) => s + punchHours(p), 0);
-    const rate = rates[st.id]; const pp = pay(total, rate);
+    const rate = rates[st.id]; const pp = pay(ps, rate);
     grand += total; grandPay += pp.pay || 0;
-    out.push(`# ${st.name}${st.position ? ` (${st.position})` : ''}: ${hrs(total)}${pp.ot ? ` (${hrs(pp.reg)} reg + ${hrs(pp.ot)} OT)` : ''}${withPay ? (rate ? ` x ${money(rate)}/h = ${money(pp.pay)}` : ' (no rate set)') : ''}`);
+    out.push(`# ${st.name}${st.position ? ` (${st.position})` : ''}: ${hrs(total)}${pp.ot ? ` (${hrs(pp.reg)} reg + ${hrs(pp.otOnly)} OT${pp.dbl ? ` + ${hrs(pp.dbl)} DT` : ''})` : ''}${withPay ? (rate ? ` x ${money(rate)}/h = ${money(pp.pay)}` : ' (no rate set)') : ''}`);
     for (const p of ps) out.push(`   ${d(p.in).padEnd(16)} ${t(p.in).padStart(8)} - ${(p.out ? t(p.out) : 'open').padStart(8)}   ${hrs(punchHours(p))}`);
     out.push('');
   }
@@ -153,6 +186,7 @@ function lines(people, wk, rates, withPay) {
 
 // One person's own hours.
 export async function timesheetView() {
+  await loadRules();
   setChrome({ tab: 'lounge', back: true });
   setTitle('My time sheet');
   const me = myStaff();
@@ -172,6 +206,7 @@ const wireWeek = (wk, go) => $$('[data-w]', view).forEach((b) => { b.onclick = (
 
 // Everyone's hours, compiled for managers and the Admin.
 export async function timesheetsView() {
+  await loadRules();
   setChrome({ tab: 'lounge', back: true });
   setTitle('Time sheets');
   if (!canTime()) { location.hash = '#/lounge'; return; }
@@ -201,7 +236,7 @@ export async function timesheetsView() {
   view.innerHTML = `${weekNav(wk)}
     ${hasKey ? '' : '<div class="hint small">This phone doesn\'t have the pay key yet, so it shows only hours made on this phone. A phone approved as Manager by the Admin gets it.</div>'}
     <div class="ts-total card"><div class="ts-row"><div><span class="muted small">Hours this week</span><b>${hrs(grand)}</b></div>${seeRates ? `<div><span class="muted small">Payroll this week</span><b>${money(grandPay)}</b></div>` : ''}</div>
-      <span class="muted small">${withHours.length} of ${staff.length} people clocked in${seeRates && noRate ? ` · ${noRate} without an hourly rate` : ''}${seeRates ? ` · overtime after ${OT_AFTER} h at 1.5×` : ''}</span></div>
+      <span class="muted small">${withHours.length} of ${staff.length} people clocked in${seeRates && noRate ? ` · ${noRate} without an hourly rate` : ''}${seeRates ? ` · ${esc(rulesText(RULES))}${canChange('payrates') ? ' · <a href="#/settings">Pay rules</a>' : ''}` : ''}</span></div>
     ${isWide() ? `<div class="wtable-wrap"><table class="wtable"><thead><tr><th>Employee</th>${DAYS.map((dn, i) => `<th class="num">${dn} ${addDays(wk, i).slice(8)}</th>`).join('')}<th class="num">Hours</th><th class="num">OT</th>${seeRates ? '<th class="num">Rate</th><th class="num">Pay</th>' : ''}</tr></thead>
       <tbody>${blocks.map(({ st, ps, b }) => `<tr><td>${esc(st.name)}</td>${DAYS.map((_, i) => { const h = dayHours(ps, i); return `<td class="num">${h ? h.toFixed(2) : '<span class="muted">—</span>'}</td>`; }).join('')}<td class="num"><b>${b.total.toFixed(2)}</b></td><td class="num">${b.ot ? b.ot.toFixed(2) : '—'}</td>${seeRates ? `<td class="num">${rates[st.id] ? money(rates[st.id]) : '<span class="muted">—</span>'}</td><td class="num"><b>${b.pay !== null ? money(b.pay) : '—'}</b></td>` : ''}</tr>`).join('')}</tbody></table></div>
       <div class="section-label">Punches</div>` : ''}
