@@ -13,6 +13,9 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 ## 🟡 Hold
 
 ## 🟣 Done
+### 0.5.1 · build 2026.11.21-1
+- [x] RRA-063 · What's new screen scrolls so long update notes can be read fully on phone and iPad; the Continue button always stays on screen. Shows every release since the phone's last update · UX · S
+
 ### 0.5.0 · build 2026.11.20-1
 - [x] RRA-059 · Pay: hourly rate per employee; Time sheets show hours, overtime (over 40 h at 1.5x), rate and pay, printable and as PDF for payroll. Everyone's hours and rates are sealed in shared data with a managers-only pay key made on the Admin phone; staff phones keep only their own hours · Feature · L
 - [x] RRA-060 · Admin sets each manager's access to time sheets and pay rates (No / See / Change) in Roles and permissions; only the Admin can change them · Feature · M

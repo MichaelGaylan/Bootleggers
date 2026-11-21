@@ -61,13 +61,15 @@ function startupScreen() {
       video.pause();
       skip.hidden = true;
       video.style.transition = 'opacity .6s'; video.style.opacity = '0';
-      const notes = WHATS_NEW.find((w) => w.version === VERSION)?.lines || [];
+      // Every release since the one this phone last saw (newest first).
+      const upto = WHATS_NEW.findIndex((w) => w.version === seen);
+      const news = WHATS_NEW.slice(0, upto < 0 ? 1 : Math.max(upto, 1));
       card.innerHTML = `
         <img src="assets/app-icon-512.png" alt="">
         <h2>${esc(APP_NAME)}</h2>
         <div class="ver">Version ${VERSION} · build ${BUILD}</div>
         ${updated
-          ? `<p style="margin-top:16px;font-weight:600">What's new</p><ul>${notes.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`
+          ? `<p class="splash-h">What's new</p><div class="splash-notes" tabindex="0">${news.map((w) => `${news.length > 1 ? `<div class="splash-v">${esc(w.version)}</div>` : ''}<ul>${w.lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`).join('')}</div>`
           : `<p style="margin:16px 0 22px;color:rgba(255,255,255,.8)">Recipes and kitchen notes for Bootleggers Bar &amp; Grill, Augusta.</p>`}
         <button class="btn" type="button">${updated ? 'Continue' : 'Get started'}</button>`;
       card.hidden = false;
