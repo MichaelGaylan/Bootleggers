@@ -2,10 +2,16 @@
 // Bump VERSION and BUILD on every release, and add one line to WHATS_NEW.
 
 export const APP_NAME = 'Bootleggers Kitchen';
-export const VERSION = '0.5.0';
-export const BUILD = '2026.11.20-1';
+export const VERSION = '0.5.1';
+export const BUILD = '2026.11.21-1';
 
 export const WHATS_NEW = [
+  {
+    version: '0.5.1', build: '2026.11.21-1', date: '2026-11-21',
+    lines: [
+      'The What\'s new screen now scrolls, so long update notes fit on any phone or iPad, and the Continue button always stays on screen.',
+    ],
+  },
   {
     version: '0.5.0', build: '2026.11.20-1', date: '2026-11-20',
     lines: [
