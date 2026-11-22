@@ -673,3 +673,45 @@ svg.lock { width: 11px; height: 11px; vertical-align: -1px; }
 .pr-flush { margin-left: 0; }
 .pill.info { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 .pill.pr-ot { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
+
+/* ---------- Point of sale (RRA-101) ---------- */
+.pos-av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: .78rem; color: #fff; flex: none; }
+.pos-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pos-num small { display: block; }
+.pos-check { padding: 10px 14px; }
+.pos-seat + .pos-seat { margin-top: 6px; }
+.pos-line { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: 0; border-bottom: .5px solid var(--sep); padding: 7px 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.pos-line .grow { flex: 1; min-width: 0; }
+.pos-line.void { text-decoration: line-through; color: var(--text-2); }
+.pos-mod { display: block; font-size: .8rem; color: var(--text-2); }
+.pos-st { font-size: .72rem; color: var(--text-2); white-space: nowrap; }
+.pos-price { min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+.pos-tot { display: flex; justify-content: space-between; padding: 3px 0; font-size: .92rem; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.pos-tot.big { color: var(--text); font-weight: 700; font-size: 1.05rem; }
+.pos-actions { margin: 0 0 6px; }
+.pos-secs { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 10px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.pos-secs::-webkit-scrollbar { display: none; }
+.pos-secs button { flex: none; border: 0; border-radius: 999px; padding: 7px 13px; font: inherit; font-size: .85rem; font-weight: 600; background: var(--card); color: var(--text); cursor: pointer; }
+.pos-secs button.on { background: var(--accent); color: var(--on-accent); }
+.pos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; margin-bottom: 18px; }
+.pos-item { min-height: 72px; border: 0; border-radius: var(--radius); background: var(--card); color: var(--text); font: inherit; font-size: .84rem; font-weight: 600; padding: 8px; text-align: left; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; box-shadow: 0 .5px 0 var(--sep); }
+.pos-item small { color: var(--text-2); font-weight: 500; }
+.pos-item:active { transform: scale(.97); }
+.pos-item.out { opacity: .45; text-decoration: line-through; }
+.pos-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
+.pos-term { background: #111; color: #fff; border-radius: 18px; padding: 18px 16px; text-align: center; }
+.pos-tips { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.pos-tips button { border: 0; border-radius: 12px; padding: 12px 6px; background: #2c2c2e; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.pos-tips button small { display: block; font-weight: 500; color: #aaa; }
+.pos-tips button.on { background: #0a84ff; }
+.pos-tap { margin-top: 14px; font-weight: 600; }
+.pos-tix { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.pos-ticket { margin: 0; border-top: 5px solid var(--ok); }
+.pos-ticket.warm { border-top-color: var(--warn); }
+.pos-ticket.late { border-top-color: var(--danger); }
+.pos-th { display: flex; justify-content: space-between; font-size: 1.05rem; }
+.pos-ti { display: flex; justify-content: space-between; gap: 8px; width: 100%; background: none; border: 0; border-bottom: .5px solid var(--sep); padding: 8px 0; font: inherit; font-weight: 600; color: var(--text); text-align: left; cursor: pointer; }
+.pos-ti em { display: block; font-style: normal; font-weight: 500; font-size: .82rem; color: var(--danger); }
+.pos-ti.done { color: var(--text-2); text-decoration: line-through; }
+.pos-ti small { color: var(--text-2); }
+.pos-ticket .btn { margin-top: 10px; }
