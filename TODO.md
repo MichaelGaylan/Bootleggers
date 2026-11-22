@@ -13,6 +13,8 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 ## 🟡 Hold
 
 ## 🟣 Done
+### 0.5.10 · build 2026.11.22-3
+- [x] RRA-094 · Collapsible sections everywhere, one open at a time: every section starts collapsed, tapping one opens it and closes the one that was open (a search still opens every match). Dishes, House recipes and Stock already do this on phones, but on an iPad or computer (the wide table view) every section shows open at once, so: (1) Dishes and House recipes wide table: section bands collapse and expand; (2) Stock count and Edit list wide table: same, keeping the low-stock count on each band. Other screens checked that would also get it: (3) Prep list, by station; (4) Order list, by vendor; (5) Time sheets wide table (the per-person punches below it already collapse); (6) Settings, by group (Pay, People, Kitchen, App), remembering which one was open; (7) Clean up duplicates, by area. Left as they are: Schedule (the whole week needs to be seen at once), Message board, Events (short lists) (Gaylan, 2026-11-22) · UX · M. Prep list opens the station a new item goes into; printouts unchanged
 ### 0.5.9 · build 2026.11.22-2
 - [x] RRA-093 · Brand settings file (BPAY-017): every built-in name, logo, icon, intro video, accent color, © credit line and data name (`blg.` prefix, on-phone database, Firebase team folder) moved into `js/brand.js`, for the multi-restaurant setup wizard. Bootleggers keeps its current values, so saved data is untouched · Infra · M · added 2026-11-22
 ### 0.5.8 · build 2026.11.22-1

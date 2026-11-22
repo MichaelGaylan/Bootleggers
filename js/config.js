@@ -4,10 +4,17 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.5.9';
-export const BUILD = '2026.11.22-2';
+export const VERSION = '0.5.10';
+export const BUILD = '2026.11.22-3';
 
 export const WHATS_NEW = [
+  {
+    version: '0.5.10', build: '2026.11.22-3', date: '2026-11-22',
+    lines: [
+      'Shorter pages: lists open one section at a time. Tap a section to open it; opening another closes the one before. This now works on iPads and computers too, in Dishes, House recipes and Stock.',
+      'The Prep list (by station, with how many are done), Order guides (by vendor), Time sheets, Settings and Clean up duplicates open one section at a time as well. Printouts still show everything.',
+    ],
+  },
   {
     version: '0.5.9', build: '2026.11.22-2', date: '2026-11-22',
     lines: [
