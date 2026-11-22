@@ -84,7 +84,8 @@ export async function loungeView() {
       ${me ? `<div class="clock-top"><div><div class="clock-state">${open ? 'On the clock' : 'Off the clock'}</div>
         <div class="muted small">${open ? `Since ${t(open.in)} · <span id="clock-run">${dur(Date.now() - open.in)}</span>` : `This week ${hrs(mine.reduce((s, p) => s + punchHours(p), 0))}`}</div></div>
         <button class="btn clock-btn${open ? ' out' : ''}" id="clock" type="button">${open ? 'Clock out' : 'Clock in'}</button></div>
-        <a class="row nav" href="#/timesheet"><span class="grow">My time sheet</span><span class="meta">${hrs(mine.reduce((s, p) => s + punchHours(p), 0))} this week</span></a>`
+        <a class="row nav" href="#/timesheet"><span class="grow">My time sheet</span><span class="meta">${hrs(mine.reduce((s, p) => s + punchHours(p), 0))} this week</span></a>
+        <a class="row nav" href="#/mypay"><span class="grow">My pay &amp; tips</span></a>`
     : `<p class="muted small" style="margin:0">${isHost() ? 'To use the time clock yourself, add your name in Settings → Staff (the same name as this phone).' : 'To use the time clock, ask a manager to add you in Settings → Staff with the same name as this phone.'}</p>`}
     </div>
 

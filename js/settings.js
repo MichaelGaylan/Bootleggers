@@ -32,7 +32,9 @@ export async function settingsView() {
     <div class="group acc-body pad-top"${so === 'look' ? '' : ' hidden'}><div class="segmented" id="theme" role="radiogroup" aria-label="Appearance">${Object.entries(THEMES).map(([k, v]) => `<button type="button" role="radio" aria-checked="${k === theme}" data-theme-opt="${k}" class="${k === theme ? 'on' : ''}">${v}</button>`).join('')}</div>
     <p class="muted small">Match device follows your phone's or iPad's own light and dark setting. The moon button at the top switches between light and dark in one tap. This choice is saved on this device only.</p></div>
     ${seePay ? `<button class="acc-head${so === 'pay' ? ' open' : ''}" type="button" data-g="pay"><span class="grow">Pay</span></button>
-    <div class="group acc-body"${so === 'pay' ? '' : ' hidden'}><button class="row nav" id="payrules" type="button"><span class="grow"><span class="title">Pay rules</span><span class="sub">${esc(PAY_PRESETS[rules.preset]?.name || 'Custom')}: ${esc(rulesText(rules))}</span></span></button></div>` : ''}
+    <div class="group acc-body"${so === 'pay' ? '' : ' hidden'}><button class="row nav" id="payrules" type="button"><span class="grow"><span class="title">Pay rules</span><span class="sub">${esc(PAY_PRESETS[rules.preset]?.name || 'Custom')}: ${esc(rulesText(rules))}</span></span></button>
+      <a class="row nav" href="#/payroll"><span class="grow"><span class="title">Payroll</span><span class="sub">Review hours, review pay, submit</span></span></a>
+      ${isHost() ? '<a class="row nav" href="#/paysettings"><span class="grow"><span class="title">Payroll settings</span><span class="sub">Pay period, tip rules, chef approval, payroll service, POS</span></span></a>' : ''}</div>` : ''}
     ${full ? `<button class="acc-head${so === 'people' ? ' open' : ''}" type="button" data-g="people"><span class="grow">People</span><span class="meta">${counts.staff} staff</span></button>
     <div class="group acc-body"${so === 'people' ? '' : ' hidden'}>
       <a class="row" href="#/staff"><span class="grow">Staff</span><span class="meta">${counts.staff}</span></a>

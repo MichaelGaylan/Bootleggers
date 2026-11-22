@@ -4,10 +4,20 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.5.10';
-export const BUILD = '2026.11.22-3';
+export const VERSION = '0.6.0';
+export const BUILD = '2026.11.22-4';
 
 export const WHATS_NEW = [
+  {
+    version: '0.6.0', build: '2026.11.22-4', date: '2026-11-22',
+    lines: [
+      'Payroll is now part of the app (More → Payroll). It reads the clock-ins, time sheets, pay rates and pay rules you already have: Review hours, fix anything marked Fix right there, Review pay, then Submit.',
+      'Everyone gets My pay & tips (in the Lounge): your hours this period, your pay so far, your tip shares, paystubs and, where offered, Get paid early. You now see your own hourly rate there.',
+      'The Admin sets the pay period, tip rules, which chef may approve kitchen hours, the payroll service and the POS in Settings → Pay → Payroll settings, and uploads the POS tip and sales report there.',
+      'Roles and permissions has two new pay switches for managers: Submit payroll and Approve early pay. Managers can review payroll by default; the Admin submits unless they allow it.',
+      'No payroll service is connected yet, so runs are practice runs: nothing is paid or filed. Amounts are estimates until one is connected.',
+    ],
+  },
   {
     version: '0.5.10', build: '2026.11.22-3', date: '2026-11-22',
     lines: [

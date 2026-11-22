@@ -6,13 +6,21 @@ Platform: a web app that works on iPhone and Android, like the VYBEON apps. Only
 Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001-011/rra-previews.html. Gaylan approved them with changes on 2026-11-18 and ordered the build. Built in 0.2.0. Firebase config is in the app; shared data works once the rules are published (RRA-032).
 
 ## 🔴 Needs you
+- [ ] RRA-100 · Payroll: pick a payroll service and POS; attorney check on tip pool, tip credit and early pay rules (federal + SC) · S
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
 
 ## 🟡 Hold
+- [ ] RRA-098 · Payroll: Crew Hub (profiles, onboarding checklists, permit expiry alerts) — was BPAY-011 · Feature · L
+- [ ] RRA-099 · Payroll: connect a real payroll service and POS through the restaurant's server (keys, pulls, money movement) — needs the server first · Infra · L
 
 ## 🟣 Done
+### 0.6.0 · build 2026.11.22-4
+- [x] RRA-095 · Payroll merged into the app (from the stand-alone Bootleggers Payroll test app, BPAY-001…024). Reads Staff, Lounge punches, Time sheets pay rates and Settings → Pay rules directly. Flow: Review hours (fix clock-outs, rate, hourly/salary, department in one sheet) → Review pay → Submit (or Send to Admin) → History. Last/This period switcher; pay period, payday, tip rules, chef approval of kitchen hours, payroll service and POS (keys keep last 4 only) and POS tip/sales CSV upload in Settings → Pay → Payroll settings (Admin) · Feature · L · added 2026-11-22
+- [x] RRA-096 · My pay & tips for everyone (Lounge, More): hours and pay so far this period, own tip shares, paystubs, Get paid early (when the payroll service offers it) with manager approval. A person's own rate, paystubs, early pay and tip shares are sealed to their phone; everyone else's stay on the pay key · Feature · M
+- [x] RRA-097 · Roles and permissions: new manager pay switches Submit payroll (default See) and Approve early pay (default Change), set by the Admin only. A chef the Admin allows fixes and approves kitchen hours (kitchen punches are also sealed to that chef's phone), never sees rates or dollars. Demoted managers lose payroll data on their phone · Feature · M
+
 ### 0.5.10 · build 2026.11.22-3
 - [x] RRA-094 · Collapsible sections everywhere, one open at a time: every section starts collapsed, tapping one opens it and closes the one that was open (a search still opens every match). Dishes, House recipes and Stock already do this on phones, but on an iPad or computer (the wide table view) every section shows open at once, so: (1) Dishes and House recipes wide table: section bands collapse and expand; (2) Stock count and Edit list wide table: same, keeping the low-stock count on each band. Other screens checked that would also get it: (3) Prep list, by station; (4) Order list, by vendor; (5) Time sheets wide table (the per-person punches below it already collapse); (6) Settings, by group (Pay, People, Kitchen, App), remembering which one was open; (7) Clean up duplicates, by area. Left as they are: Schedule (the whole week needs to be seen at once), Message board, Events (short lists) (Gaylan, 2026-11-22) · UX · M. Prep list opens the station a new item goes into; printouts unchanged
 ### 0.5.9 · build 2026.11.22-2
