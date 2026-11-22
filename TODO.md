@@ -10,6 +10,7 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
+- [ ] RRA-106 · Settings: Clear test data (Admin only). One screen with checkboxes for what to erase for the whole team: clock-ins and time sheets, payroll (pay runs, paystubs, early pay, tip shares, tip pool and sales uploads), Point of sale (checks, kitchen and bar tickets, today's sales), messages and problem reports, swap requests, events, waste log, schedules. Never touches dishes, house recipes, stock, vendors, prep lists, staff, pay rates, roles or settings. Shows how many of each will go, asks the Admin to type CLEAR to confirm, and offers a backup file first. Removes them on every phone (Gaylan, 2026-11-22) · Feature · M
 
 ## 🟡 Hold
 - [ ] RRA-104 · POS: live card payments through the restaurant's service (Square Terminal API, Clover REST Pay Display, or Toast order handoff) via the restaurant's server; bar menu with drink prices · Infra · L
