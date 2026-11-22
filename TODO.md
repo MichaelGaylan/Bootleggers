@@ -10,6 +10,7 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
+- [ ] RRA-101 · Events (BEOs): reminders for upcoming events. Each event gets a "Remind" choice for how many days ahead (e.g. Off, 1, 2, 3, 5, 7, 14 days; default set in Settings, changeable per event). From that day until the event, the app shows a pop-up when it opens (to the Admin, managers and chefs, or the people picked on the event), a badge on Events, and the event at the top of the Employee lounge. Each person can dismiss it for the day (Gaylan, 2026-11-22) · Feature · M
 
 ## 🟡 Hold
 - [ ] RRA-098 · Payroll: Crew Hub (profiles, onboarding checklists, permit expiry alerts) — was BPAY-011 · Feature · L
