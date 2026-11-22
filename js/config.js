@@ -4,10 +4,20 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.6.0';
-export const BUILD = '2026.11.22-4';
+export const VERSION = '0.7.0';
+export const BUILD = '2026.11.22-5';
 
 export const WHATS_NEW = [
+  {
+    version: '0.7.0', build: '2026.11.22-5', date: '2026-11-22',
+    lines: [
+      'Point of sale (More → Orders): open a check for a table or bar tab, add dishes from your menu by seat with sauce, temperature and notes, and send them to the kitchen and bar.',
+      'Kitchen and bar screen: tickets with timers that turn orange at 8 minutes and red at 15; tap items when they are up and Bump the ticket. Chefs and cooks keep the 86 list, which switches items off on every phone.',
+      'Paying: one check, split evenly or by seat; card with tip, cash with change. Cards will go through your own Square Terminal, Clover Flex/Mini or Toast handheld; nothing is connected yet, so card payments are practice runs.',
+      "Managers see Today's sales. Tips go into each night's tip pool and net sales into labor % in Payroll on their own.",
+      'The Admin picks the card service, reader name and sales tax in Settings → App → Point of sale. Roles and permissions has a new Point of sale switch.',
+    ],
+  },
   {
     version: '0.6.0', build: '2026.11.22-4', date: '2026-11-22',
     lines: [

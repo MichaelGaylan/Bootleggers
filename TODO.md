@@ -13,10 +13,16 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-101 · Events (BEOs): reminders for upcoming events. Each event gets a "Remind" choice for how many days ahead (e.g. Off, 1, 2, 3, 5, 7, 14 days; default set in Settings, changeable per event). From that day until the event, the app shows a pop-up when it opens (to the Admin, managers and chefs, or the people picked on the event), a badge on Events, and the event at the top of the Employee lounge. Each person can dismiss it for the day (Gaylan, 2026-11-22) · Feature · M
 
 ## 🟡 Hold
+- [ ] RRA-104 · POS: live card payments through the restaurant's service (Square Terminal API, Clover REST Pay Display, or Toast order handoff) via the restaurant's server; bar menu with drink prices · Infra · L
 - [ ] RRA-098 · Payroll: Crew Hub (profiles, onboarding checklists, permit expiry alerts) — was BPAY-011 · Feature · L
 - [ ] RRA-099 · Payroll: connect a real payroll service and POS through the restaurant's server (keys, pulls, money movement) — needs the server first · Infra · L
 
 ## 🟣 Done
+### 0.7.0 · build 2026.11.22-5
+- [x] RRA-101 · Point of sale merged into the app (from the Bootleggers POS test app, BPAY-025): checks for tables and bar tabs from the Recipe archive menu (sauce, temperature, dressing, notes, seats), send to kitchen and bar tickets, kitchen and bar screen (timers, mark up, bump), 86 list shared by all phones, split one/evenly/by seat, card with tip and cash with change through the chosen card service (practice until connected), today's sales for managers · Feature · L · added 2026-11-22
+- [x] RRA-102 · POS feeds Payroll: closed checks give each night's tip pool and net sales (labor %), unless that night has an uploaded POS report · Feature · S
+- [x] RRA-103 · Roles: new Point of sale permission (staff Change by default). Servers and bartenders take orders and see their own checks; managers and the Admin see all checks, void and see sales; chefs and kitchen staff get the kitchen screen and 86 list; card settings are Admin only (Settings → App → Point of sale) · Feature · S
+
 ### 0.6.0 · build 2026.11.22-4
 - [x] RRA-095 · Payroll merged into the app (from the stand-alone Bootleggers Payroll test app, BPAY-001…024). Reads Staff, Lounge punches, Time sheets pay rates and Settings → Pay rules directly. Flow: Review hours (fix clock-outs, rate, hourly/salary, department in one sheet) → Review pay → Submit (or Send to Admin) → History. Last/This period switcher; pay period, payday, tip rules, chef approval of kitchen hours, payroll service and POS (keys keep last 4 only) and POS tip/sales CSV upload in Settings → Pay → Payroll settings (Admin) · Feature · L · added 2026-11-22
 - [x] RRA-096 · My pay & tips for everyone (Lounge, More): hours and pay so far this period, own tip shares, paystubs, Get paid early (when the payroll service offers it) with manager approval. A person's own rate, paystubs, early pay and tip shares are sealed to their phone; everyone else's stay on the pay key · Feature · M

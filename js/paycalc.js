@@ -57,16 +57,30 @@ export function ptsOf(st, pr, P) {
 
 // Everything payroll needs for one period, from this phone's data.
 export async function load(per) {
-  const [staff, punches, rates, pools, sales, advances, settings] = await Promise.all([
-    data.list('staff'), data.list('punch'), data.list('payrate'), data.list('tippool'), data.list('possales'), data.list('advance'), data.settings(),
+  const [staff, punches, rates, pools, sales, advances, settings, checks] = await Promise.all([
+    data.list('staff'), data.list('punch'), data.list('payrate'), data.list('tippool'), data.list('possales'), data.list('advance'), data.settings(), data.list('check'),
   ]);
   const inPer = (iso) => iso >= per.start && iso <= per.end;
+  // Point of sale (RRA-101): closed checks give each night's tips and net
+  // sales. A night that has an uploaded POS report uses the report instead.
+  const pool = Object.fromEntries(pools.filter((p) => inPer(p.id)).map((p) => [p.id, +p.amount || 0]));
+  const sold = Object.fromEntries(sales.filter((x) => inPer(x.id)).map((x) => [x.id, +x.sales || 0]));
+  const posTips = {}, posSales = {};
+  for (const c of checks) {
+    if (!c.closed) continue;
+    const d = c.closedDate || dateOf(c.closed);
+    if (!inPer(d)) continue;
+    posTips[d] = (posTips[d] || 0) + (c.payments || []).reduce((t, p) => t + (+p.tip || 0), 0);
+    posSales[d] = (posSales[d] || 0) + (c.items || []).reduce((t, x) => t + (x.voided ? 0 : (+x.price || 0) * (x.qty || 1)), 0);
+  }
+  for (const [d, v] of Object.entries(posTips)) if (!(d in pool) && v > 0) pool[d] = Math.round(v * 100) / 100;
+  for (const [d, v] of Object.entries(posSales)) if (!(d in sold)) sold[d] = v;
   return {
     staff: staff.filter((s) => !s.removed).sort(data.byName),
     punches: punches.filter((p) => inPer(dateOf(p.in))).sort((a, b) => a.in - b.in),
     rates: Object.fromEntries(rates.map((r) => [r.staffId || r.id, r])),
-    pools: Object.fromEntries(pools.filter((p) => inPer(p.id)).map((p) => [p.id, +p.amount || 0])),
-    sales: sales.filter((x) => inPer(x.id)).reduce((t, x) => t + (+x.sales || 0), 0),
+    pools: pool,
+    sales: Object.values(sold).reduce((t, v) => t + v, 0),
     advances: advances.filter((a) => a.period === per.start),
     rules: payRules(settings),
   };

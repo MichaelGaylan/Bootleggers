@@ -51,6 +51,7 @@ export async function settingsView() {
     </div>
     <button class="acc-head${so === 'app' ? ' open' : ''}" type="button" data-g="app"><span class="grow">App</span>${nReports ? `<span class="chip warn">${nReports} open</span>` : ''}</button>
     <div class="group acc-body"${so === 'app' ? '' : ' hidden'}>
+      ${isHost() ? '<a class="row nav" href="#/posset"><span class="grow"><span class="title">Point of sale</span><span class="sub">Card payments service, card reader, sales tax</span></span></a>' : ''}
       <div class="row"><span class="grow">Popups for new notices</span><button class="toggle ${s.popups !== false ? 'on' : ''}" id="popups" type="button" ${edit ? '' : 'disabled'} aria-label="Popups for new notices"></button></div>
       <div class="row"><span class="grow">Food cost target</span><span class="meta">${s.foodCostTarget || 30}%</span>${edit ? '<button class="btn plain small" id="target" type="button">Change</button>' : ''}</div>
       <div class="row"><span class="grow">Shared team data</span><span class="meta">${esc(syncLabel())}</span></div>
