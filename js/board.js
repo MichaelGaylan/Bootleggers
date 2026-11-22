@@ -23,7 +23,7 @@ export async function unreadPosts() {
   // A new reply from someone else counts too (RRA-081).
   const me = myId();
   const last = (p) => Math.max(sentByMe(p) ? 0 : p.at, ...(p.replies || []).filter((r) => (r.byId ? r.byId !== me : r.by !== session.profile?.name)).map((r) => r.at));
-  return (await data.list('post')).filter((p) => canSeePost(p) && last(p) > seen).length;
+  return (await data.list('post')).filter((p) => canSeePost(p) && !p.about?.report && last(p) > seen).length;
 }
 
 export async function boardView() {
@@ -32,7 +32,7 @@ export async function boardView() {
   const f = FILTERS[LS.get('boardFilter', 'all')] ? LS.get('boardFilter', 'all') : 'all';
   const staff = (await staffList()).sort(data.byName);
   const me = myId();
-  const posts = (await data.list('post')).filter(canSeePost)
+  const posts = (await data.list('post')).filter((p) => canSeePost(p) && !p.about?.report)
     .filter((p) => (f === 'private' ? isPrivate(p) : f === 'mine' ? sentByMe(p) : true))
     .sort((a, b) => b.at - a.at);
   const read = new Set(LS.get('read', []));
@@ -42,7 +42,8 @@ export async function boardView() {
   view.innerHTML = `
     <div class="segmented">${Object.entries(FILTERS).map(([k, n]) => `<button type="button" data-f="${k}" class="${f === k ? 'on' : ''}">${n}</button>`).join('')}</div>
     ${f === 'all' && notices.length ? `<div class="section-label">From management</div>${notices.slice(0, 3).map((n) => `
-      <div class="msg notice"><div class="who">${esc(n.from || 'Management')} · ${esc(n.date || '')} ${read.has(n.id) ? '' : '<span class="chip warn">New</span>'}</div><b>${esc(n.title)}</b><br>${esc(n.body)}</div>`).join('')}` : ''}
+      <div class="msg notice"><div class="who">${esc(n.from || 'Management')} · ${esc(n.date || '')} ${read.has(n.id) ? '' : '<span class="chip warn">New</span>'}</div><b>${esc(n.title)}</b><br>${esc(n.body)}
+        <div class="btn-row" style="margin-top:6px"><button class="btn plain small" type="button" data-hide-notice="${esc(n.id)}">Remove</button></div></div>`).join('')}` : ''}
     ${canChange('board') ? `<div class="card" style="padding:12px">
       <label class="field" style="margin-top:0"><span>To</span><select id="p-to">
         <option value="all"${to === 'all' ? ' selected' : ''}>Everyone</option>
@@ -69,6 +70,12 @@ export async function boardView() {
   LS.set('boardSeen', Date.now());
   LS.set('read', notices.map((n) => n.id));
   boardView.after?.();
+  // RRA-089: remove a notice from this phone's board.
+  $$('[data-hide-notice]', view).forEach((b) => { b.onclick = () => {
+    LS.set('hiddenNotices', [...new Set([...LS.get('hiddenNotices', []), b.dataset.hideNotice])]);
+    session.notices = (session.notices || []).filter((x) => x.id !== b.dataset.hideNotice);
+    toast('Notice removed from your board'); boardView();
+  }; });
   $$('[data-f]', view).forEach((b) => { b.onclick = () => { LS.set('boardFilter', b.dataset.f); boardView(); }; });
   $('#p-send')?.addEventListener('click', async () => {
     const text = $('#p-text').value.trim();

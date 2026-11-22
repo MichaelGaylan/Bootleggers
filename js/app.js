@@ -10,11 +10,12 @@ import * as data from './data.js';
 import * as sync from './sync.js';
 import { canSee, canChange, isHost, myStaff } from './perms.js';
 import { findDuplicates, countDuplicates } from './dedupe.js';
+import { reportsView, reportPopups, sendReportInApp, openReports } from './reports.js';
 import { recipesView, recipeView, printView } from './recipes.js';
 import { stockView, neededView, ordersView, vendorsView } from './stock.js';
 import { boardView, unreadPosts } from './board.js';
 import { prepView } from './prep.js';
-import { scheduleView, staffView, ensureStaffFor, staffList, schedulePrintView, swapPopups } from './schedule.js';
+import { scheduleView, staffView, ensureStaffFor, staffList, schedulePrintView, swapPopups, shiftTimesView } from './schedule.js';
 import { eventsView, eventView } from './events.js';
 import { costsView } from './costs.js';
 import { loungeView, timesheetView, timesheetsView, canTime } from './lounge.js';
@@ -112,7 +113,7 @@ async function emailNotice() {
   if (LS.get('emailAck', false)) return true;
   const ok = await sheet({
     title: 'About email', left: 'Cancel',
-    body: `<p>Your report goes out by email. Email could possibly (but unlikely) become public, so leave out private details like passwords or personal information.</p>
+    body: `<p>Your report goes to the Admin and managers in the app, and out by email. Email could possibly (but unlikely) become public, so leave out private details like passwords or personal information.</p>
       <button class="btn block" id="ack" type="button" style="margin-top:16px">Send report</button>`,
     onMount: ({ close, el }) => { $('#ack', el).onclick = () => close(true); },
   });
@@ -127,7 +128,9 @@ async function loadNotices() {
     const r = await fetch(NOTIFICATIONS_URL, { cache: 'no-store' });
     if (r.ok) { notices = (await r.json()).messages || []; LS.set('noticesCache', notices); }
   } catch { notices = LS.get('noticesCache', []); }
-  session.notices = notices;
+  // RRA-089: notices someone removed stay hidden on their phone.
+  const hidden = new Set(LS.get('hiddenNotices', []));
+  session.notices = notices.filter((x) => !hidden.has(x.id));
   updateBadge();
   const popped = new Set(LS.get('popped', []));
   const fresh = notices.find((n) => !popped.has(n.id));
@@ -142,7 +145,8 @@ async function loadNotices() {
 
 function unreadCount() {
   const read = new Set(LS.get('read', []));
-  return notices.filter((n) => !read.has(n.id)).length;
+  const hidden = new Set(LS.get('hiddenNotices', []));
+  return notices.filter((n) => !read.has(n.id) && !hidden.has(n.id)).length;
 }
 
 async function onRequest(iid, box) {
@@ -387,7 +391,8 @@ function reportView() {
   setChrome({ tab: 'more', back: true });
   setTitle('Report a problem');
   view.innerHTML = `
-    <p class="muted small">Tell us what went wrong. Reports go to the app's inbox by email, so leave out anything private.</p>
+    <p class="muted small">Tell us what went wrong. Your report goes to the Admin and managers in the app, where they can reply to you, and to the app's inbox by email, so leave out anything private.</p>
+    <a class="row nav" href="#/reports" style="border-radius:12px;margin-bottom:8px"><span class="grow">My problem reports and replies</span></a>
     <label class="field"><span>What kind of problem?</span><select id="p-type">
       <option>Something isn't working</option><option>A recipe is wrong</option><option>Access or invite</option><option>Idea or request</option><option>Other</option></select></label>
     <label class="field"><span>Where in the app?</span><select id="p-where">
@@ -410,11 +415,14 @@ function reportView() {
     const btn = $('#p-send');
     btn.disabled = true; btn.textContent = 'Sending…';
     const r = compose();
+    // RRA-088: the report also goes to the Admin and managers in the app.
+    let inApp = false;
+    try { await sendReportInApp({ type: $('#p-type').value, where: $('#p-where').value, text: $('#p-body').value.trim() }); inApp = true; } catch { /* email still goes */ }
     const result = await sendReport(r);
     btn.disabled = false; btn.textContent = 'Send report';
-    if (result === 'sent') {
+    if (result === 'sent' || inApp) {
       $('#p-body').value = '';
-      $('#p-status').innerHTML = '<span style="color:var(--ok)">Sent. Thank you.</span>';
+      $('#p-status').innerHTML = '<span style="color:var(--ok)">Sent. Thank you. You\'ll get a pop-up when someone replies.</span>';
     } else {
       copy(`${REPORT_PREFIX} ${r.subject}\n\n${r.body}`, 'Not sent, so the report was copied');
       $('#p-status').innerHTML = '<span style="color:var(--danger)">It couldn\'t be sent (maybe no signal). The report text was copied so you can paste it in a message to a manager.</span>';
@@ -696,6 +704,7 @@ const routes = {
   schedule: (arg) => scheduleView(arg),
   'schedule-print': (arg) => schedulePrintView(arg),
   staff: () => staffView(),
+  shifts: () => shiftTimesView(),
   events: () => eventsView(),
   event: (id) => eventView(id),
   costs: () => costsView(),
@@ -708,6 +717,7 @@ const routes = {
   about: () => aboutView(),
   whatsnew: () => whatsNewView(),
   report: () => reportView(),
+  reports: () => reportsView(),
   team: (arg) => teamView(arg),
   backup: () => backupView(),
 };
@@ -773,13 +783,17 @@ async function route() {
   if (!profile) return;
   const [, name = 'recipes', arg] = location.hash.match(/^#\/([^/]+)\/?(.*)$/) || [];
   session.staff = await staffList(); // permissions (RRA-002) read this
+  // RRA-090: this phone's person was removed from the team. Lock it.
+  if (profile.role !== 'owner' && profile.iid && (await data.settings()).removed?.[profile.iid]) {
+    await access.wipeAccess(); profile = null; session.profile = null; location.hash = ''; location.reload(); return;
+  }
   await checkRoleGrant();
   if (isHost()) await adminPayKeyCheck();
   renderSide();
   const at = location.hash;
   await (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
   // RRA-078: swap conflicts for managers, and a manager's question for the requester.
-  if (location.hash === at && !dlg.open && $('#splash').hidden && await swapPopups().catch(() => false) && location.hash === at) (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
+  if (location.hash === at && !dlg.open && $('#splash').hidden && (await swapPopups().catch(() => false) || await reportPopups().catch(() => false)) && location.hash === at) (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
   // A slow screen can finish after a quicker tap: show what the address says.
   if (location.hash !== at && !dlg.open) route();
 }

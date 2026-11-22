@@ -22,6 +22,8 @@ export async function settingsView() {
   const full = canSee('settings') || isHost();
   const theme = getTheme();
   const seePay = level('payrates') !== 'none';
+  const { inReportTeam, openReports } = await import('./reports.js');
+  const nReports = inReportTeam() ? await openReports() : 0;
   const rules = payRules(s);
   view.innerHTML = `
     <div class="section-label">Appearance · this device</div>
@@ -33,6 +35,7 @@ export async function settingsView() {
     <div class="group">
       <a class="row" href="#/staff"><span class="grow">Staff</span><span class="meta">${counts.staff}</span></a>
       <a class="row" href="#/roles"><span class="grow">Roles and permissions</span></a>
+      ${canChange('schedule') ? '<a class="row" href="#/shifts"><span class="grow">Shift times</span><span class="meta">Schedule buttons</span></a>' : ''}
       ${canAccess(session.profile, 'invite') ? '<a class="row" href="#/team"><span class="grow">Invite and approve phones</span></a>' : ''}
     </div>
     <div class="section-label">Kitchen</div>
@@ -51,6 +54,7 @@ export async function settingsView() {
       <div class="row"><span class="grow">Lock after no use</span><span class="meta">${INACTIVITY_DAYS} days</span></div>
       <a class="row" href="#/about"><span class="grow">About</span></a>
       <a class="row" href="#/report"><span class="grow">Report a problem</span></a>
+      ${inReportTeam() ? `<a class="row" href="#/reports"><span class="grow">Problem reports</span>${nReports ? `<span class="chip warn">${nReports} open</span>` : ''}</a>` : ''}
     </div>
     <p class="muted small center">${edit ? 'You can change Settings.' : 'Only the Admin, and people the Admin allows, can change Settings.'}</p>` : ''}`;
   $$('[data-theme-opt]', view).forEach((b) => { b.onclick = () => { setTheme(b.dataset.themeOpt); settingsView(); }; });

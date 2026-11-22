@@ -632,3 +632,11 @@ svg.lock { width: 11px; height: 11px; vertical-align: -1px; }
 .swap-row > .grow { flex: 1 1 100%; min-width: 0; }
 .swap-row .sub, .swap-row .title { white-space: normal; overflow: visible; text-overflow: clip; }
 .swap-row .swap-acts { width: 100%; justify-content: flex-start; margin-top: 8px; }
+
+/* RRA-091: Shift times editor */
+.st-row { gap: 8px; flex-wrap: wrap; }
+.st-row input[type=text] { flex: 1 1 90px; min-width: 80px; }
+.st-row select { flex: 1 1 110px; min-width: 100px; }
+.st-row .meta { min-width: 34px; }
+.st-acts { display: flex; gap: 2px; margin-left: auto; }
+.st-acts .btn { min-width: 34px; padding-left: 6px; padding-right: 6px; }
