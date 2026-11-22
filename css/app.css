@@ -519,11 +519,6 @@ html[data-theme="dark"] { --c-green: #30d158; --c-orange: #ff9f0a; --c-blue: #40
   body:not(.locked) .view { margin: 0 0 0 var(--side-w); max-width: 1280px; padding: calc(var(--hdr) + 16px) 28px 40px; }
   body:not(.locked) .top-title { padding-left: calc(var(--side-w) + 28px); padding-right: 28px; }
   body:not(.locked) .stock-tools { margin: 0 -28px; padding: 6px 28px 2px; }
-  /* Sections shown open instead of collapsed. */
-  .acc-body[hidden] { display: block !important; }
-  .acc-head { pointer-events: none; }
-  .acc-head::after { display: none; }
-  .acc-head:not(.open) { border-radius: var(--radius) var(--radius) 0 0; }
   .search { max-width: 420px; }
 }
 @media print { .side { display: none !important; } body .view { margin: 0 !important; } }
@@ -640,3 +635,19 @@ svg.lock { width: 11px; height: 11px; vertical-align: -1px; }
 .st-row .meta { min-width: 34px; }
 .st-acts { display: flex; gap: 2px; margin-left: auto; }
 .st-acts .btn { min-width: 34px; padding-left: 6px; padding-right: 6px; }
+
+/* RRA-094: one section open at a time, in lists and in wide tables. */
+.wtable tr.acc-band { cursor: pointer; }
+.wtable tr.acc-band td:first-child::before { content: "›"; display: inline-block; width: 1em; margin-right: 6px; font-size: 1.15rem; line-height: 1; color: var(--text-2); transition: transform 0.15s; text-align: center; }
+.wtable tr.acc-band.open td:first-child::before { transform: rotate(90deg); }
+.wtable tr.acc-band:hover td { filter: brightness(0.97); }
+.acc-head .meta { color: var(--text-2); font-weight: 400; font-size: .9rem; }
+.acc-head .meta .chip { font-weight: 600; }
+.set-acc .acc-body { padding-bottom: 4px; }
+.set-acc .acc-body > .segmented, .set-acc .acc-body > p { margin-left: 12px; margin-right: 12px; }
+@media print {
+  .acc-body[hidden] { display: block !important; }
+  .wtable tbody[hidden] { display: table-row-group !important; }
+  .acc-head::after, .wtable tr.acc-band td:first-child::before { display: none; }
+}
+.set-acc .pad-top { padding-top: 10px; }

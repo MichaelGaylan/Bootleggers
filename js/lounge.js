@@ -5,7 +5,7 @@
 // and print or send the time sheet for payroll.
 
 import * as data from './data.js';
-import { $, $$, esc, view, LS, sheet, toast, setTitle, setChrome, session, copy, isWide, chip } from './ui.js';
+import { $, $$, esc, view, LS, sheet, toast, setTitle, setChrome, session, copy, isWide, chip, oneOpen } from './ui.js';
 import { canChange, canSee, myStaff, isHost, canTime } from './perms.js';
 import { payKeyInfo } from './access.js';
 import { unreadPosts, sendPost } from './board.js';
@@ -237,8 +237,10 @@ export async function timesheetsView() {
     ${hasKey ? '' : '<div class="hint small">This phone doesn\'t have the pay key yet, so it shows only hours made on this phone. A phone approved as Manager by the Admin gets it.</div>'}
     <div class="ts-total card"><div class="ts-row"><div><span class="muted small">Hours this week</span><b>${hrs(grand)}</b></div>${seeRates ? `<div><span class="muted small">Payroll this week</span><b>${money(grandPay)}</b></div>` : ''}</div>
       <span class="muted small">${withHours.length} of ${staff.length} people clocked in${seeRates && noRate ? ` · ${noRate} without an hourly rate` : ''}${seeRates ? ` · ${esc(rulesText(RULES))}${canChange('payrates') ? ' · <a href="#/settings">Pay rules</a>' : ''}` : ''}</span></div>
-    ${isWide() ? `<div class="wtable-wrap"><table class="wtable"><thead><tr><th>Employee</th>${DAYS.map((dn, i) => `<th class="num">${dn} ${addDays(wk, i).slice(8)}</th>`).join('')}<th class="num">Hours</th><th class="num">OT</th>${seeRates ? '<th class="num">Rate</th><th class="num">Pay</th>' : ''}</tr></thead>
+    ${isWide() ? `<button class="acc-head${open === '__week' ? ' open' : ''}" type="button" data-g="__week"><span class="grow">Week at a glance</span><span class="meta">Everyone, by day</span></button>
+      <div class="acc-body"${open === '__week' ? '' : ' hidden'}><div class="wtable-wrap"><table class="wtable"><thead><tr><th>Employee</th>${DAYS.map((dn, i) => `<th class="num">${dn} ${addDays(wk, i).slice(8)}</th>`).join('')}<th class="num">Hours</th><th class="num">OT</th>${seeRates ? '<th class="num">Rate</th><th class="num">Pay</th>' : ''}</tr></thead>
       <tbody>${blocks.map(({ st, ps, b }) => `<tr><td>${esc(st.name)}</td>${DAYS.map((_, i) => { const h = dayHours(ps, i); return `<td class="num">${h ? h.toFixed(2) : '<span class="muted">—</span>'}</td>`; }).join('')}<td class="num"><b>${b.total.toFixed(2)}</b></td><td class="num">${b.ot ? b.ot.toFixed(2) : '—'}</td>${seeRates ? `<td class="num">${rates[st.id] ? money(rates[st.id]) : '<span class="muted">—</span>'}</td><td class="num"><b>${b.pay !== null ? money(b.pay) : '—'}</b></td>` : ''}</tr>`).join('')}</tbody></table></div>
+</div>
       <div class="section-label">Punches</div>` : ''}
     ${blocks.map(({ st, b }) => `
       <button class="acc-head${open === st.id ? ' open' : ''}" type="button" data-g="${st.id}"><span class="grow">${esc(st.name)}</span><span class="meta">${hrs(b.total)}${b.pay !== null ? ` · ${money(b.pay)}` : ''}</span></button>
@@ -247,14 +249,7 @@ export async function timesheetsView() {
     <button class="btn plain block no-print" id="copy" type="button">Copy to send</button>
     <p class="muted small center">${editTime ? 'Tap a punch to fix a time. ' : ''}${editRates ? 'Tap the hourly rate to change it. ' : ''}Totals count open punches up to now. Only managers the Admin allows can see this page.</p>`;
   wireWeek(wk, (w) => { timesheetsView.week = w; timesheetsView(); });
-  $$('.acc-head', view).forEach((h) => {
-    h.onclick = () => {
-      const opening = !h.classList.contains('open');
-      $$('.acc-head', view).forEach((x) => { x.classList.remove('open'); x.nextElementSibling.hidden = true; });
-      if (opening) { h.classList.add('open'); h.nextElementSibling.hidden = false; }
-      LS.set('tsOpen', opening ? h.dataset.g : null);
-    };
-  });
+  oneOpen(view, (g) => LS.set('tsOpen', g));
   const title = `Time sheets - week of ${label(wk)}`;
   wirePrint({ $, title, mono: true, getLines: () => lines(withHours, wk, rates, seeRates) });
   $('#copy').onclick = () => copy(lines(withHours, wk, rates, seeRates).join('\n'), 'Time sheet copied');
