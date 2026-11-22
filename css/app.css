@@ -715,3 +715,7 @@ svg.lock { width: 11px; height: 11px; vertical-align: -1px; }
 .pos-ti.done { color: var(--text-2); text-decoration: line-through; }
 .pos-ti small { color: var(--text-2); }
 .pos-ticket .btn { margin-top: 10px; }
+/* RRA-105: events coming up */
+.lounge .ev-due { margin: 0 0 12px; border-left: 4px solid var(--c-orange); }
+.group .row .sbadge#more-ev-badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--danger); color: #fff; font-size: 11px; font-style: normal; font-weight: 700; display: grid; place-items: center; }
+.group .row .sbadge#more-ev-badge[hidden] { display: none; }

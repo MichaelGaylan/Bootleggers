@@ -79,7 +79,11 @@ export async function loungeView() {
   const allSwaps = swaps ? (await data.list('swap')).filter((s) => s.status === 'asked' || (me && s.from === me.id)).sort((a, b) => b.at - a.at) : [];
   const firstSwap = (canChange('schedule') ? allSwaps.find((s) => s.status === 'asked') : null) || allSwaps.find((s) => me && s.from === me.id && s.status !== 'withdrawn') || allSwaps[0];
   const onClock = canTime() ? all.filter((p) => !p.out) : [];
+  // RRA-105: events coming up, at the top.
+  const { dueEvents, daysUntil, whenText } = await import('./events.js');
+  const evs = await dueEvents();
   view.innerHTML = `<div class="lounge">
+    ${evs.length ? `<div class="group ev-due">${evs.map((e) => `<a class="row nav" href="#/event/${e.id}"><span class="grow"><span class="title">${esc(e.name)} ${chip(whenText(daysUntil(e)), 'orange')}</span><span class="sub">${esc(['Event', e.time, e.guests && `${e.guests} guests`, e.room].filter(Boolean).join(' · '))}</span></span></a>`).join('')}</div>` : ''}
     <div class="card clock-card${open ? ' on' : ''}">
       ${me ? `<div class="clock-top"><div><div class="clock-state">${open ? 'On the clock' : 'Off the clock'}</div>
         <div class="muted small">${open ? `Since ${t(open.in)} · <span id="clock-run">${dur(Date.now() - open.in)}</span>` : `This week ${hrs(mine.reduce((s, p) => s + punchHours(p), 0))}`}</div></div>
