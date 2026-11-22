@@ -132,7 +132,7 @@ async function newPayKeyAfterDemotion(exceptId) {
     await data.put('staff', { ...m, grant: await makeRoleChange(session.profile, m, 'manager'), grantRole: 'manager' });
   }
   for (const c of ['punch', 'payrate']) for (const d of await data.list(c)) await data.put(c, d);
-  localStorage.removeItem('blg.backupAt'); // the old Admin backup has the old pay key
+  localStorage.removeItem(globalThis.BRAND.dataPrefix + 'backupAt'); // the old Admin backup has the old pay key
   toast('New pay key made. Make a new Admin backup.');
 }
 

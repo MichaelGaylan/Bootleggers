@@ -569,7 +569,7 @@ export async function schedulePrintView(arg = '') {
   }
   view.innerHTML = `
     <div class="paper">
-      <h3>Bootleggers schedule</h3>
+      <h3>${esc(globalThis.BRAND.shortName)} schedule</h3>
       <div class="paper-meta">${label(start)} to ${label(addDays(start, count * 7 - 1))} · printed ${new Date().toLocaleDateString()}</div>
       ${weeks.map((w) => `<div class="week">
         <p style="margin:12px 0 0"><b>Week of ${label(w.id)}</b>${w.published ? '' : ' <i>(draft, not published)</i>'}</p>
@@ -577,12 +577,12 @@ export async function schedulePrintView(arg = '') {
           ${staff.map((s) => `<tr><td>${esc(s.name)}</td>${DAYS.map((_, i) => `<td>${esc(w.shifts?.[s.id]?.[i] || '')}</td>`).join('')}</tr>`).join('')}</table>`
           : '<p class="small">Not published yet.</p>'}
       </div>`).join('')}
-      <div class="paper-foot">Bootleggers Bar &amp; Grill</div>
+      <div class="paper-foot">${esc(globalThis.BRAND.restaurant)}</div>
     </div>
     ${printButtons()}`;
   const pad = (v, n) => String(v || '').slice(0, n).padEnd(n);
   wirePrint({
-    $, mono: true, title: `Bootleggers schedule ${label(start)} to ${label(addDays(start, count * 7 - 1))}`,
+    $, mono: true, title: `${globalThis.BRAND.shortName} schedule ${label(start)} to ${label(addDays(start, count * 7 - 1))}`,
     getLines: () => weeks.flatMap((w) => [
       `# Week of ${label(w.id)}${w.published ? '' : ' (draft)'}`,
       ...(w.published || change ? [

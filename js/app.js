@@ -1,7 +1,7 @@
-// Bootleggers Kitchen: screens and navigation.
+// Restaurant kitchen app: screens and navigation. Names come from js/brand.js.
 
 import {
-  APP_NAME, VERSION, BUILD, WHATS_NEW, ROOT_KEYS, INACTIVITY_DAYS, INVITE_HOURS,
+  BRAND, APP_NAME, VERSION, BUILD, WHATS_NEW, ROOT_KEYS, INACTIVITY_DAYS, INVITE_HOURS,
   WEB3FORMS_KEY, REPORT_PREFIX, NOTIFICATIONS_URL,
 } from './config.js';
 import * as access from './access.js';
@@ -24,6 +24,9 @@ import { applyMenu, applyVendors, applySupplies } from './menu.js';
 
 import { $, $$, esc, view, dlg, LS, isIOS, standalone, toast, copy, share, pasteInto, sheet, setTitle, setChrome, fmtDate, session, wideMQ, THEMES, getTheme } from './ui.js';
 
+// Header logo from the brand settings (BPAY-017).
+document.getElementById('brand-logo')?.setAttribute('src', BRAND.logo);
+
 const NOTICE_VERSION = 1;
 
 let profile = null;
@@ -44,6 +47,7 @@ function startupScreen() {
     const video = $('#splash-video');
     const card = $('#splash-card');
     const skip = $('#splash-skip');
+    if (BRAND.introVideo) video.src = BRAND.introVideo;
     splash.hidden = false;
     // Whoosh with the opening clip (RRA-048), first launch and updates only.
     // iPhone blocks sound until a tap: then it plays on the first tap instead.
@@ -67,12 +71,12 @@ function startupScreen() {
       const upto = WHATS_NEW.findIndex((w) => w.version === seen);
       const news = WHATS_NEW.slice(0, upto < 0 ? 1 : Math.max(upto, 1));
       card.innerHTML = `
-        <img src="assets/app-icon-512.png" alt="">
+        <img src="${esc(BRAND.icon512)}" alt="">
         <h2>${esc(APP_NAME)}</h2>
         <div class="ver">Version ${VERSION} · build ${BUILD}</div>
         ${updated
           ? `<p class="splash-h">What's new</p><div class="splash-notes" tabindex="0">${news.map((w) => `${news.length > 1 ? `<div class="splash-v">${esc(w.version)}</div>` : ''}<ul>${w.lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`).join('')}</div>`
-          : `<p style="margin:16px 0 22px;color:rgba(255,255,255,.8)">Recipes and kitchen notes for Bootleggers Bar &amp; Grill, Augusta.</p>`}
+          : `<p style="margin:16px 0 22px;color:rgba(255,255,255,.8)">${esc(BRAND.tagline)}</p>`}
         <button class="btn" type="button">${updated ? 'Continue' : 'Get started'}</button>`;
       card.hidden = false;
       $('button', card).onclick = () => {
@@ -86,7 +90,8 @@ function startupScreen() {
     video.onerror = showCard;
     skip.onclick = showCard;
     setTimeout(showCard, 9000); // never get stuck if the clip stalls
-    video.play().catch(showCard); // e.g. iPhone Low Power Mode blocks autoplay
+    if (BRAND.introVideo) video.play().catch(showCard); // e.g. iPhone Low Power Mode blocks autoplay
+    else showCard(); // no intro clip for this restaurant
   });
 }
 
@@ -94,7 +99,7 @@ function startupScreen() {
 
 const NOTICE_HTML = `
   <ul class="notice-list">
-    <li><b>Proprietary software.</b> Bootleggers Kitchen and the recipes in it belong to Bootleggers Bar &amp; Grill. They are for your work here only.</li>
+    <li><b>Proprietary software.</b> ${esc(APP_NAME)} and the recipes in it belong to ${esc(BRAND.restaurant)}. They are for your work here only.</li>
     <li><b>Do not share it.</b> Don't forward invites, codes or screenshots of recipes, and don't let anyone else use the app on your phone.</li>
     <li><b>About email.</b> Messages sent by email, such as a problem report, could possibly (but unlikely) become public. Don't put private information in them.</li>
   </ul>`;
@@ -158,8 +163,8 @@ async function onRequest(iid, box) {
   if (location.hash.startsWith('#/team') && !dlg.open) teamView();
   else toast(`${req.invite.name}'s phone is waiting for your approval`);
   if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
-    navigator.serviceWorker?.ready.then((r) => r.showNotification('Bootleggers Kitchen', {
-      body: `${req.invite.name}'s phone is waiting for your approval.`, tag: `req-${iid}`, icon: 'assets/app-icon-192.png',
+    navigator.serviceWorker?.ready.then((r) => r.showNotification(APP_NAME, {
+      body: `${req.invite.name}'s phone is waiting for your approval.`, tag: `req-${iid}`, icon: BRAND.icon192,
     })).catch(() => {});
   }
 }
@@ -238,14 +243,14 @@ function moreView() {
     const ok = await sheet({ title: 'Remove access?', right: 'Remove', body: `<p>This deletes the app's data from this phone, including recipes saved here. You'll need a new invite to use it again.</p>${profile.role === 'owner' ? '<p class="hint">This is the Admin phone. Removing access deletes the Admin key. You can get back in only with an Admin backup, or by adding a new key to the app.</p>' : ''}` });
     if (!ok) return;
     await access.wipeAccess();
-    localStorage.removeItem('blg.expiredNotice');
+    localStorage.removeItem(BRAND.dataPrefix + 'expiredNotice');
     location.hash = ''; location.reload();
   };
 }
 
 // ------------------------------------------- keep access (RRA-037)
 
-const KEEP_TIP = `always open Bootleggers from its icon on your home screen${isIOS ? ', not from Safari' : ''}. Your access is saved inside that app on this phone. Removing the icon${isIOS ? ' or opening the site in Safari' : ''} starts with no access.`;
+const KEEP_TIP = `always open ${esc(BRAND.shortName)} from its icon on your home screen${isIOS ? ', not from Safari' : ''}. Your access is saved inside that app on this phone. Removing the icon${isIOS ? ' or opening the site in Safari' : ''} starts with no access.`;
 
 async function homeTip() {
   if (LS.get('homeTip', 0)) return;
@@ -291,14 +296,14 @@ async function backupView() {
     try { res = await access.createHostBackup(profile, pw); }
     catch (e) { $('#b-err').textContent = e.message; btn.disabled = false; btn.textContent = 'Make backup'; return; }
     LS.set('backupAt', Date.now());
-    const text = `Bootleggers Kitchen Admin backup (${res.bid}, ${new Date().toLocaleDateString()}). To restore: open the app from the home screen, tap "Restore from an Admin backup", paste this and enter the password.\n${res.text}`;
+    const text = `${APP_NAME} Admin backup (${res.bid}, ${new Date().toLocaleDateString()}). To restore: open the app from the home screen, tap "Restore from an Admin backup", paste this and enter the password.\n${res.text}`;
     await sheet({
       title: 'Backup ready', left: null, right: 'Done',
       body: `<p>Save this backup now. It is not kept anywhere else.</p>
         <button class="btn block" id="s" type="button">Save or send backup</button>
         <button class="btn plain block" id="c" type="button" style="margin-top:6px">Copy backup</button>`,
       onMount: ({ el }) => {
-        $('#s', el).onclick = () => share('Bootleggers Kitchen Admin backup', text);
+        $('#s', el).onclick = () => share(`${APP_NAME} Admin backup`, text);
         $('#c', el).onclick = () => copy(text, 'Backup copied');
       },
     });
@@ -334,10 +339,10 @@ function aboutView() {
   setTitle('About');
   view.innerHTML = `
     <div class="card center">
-      <img src="assets/app-icon-192.png" alt="" width="84" height="84" style="border-radius:20px">
+      <img src="${esc(BRAND.icon192)}" alt="" width="84" height="84" style="border-radius:20px">
       <h2 style="margin:10px 0 0">${esc(APP_NAME)}</h2>
       <p class="muted">Version ${VERSION} · build ${BUILD}</p>
-      <p class="small muted">Bootleggers Bar &amp; Grill · Augusta</p>
+      <p class="small muted">${esc(BRAND.restaurant)} · ${esc(BRAND.location)}</p>${BRAND.credit ? `<p class="small muted">${esc(BRAND.credit)}</p>` : ''}
     </div>
     <div class="section-label">How to use it</div>
     <div class="card small">
@@ -473,7 +478,7 @@ async function teamView(incoming) {
     try { code = await access.createInvite(profile, name, role); }
     catch (e) { toast(e.message); return; }
     const link = `${location.origin}${location.pathname}#t=${code}`;
-    const text = `Bootleggers Kitchen invite for ${name}. Open this on your own phone (works once, for ${INVITE_HOURS} hours):\n${link}`;
+    const text = `${APP_NAME} invite for ${name}. Open this on your own phone (works once, for ${INVITE_HOURS} hours):\n${link}`;
     await sheet({
       title: 'Invite ready', left: null, right: 'Done',
       body: `<p>Send this to <b>${esc(name)}</b> by text message. It works once, only on the first phone that's approved.</p>
@@ -482,7 +487,7 @@ async function teamView(incoming) {
         ${codeBox(code, 'Invite')}
         <p class="muted small">The code alone works too: they paste it on the Invite only screen. Next: when they open it, their request shows up under “Waiting for you” and you get a note. Keep using the app meanwhile.</p>`,
       onMount: ({ el }) => {
-        $('#s', el).onclick = () => share('Bootleggers Kitchen invite', text);
+        $('#s', el).onclick = () => share(`${APP_NAME} invite`, text);
         $('#c', el).onclick = () => copy(text, 'Invite copied');
         wireCodeBox(el, code, 'Invite');
       },
@@ -515,7 +520,7 @@ async function teamView(incoming) {
     try { code = await access.approve(profile, req, typeof ok === 'string' ? ok : undefined); }
     catch (e) { toast(e.message); return; }
     if (waiting.has(req.invite.iid)) { waiting.delete(req.invite.iid); sync.clearRequest(req.invite.iid); updateBadge(); }
-    const text = `Bootleggers Kitchen activation for ${req.invite.name}. Copy this whole message, then open the app and tap Paste:\n${code}`;
+    const text = `${APP_NAME} activation for ${req.invite.name}. Copy this whole message, then open the app and tap Paste:\n${code}`;
     await sheet({
       title: 'Approved', left: null, right: 'Done',
       body: `<p>Send this activation back to <b>${esc(req.invite.name)}</b>. It only works on their phone.</p>
@@ -523,7 +528,7 @@ async function teamView(incoming) {
         <button class="btn plain block" id="c" type="button" style="margin-top:6px">Copy whole message</button>
         ${codeBox(code, 'Activation')}`,
       onMount: ({ el }) => {
-        $('#s', el).onclick = () => share('Bootleggers Kitchen activation', text);
+        $('#s', el).onclick = () => share(`${APP_NAME} activation`, text);
         $('#c', el).onclick = () => copy(text, 'Activation copied');
         wireCodeBox(el, code, 'Activation');
       },
@@ -545,7 +550,7 @@ const wireCodeBox = (el, code, what) => { const b = $('#copy-code', el); if (b) 
 
 function installHint(code) {
   if (!isIOS || standalone) return '';
-  return `<div class="hint small"><b>iPhone: install first.</b> Tap the Share button, then <b>Add to Home Screen</b>. Open Bootleggers from your home screen and paste your code there.
+  return `<div class="hint small"><b>iPhone: install first.</b> Tap the Share button, then <b>Add to Home Screen</b>. Open ${esc(BRAND.shortName)} from your home screen and paste your code there.
     ${code ? `<button class="btn tonal small" id="copy-in" type="button" style="margin-top:8px">Copy my code</button>` : ''}</div>`;
 }
 
@@ -554,7 +559,7 @@ async function lockedView(incoming) {
   setTitle('');
   const pending = await access.pendingInvite();
   const ownerInfo = await access.ownerSetupInfo();
-  const expired = localStorage.getItem('blg.expiredNotice');
+  const expired = localStorage.getItem(BRAND.dataPrefix + 'expiredNotice');
 
   if (ownerInfo && !ROOT_KEYS.includes(ownerInfo.pub)) {
     // RRA-064: never a dead end. A second device (an iPad, say) gets in with
@@ -575,7 +580,7 @@ async function lockedView(incoming) {
     $('#restore')?.addEventListener('click', async () => {
       const p = await restoreSheet();
       if (!p) return;
-      profile = p; localStorage.removeItem('blg.expiredNotice'); toast('Welcome back, Admin'); boot();
+      profile = p; localStorage.removeItem(BRAND.dataPrefix + 'expiredNotice'); toast('Welcome back, Admin'); boot();
     });
     return;
   }
@@ -600,8 +605,8 @@ async function lockedView(incoming) {
       </div>
       <p id="err" class="small" style="color:var(--danger)"></p>
       <button class="btn plain block" id="restart" type="button">${pending.restore ? 'Start again' : 'Use a different invite'}</button>`;
-    const req = `Bootleggers Kitchen request from ${pending.name}. Paste this in the app under More → Invite and approve staff:\n${pending.request}`;
-    $('#send').onclick = () => share('Bootleggers Kitchen request', req);
+    const req = `${APP_NAME} request from ${pending.name}. Paste this in the app under More → Invite and approve staff:\n${pending.request}`;
+    $('#send').onclick = () => share(`${APP_NAME} request`, req);
     wireCodeBox(view, pending.request, 'Request');
     if (pending.rk && !pending.posted && sync.enabled()) {
       $('#auto').textContent = 'Sending your request to your manager’s phone…';
@@ -616,7 +621,7 @@ async function lockedView(incoming) {
     }
     $('#paste').onclick = () => pasteInto($('#code'));
     $('#go').onclick = async () => {
-      try { profile = await access.activate($('#code').value); localStorage.removeItem('blg.expiredNotice'); toast(`Welcome, ${profile.name}`); boot(); }
+      try { profile = await access.activate($('#code').value); localStorage.removeItem(BRAND.dataPrefix + 'expiredNotice'); toast(`Welcome, ${profile.name}`); boot(); }
       catch (e) { $('#err').textContent = e.message; }
     };
     $('#restart').onclick = async () => { await store.del('pending'); lockedView(); };
@@ -627,7 +632,7 @@ async function lockedView(incoming) {
   view.innerHTML = `
     ${expired ? `<div class="hint"><b>Your access ended</b> after ${INACTIVITY_DAYS} days without use, or a manager removed it. Ask a manager for a new invite.</div>` : ''}
     <h2>Invite only</h2>
-    <p>Bootleggers Kitchen is for the Bootleggers team. A manager sends you an invite, and it opens on your phone only.</p>
+    <p>${esc(APP_NAME)} is for the ${esc(BRAND.shortName)} team. A manager sends you an invite, and it opens on your phone only.</p>
     ${installHint(incoming)}
     <textarea id="code" placeholder="Paste your invite" style="min-height:70px">${esc(incoming || '')}</textarea>
     <div class="btn-row" style="margin-top:10px">
@@ -652,7 +657,7 @@ async function lockedView(incoming) {
   const doRestore = async (prefill) => {
     const p = await restoreSheet(prefill);
     if (!p) return;
-    profile = p; localStorage.removeItem('blg.expiredNotice'); toast('Welcome back, Admin'); boot();
+    profile = p; localStorage.removeItem(BRAND.dataPrefix + 'expiredNotice'); toast('Welcome back, Admin'); boot();
   };
   $('#restore')?.addEventListener('click', () => doRestore());
   $('#copy-in')?.addEventListener('click', () => copy(incoming, 'Code copied'));

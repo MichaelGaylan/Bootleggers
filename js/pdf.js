@@ -57,7 +57,7 @@ export function textPdf(title, lines, { mono = false } = {}) {
       y -= lead;
       stream += `/${r.head ? 'F2' : 'F1'} ${r.head ? size + 1.5 : size} Tf 1 0 0 1 ${MARGIN} ${y.toFixed(1)} Tm (${pdfStr(r.t)}) Tj\n`;
     }
-    stream += `/F1 8 Tf 1 0 0 1 ${MARGIN} ${MARGIN / 2} Tm (${pdfStr(`Bootleggers Bar & Grill - page ${n + 1} of ${pages.length}`)}) Tj\nET`;
+    stream += `/F1 8 Tf 1 0 0 1 ${MARGIN} ${MARGIN / 2} Tm (${pdfStr(`${globalThis.BRAND.restaurant} - page ${n + 1} of ${pages.length}`)}) Tj\nET`;
     const content = add(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
     kids.push(add(`<< /Type /Page /Parent ${pagesObj} 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 ${fBody} 0 R /F2 ${fBold} 0 R >> >> /Contents ${content} 0 R >>`));
   });
@@ -73,7 +73,7 @@ export function textPdf(title, lines, { mono = false } = {}) {
   return new Blob([out], { type: 'application/pdf' });
 }
 
-const slug = (s) => clean(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'bootleggers';
+const slug = (s) => clean(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || globalThis.BRAND.teamId;
 
 // Share the PDF (the share sheet has Print, Save to Files, Mail...). Where
 // sharing files isn't possible, open or download it instead.

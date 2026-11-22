@@ -5,10 +5,11 @@
 // config) only ever sees scrambled data. Phones sign in anonymously; the
 // Firestore rules in firestore.rules only let signed-in phones read and write.
 //
-// Layout: teams/bootleggers/docs/{collection}~{id} = { c, i, u, d, iv, ct }
+// Layout: teams/<BRAND.teamId>/docs/{collection}~{id} = { c, i, u, d, iv, ct }
 //   c collection, i id, u updated (ms), d deleted flag, iv + ct the sealed record.
 
-import { FIREBASE } from './config.js';
+import { FIREBASE, BRAND } from './config.js';
+const TEAM = BRAND.teamId; // each restaurant's own shared data folder
 import * as data from './data.js';
 import * as store from './store.js';
 import { b64uEnc, b64uDec, importTeamKey, sealTo, openFrom } from './crypto.js';
@@ -66,7 +67,7 @@ function connect() {
   return connecting;
 }
 
-const inboxRef = (iid) => fs.doc(db, 'teams', 'bootleggers', 'docs', docPath('inbox', iid));
+const inboxRef = (iid) => fs.doc(db, 'teams', TEAM, 'docs', docPath('inbox', iid));
 
 // New phone: leave a sealed request for the inviter (RRA-043).
 export async function postRequest(iid, box) {
@@ -149,20 +150,20 @@ async function openMessage(r) {
 async function push(coll, doc) {
   if (!db) return;
   if (coll === 'post' && isPrivate(doc)) {
-    await fs.setDoc(fs.doc(db, 'teams', 'bootleggers', 'docs', docPath(coll, doc.id)), { c: coll, i: doc.id, u: doc.updated || Date.now(), d: false, ...(await sealMessage(doc)) });
+    await fs.setDoc(fs.doc(db, 'teams', TEAM, 'docs', docPath(coll, doc.id)), { c: coll, i: doc.id, u: doc.updated || Date.now(), d: false, ...(await sealMessage(doc)) });
     return;
   }
   if (PRIVATE.includes(coll)) {
     const pbox = await sealPrivate(coll, doc);
-    if (pbox) await fs.setDoc(fs.doc(db, 'teams', 'bootleggers', 'docs', docPath(coll, doc.id)), { c: coll, i: doc.id, u: doc.updated || Date.now(), d: false, ...pbox });
+    if (pbox) await fs.setDoc(fs.doc(db, 'teams', TEAM, 'docs', docPath(coll, doc.id)), { c: coll, i: doc.id, u: doc.updated || Date.now(), d: false, ...pbox });
     return;
   }
   const box = await seal(doc);
-  await fs.setDoc(fs.doc(db, 'teams', 'bootleggers', 'docs', docPath(coll, doc.id)), { c: coll, i: doc.id, u: doc.updated || Date.now(), d: false, ...box });
+  await fs.setDoc(fs.doc(db, 'teams', TEAM, 'docs', docPath(coll, doc.id)), { c: coll, i: doc.id, u: doc.updated || Date.now(), d: false, ...box });
 }
 async function drop(coll, id) {
   if (!db) return;
-  await fs.setDoc(fs.doc(db, 'teams', 'bootleggers', 'docs', docPath(coll, id)), { c: coll, i: id, u: Date.now(), d: true, iv: '', ct: '' });
+  await fs.setDoc(fs.doc(db, 'teams', TEAM, 'docs', docPath(coll, id)), { c: coll, i: id, u: Date.now(), d: true, iv: '', ct: '' });
 }
 
 async function localDoc(coll, id) {
@@ -181,7 +182,7 @@ export async function start(profile, onStatus = () => {}) {
       drop: (c, i) => drop(c, i).catch((e) => set('error', e.message)),
     });
     let first = true;
-    fs.onSnapshot(fs.collection(db, 'teams', 'bootleggers', 'docs'), async (snap) => {
+    fs.onSnapshot(fs.collection(db, 'teams', TEAM, 'docs'), async (snap) => {
       lastSnap = snap;
       const seen = new Set();
       for (const ch of snap.docChanges()) {

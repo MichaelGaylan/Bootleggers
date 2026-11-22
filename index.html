@@ -16,6 +16,8 @@
   <link rel="icon" href="assets/favicon-32.png" sizes="32x32">
   <link rel="apple-touch-icon" href="assets/app-icon-180.png">
   <link rel="stylesheet" href="css/app.css">
+  <!-- Brand settings (BPAY-017): names, pictures, colors and data names for this restaurant -->
+  <script src="js/brand.js"></script>
   <script>
     // Platform look (RRA-013): set before first paint to avoid a flash.
     (function () {
@@ -25,21 +27,21 @@
       if (ios) d.classList.add('is-ios');
       if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) d.classList.add('standalone');
       // Appearance (RRA-065): Light, Dark or Match device, saved on this device.
-      try { var t = JSON.parse(localStorage.getItem('blg.theme')); if (t === 'light' || t === 'dark') d.dataset.theme = t; } catch (e) {}
+      try { var t = JSON.parse(localStorage.getItem(self.BRAND.dataPrefix + 'theme')); if (t === 'light' || t === 'dark') d.dataset.theme = t; } catch (e) {}
     })();
   </script>
 </head>
 <body>
   <!-- Startup screen (RRA-014) with the intro clip (RRA-022) -->
   <div id="splash" hidden>
-    <video id="splash-video" muted playsinline preload="auto" src="assets/intro.mp4"></video>
+    <video id="splash-video" muted playsinline preload="auto"></video>
     <button id="splash-skip" class="splash-skip" type="button">Skip</button>
     <div id="splash-card" class="splash-card" hidden></div>
   </div>
 
   <!-- Pinned logo behind the control bar (RRA-023) -->
   <header id="top" class="top">
-    <div class="top-logo" aria-hidden="true"><img src="assets/bootleggers-logo.png" alt=""></div>
+    <div class="top-logo" aria-hidden="true"><img id="brand-logo" src="assets/bootleggers-logo.png" alt=""></div>
     <div class="top-bar">
       <button id="btn-back" class="icon-btn" type="button" aria-label="Back" hidden>
         <svg viewBox="0 0 24 24"><path d="M15 4l-8 8 8 8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -87,7 +89,7 @@
   <dialog id="dlg" class="sheet"></dialog>
   <div id="toast" class="toast" role="status" hidden></div>
 
-  <noscript><p style="padding:2rem">Bootleggers Kitchen needs JavaScript turned on.</p></noscript>
+  <noscript><p style="padding:2rem">This app needs JavaScript turned on.</p></noscript>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

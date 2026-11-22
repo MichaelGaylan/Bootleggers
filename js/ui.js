@@ -6,8 +6,8 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&a
 export const view = $('#view');
 export const dlg = $('#dlg');
 export const LS = {
-  get: (k, d) => { try { return JSON.parse(localStorage.getItem('blg.' + k)) ?? d; } catch { return d; } },
-  set: (k, v) => localStorage.setItem('blg.' + k, JSON.stringify(v)),
+  get: (k, d) => { try { return JSON.parse(localStorage.getItem(globalThis.BRAND.dataPrefix + k)) ?? d; } catch { return d; } },
+  set: (k, v) => localStorage.setItem(globalThis.BRAND.dataPrefix + k, JSON.stringify(v)),
 };
 export const isIOS = document.documentElement.classList.contains('is-ios');
 
