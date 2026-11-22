@@ -16,7 +16,7 @@ import { stockView, neededView, ordersView, vendorsView } from './stock.js';
 import { boardView, unreadPosts } from './board.js';
 import { prepView } from './prep.js';
 import { scheduleView, staffView, ensureStaffFor, staffList, schedulePrintView, swapPopups, shiftTimesView } from './schedule.js';
-import { eventsView, eventView } from './events.js';
+import { eventsView, eventView, dueEvents, eventPopups } from './events.js';
 import { costsView } from './costs.js';
 import { loungeView, timesheetView, timesheetsView, canTime } from './lounge.js';
 import { settingsView, listView, rolesView, personView, dedupeView } from './settings.js';
@@ -179,6 +179,9 @@ async function updateBadge() {
   $('#bell-dot').hidden = !n;
   const sb = $('#side-badge');
   if (sb) { sb.hidden = !n; sb.textContent = n; }
+  // RRA-105: events coming up, on the sidebar and More.
+  const ev = profile ? (await dueEvents().catch(() => [])).length : 0;
+  for (const b of $$('#ev-badge, #more-ev-badge')) { b.hidden = !ev; b.textContent = ev; }
 }
 
 // Sidebar for tablets and computers (RRA-051): every section, no More tab.
@@ -200,7 +203,7 @@ function renderSide() {
     renderSide.pay ? link('payroll', 'Payroll') : '',
     canOrder() ? link('pos', 'Orders (POS)') : '',
     canKitchen() ? link('tickets', '<span class="sub-l">Kitchen and bar screen</span>') : '',
-    canSee('events') ? link('events', 'Events (BEOs)') : '',
+    canSee('events') ? link('events', 'Events (BEOs)', '<i id="ev-badge" class="sbadge" hidden></i>') : '',
     canSee('costs') ? link('costs', 'Costs and waste') : '',
     '<hr>',
     link('settings', 'Settings'),
@@ -234,7 +237,7 @@ function moreView() {
       ${moreView.pay ? '<a class="row" href="#/payroll"><span class="grow">Payroll</span></a>' : ''}
       ${myStaff() ? '<a class="row" href="#/mypay"><span class="grow">My pay &amp; tips</span></a>' : ''}
       ${canSee('schedule') ? '<a class="row" href="#/schedule"><span class="grow">Schedule</span></a>' : ''}
-      ${canSee('events') ? '<a class="row" href="#/events"><span class="grow">Events (BEOs)</span></a>' : ''}
+      ${canSee('events') ? '<a class="row" href="#/events"><span class="grow">Events (BEOs)</span><i id="more-ev-badge" class="sbadge" hidden></i></a>' : ''}
       ${canSee('costs') ? '<a class="row" href="#/costs"><span class="grow">Costs and waste</span></a>' : ''}
     </div>
     <div class="group">
@@ -831,7 +834,7 @@ async function route() {
   const at = location.hash;
   await (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
   // RRA-078: swap conflicts for managers, and a manager's question for the requester.
-  if (location.hash === at && !dlg.open && $('#splash').hidden && (await swapPopups().catch(() => false) || await reportPopups().catch(() => false)) && location.hash === at) (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
+  if (location.hash === at && !dlg.open && $('#splash').hidden && (await swapPopups().catch(() => false) || await reportPopups().catch(() => false) || await eventPopups().catch(() => false)) && location.hash === at) (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
   // A slow screen can finish after a quicker tap: show what the address says.
   if (location.hash !== at && !dlg.open) route();
 }

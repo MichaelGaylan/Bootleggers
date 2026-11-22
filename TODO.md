@@ -17,6 +17,8 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-099 · Payroll: connect a real payroll service and POS through the restaurant's server (keys, pulls, money movement) — needs the server first · Infra · L
 
 ## 🟣 Done
+### 0.7.1 · build 2026.11.22-6
+- [x] RRA-105 · Events (BEOs): reminders for upcoming events. Each event gets a "Remind" choice for how many days ahead (e.g. Off, 1, 2, 3, 5, 7, 14 days; default set in Settings, changeable per event). From that day until the event, the app shows a pop-up when it opens (to the Admin, managers and chefs, or the people picked on the event), a badge on Events, and the event at the top of the Employee lounge. Each person can dismiss it for the day (Gaylan, 2026-11-22) · Feature · M
 ### 0.7.0 · build 2026.11.22-5
 - [x] RRA-101 · Point of sale merged into the app (from the Bootleggers POS test app, BPAY-025): checks for tables and bar tabs from the Recipe archive menu (sauce, temperature, dressing, notes, seats), send to kitchen and bar tickets, kitchen and bar screen (timers, mark up, bump), 86 list shared by all phones, split one/evenly/by seat, card with tip and cash with change through the chosen card service (practice until connected), today's sales for managers · Feature · L · added 2026-11-22
 - [x] RRA-102 · POS feeds Payroll: closed checks give each night's tip pool and net sales (labor %), unless that night has an uploaded POS report · Feature · S

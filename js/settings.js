@@ -8,6 +8,7 @@ import { ROLES, can as canAccess, canChangeRole, makeRoleChange, rotatePayKey } 
 import { staffList } from './schedule.js';
 import { INACTIVITY_DAYS } from './config.js';
 import * as sync from './sync.js';
+import { REMIND_DAYS, remindLabel, remindOf } from './events.js';
 
 export async function settingsView() {
   setChrome({ tab: 'more', back: true });
@@ -53,6 +54,7 @@ export async function settingsView() {
     <div class="group acc-body"${so === 'app' ? '' : ' hidden'}>
       ${isHost() ? '<a class="row nav" href="#/posset"><span class="grow"><span class="title">Point of sale</span><span class="sub">Card payments service, card reader, sales tax</span></span></a>' : ''}
       <div class="row"><span class="grow">Popups for new notices</span><button class="toggle ${s.popups !== false ? 'on' : ''}" id="popups" type="button" ${edit ? '' : 'disabled'} aria-label="Popups for new notices"></button></div>
+      ${canSee('events') ? `<div class="row"><span class="grow">Event reminders</span><span class="meta">${esc(remindLabel(remindOf({}, s)))}</span>${edit ? '<button class="btn plain small" id="ev-remind" type="button">Change</button>' : ''}</div>` : ''}
       <div class="row"><span class="grow">Food cost target</span><span class="meta">${s.foodCostTarget || 30}%</span>${edit ? '<button class="btn plain small" id="target" type="button">Change</button>' : ''}</div>
       <div class="row"><span class="grow">Shared team data</span><span class="meta">${esc(syncLabel())}</span></div>
       ${edit ? '<a class="row" href="#/dedupe"><span class="grow">Clean up duplicates</span></a>' : ''}
@@ -97,6 +99,17 @@ export async function settingsView() {
     settingsView();
   });
   $('#popups')?.addEventListener('click', async () => { if (!edit) return; s.popups = s.popups === false; await data.saveSettings(s); settingsView(); });
+  // RRA-105: how many days before an event the reminders start, for the whole team.
+  $('#ev-remind')?.addEventListener('click', async () => {
+    const cur = remindOf({}, s);
+    const v = await sheet({ title: 'Event reminders', right: 'Save',
+      body: `<label class="field"><span>Start reminding the Admin, managers and chefs</span><select id="evr">${REMIND_DAYS.map((d) => `<option value="${d}"${d === cur ? ' selected' : ''}>${esc(remindLabel(d))}</option>`).join('')}</select></label>
+        <p class="muted small">This is the usual choice for every event. Each event can change it under Edit.</p>`,
+      onMount: (api) => { api.onRight = () => api.close({ d: +$('#evr', api.el).value }); } });
+    if (!v) return;
+    await data.saveSettings({ ...(await data.settings()), eventRemind: v.d });
+    toast('Saved for everyone'); settingsView();
+  });
   $('#target')?.addEventListener('click', async () => {
     const v = await sheet({
       title: 'Food cost target', right: 'Save',

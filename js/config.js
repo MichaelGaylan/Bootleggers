@@ -4,10 +4,17 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.7.0';
-export const BUILD = '2026.11.22-5';
+export const VERSION = '0.7.1';
+export const BUILD = '2026.11.22-6';
 
 export const WHATS_NEW = [
+  {
+    version: '0.7.1', build: '2026.11.22-6', date: '2026-11-22',
+    lines: [
+      'Event reminders: the Admin, managers and chefs get a pop-up for an event coming up, once a day until it happens, plus a badge on Events and a card at the top of the Employee lounge.',
+      'Pick how many days ahead (Off, 1, 2, 3, 5, 7 or 14) for each event under Edit, or the usual for every event in Settings → App → Event reminders (3 days to start).',
+    ],
+  },
   {
     version: '0.7.0', build: '2026.11.22-5', date: '2026-11-22',
     lines: [
