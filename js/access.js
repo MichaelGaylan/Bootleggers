@@ -18,7 +18,8 @@ import { ROOT_KEYS, INVITE_HOURS, INACTIVITY_DAYS, ACCESS_URL } from './config.j
 import { sign, verify, exportPublic, shortCode, randomId, textToB64u, b64uToText, sealTo, openFrom, b64uEnc, b64uDec, newTeamKeyBytes, newBackupKey, exportPrivate, importKeyPair, passwordSeal, passwordOpen , newPayKey, importDhPrivate } from './crypto.js';
 import * as store from './store.js';
 
-const LAST_USED = 'blg.lastUsed';
+const P = globalThis.BRAND.dataPrefix;
+const LAST_USED = P + 'lastUsed';
 const DAY = 86400000;
 
 // The internal key stays 'owner' so existing codes keep working; people see "Admin".
@@ -70,7 +71,7 @@ export async function loadRevocations() {
 // Returns the payload or throws an Error with a plain-language message.
 export async function check(code, kind) {
   const t = typeof code === 'string' ? parse(code) : code;
-  if (!t) throw new Error("That doesn't look like a Bootleggers code.");
+  if (!t) throw new Error(`That doesn't look like a ${globalThis.BRAND.shortName} code.`);
   if (t.kind !== kind) throw new Error(`This is ${kindName(t.kind)}, not ${kindName(kind)}.`);
   const p = t.payload;
   if (!(await verify(p.by, t.head, t.sig))) throw new Error('This code has been changed or damaged.');
@@ -82,9 +83,9 @@ export async function check(code, kind) {
 
 async function checkSigner(p) {
   if (ROOT_KEYS.includes(p.by)) return;
-  if (!p.chain) throw new Error('This code was not signed by a Bootleggers manager.');
+  if (!p.chain) throw new Error(`This code was not signed by a ${globalThis.BRAND.shortName} manager.`);
   const c = await check(p.chain, 'act');
-  if (c.dev !== p.by || !CAN_INVITE.includes(c.role)) throw new Error('This code was not signed by a Bootleggers manager.');
+  if (c.dev !== p.by || !CAN_INVITE.includes(c.role)) throw new Error(`This code was not signed by a ${globalThis.BRAND.shortName} manager.`);
 }
 
 function kindName(k) {
@@ -398,7 +399,7 @@ export function isExpired() {
 export async function wipeAccess() {
   await store.wipe();
   for (const k of Object.keys(localStorage)) {
-    if (k.startsWith('blg.') && k !== 'blg.seenVersion') localStorage.removeItem(k);
+    if (k.startsWith(P) && k !== P + 'seenVersion') localStorage.removeItem(k);
   }
-  localStorage.setItem('blg.expiredNotice', '1');
+  localStorage.setItem(P + 'expiredNotice', '1');
 }

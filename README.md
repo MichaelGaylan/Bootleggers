@@ -6,6 +6,7 @@ No build step: it is plain HTML, CSS and JavaScript modules, served as static fi
 
 ## Layout
 - `index.html`, `css/app.css`: the app and its iOS/Android look (light and dark)
+- `js/brand.js`: the restaurant's names, logo, icons, intro video, accent color, © credit line and data names (one file per restaurant; keep `index.html` and `manifest.webmanifest` in step)
 - `js/config.js`: version, build, Admin keys, expiry days, Report a problem key
 - `js/access.js`: invite, approval and activation codes; inactivity expiry
 - `js/crypto.js`, `js/store.js`: device keys and encrypted on-phone storage

@@ -179,7 +179,7 @@ export async function printView(id) {
       <div class="paper-meta">${esc(r.kind === 'house' ? r.category || 'House recipe' : r.section || 'Dish')}${r.yield ? ` · yield ${esc(scaleQty(r.yield, k))}` : ''}${r.storage ? ` · ${esc(r.storage)}` : ''} · printed ${new Date().toLocaleDateString()}</div>
       <table>${(r.ingredients || []).map((i) => `<tr><td><b>${esc(scaleQty(i.qty, k))}</b></td><td>${esc(i.item)}</td></tr>`).join('')}</table>
       <ol>${(r.steps || []).map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
-      <div class="paper-foot">Bootleggers Bar &amp; Grill · Proprietary, do not share</div>
+      <div class="paper-foot">${esc(globalThis.BRAND.restaurant)} · Proprietary, do not share</div>
     </div>
     ${printButtons()}`;
   $$('.segmented button', view).forEach((b) => { b.onclick = () => { printView.k = +b.dataset.k; printView(id); }; });

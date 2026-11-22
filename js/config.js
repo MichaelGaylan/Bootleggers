@@ -1,11 +1,19 @@
-// Bootleggers Kitchen: app settings.
+// App settings: version, keys and timings. Restaurant names live in js/brand.js.
 // Bump VERSION and BUILD on every release, and add one line to WHATS_NEW.
 
-export const APP_NAME = 'Bootleggers Kitchen';
-export const VERSION = '0.5.8';
-export const BUILD = '2026.11.22-1';
+// Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
+export const BRAND = globalThis.BRAND;
+export const APP_NAME = BRAND.appName;
+export const VERSION = '0.5.9';
+export const BUILD = '2026.11.22-2';
 
 export const WHATS_NEW = [
+  {
+    version: '0.5.9', build: '2026.11.22-2', date: '2026-11-22',
+    lines: [
+      'Behind the scenes: the restaurant name, logo, icons and colors now come from one settings file, ready for other restaurants. Nothing changes for you.',
+    ],
+  },
   {
     version: '0.5.8', build: '2026.11.22-1', date: '2026-11-22',
     lines: [
@@ -177,7 +185,7 @@ export const INVITE_HOURS = 72;
 // Report a problem (Web3Forms). The key is public by design: it can only post
 // to the inbox it is registered to. Never put the inbox address here.
 export const WEB3FORMS_KEY = '003383c6-4896-4f71-bdec-f7ada99ae0ec';
-export const REPORT_PREFIX = 'Bootleggers —';
+export const REPORT_PREFIX = BRAND.reportPrefix;
 
 // Shared team data (RRA-031): the web config from the Firebase console
 // (Project settings → Your apps → Web). Public by design; the data itself is
