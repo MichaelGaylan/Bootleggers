@@ -23,6 +23,7 @@ import { settingsView, listView, rolesView, personView, dedupeView } from './set
 import { applyMenu, applyVendors, applySupplies } from './menu.js';
 import { payrollView, payRunView, payRunDoneView, payHistoryView, myPayView, tipRulesView, paySettingsView } from './payroll.js';
 import { payrollSettings, hasPayroll } from './paycalc.js';
+import { posView, posCheckView, posPayView, ticketsView, posSalesView, posSettingsView, canOrder, canKitchen, canSales } from './pos.js';
 
 import { $, $$, esc, view, dlg, LS, isIOS, standalone, toast, copy, share, pasteInto, sheet, setTitle, setChrome, fmtDate, session, wideMQ, THEMES, getTheme } from './ui.js';
 
@@ -197,6 +198,8 @@ function renderSide() {
     canTime() ? link('timesheets', '<span class="sub-l">Time sheets</span>') : link('timesheet', '<span class="sub-l">My time sheet</span>'),
     myStaff() ? link('mypay', '<span class="sub-l">My pay &amp; tips</span>') : '',
     renderSide.pay ? link('payroll', 'Payroll') : '',
+    canOrder() ? link('pos', 'Orders (POS)') : '',
+    canKitchen() ? link('tickets', '<span class="sub-l">Kitchen and bar screen</span>') : '',
     canSee('events') ? link('events', 'Events (BEOs)') : '',
     canSee('costs') ? link('costs', 'Costs and waste') : '',
     '<hr>',
@@ -225,6 +228,9 @@ function moreView() {
       <p class="muted small">${profile.role === 'owner' ? 'Admin phone. Access does not expire.' : `Access stays on while you use it. It ends after ${daysLeft} days without opening the app.`}</p>
     </div>
     <div class="group">
+      ${canOrder() ? '<a class="row" href="#/pos"><span class="grow">Orders (POS)</span></a>' : ''}
+      ${canKitchen() ? '<a class="row" href="#/tickets"><span class="grow">Kitchen and bar screen</span></a>' : ''}
+      ${canSales() ? '<a class="row" href="#/possales"><span class="grow">Today\'s sales</span></a>' : ''}
       ${moreView.pay ? '<a class="row" href="#/payroll"><span class="grow">Payroll</span></a>' : ''}
       ${myStaff() ? '<a class="row" href="#/mypay"><span class="grow">My pay &amp; tips</span></a>' : ''}
       ${canSee('schedule') ? '<a class="row" href="#/schedule"><span class="grow">Schedule</span></a>' : ''}
@@ -721,6 +727,13 @@ const routes = {
   mypay: () => myPayView(),
   tiprules: () => tipRulesView(),
   paysettings: () => paySettingsView(),
+  // Point of sale (RRA-101)
+  pos: () => posView(),
+  poscheck: (id) => posCheckView(id),
+  pospay: (id) => posPayView(id),
+  tickets: () => ticketsView(),
+  possales: () => posSalesView(),
+  posset: () => posSettingsView(),
   notices: () => boardView(),
   schedule: (arg) => scheduleView(arg),
   'schedule-print': (arg) => schedulePrintView(arg),
