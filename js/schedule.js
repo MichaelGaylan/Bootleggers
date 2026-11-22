@@ -32,15 +32,27 @@ export const pill = (v, g) => (isOff(v) ? '<span class="spill off">TIME OFF</spa
   : `<span class="spill c-${g.c}"><i>${g.l}</i><span>${esc(v)}</span></span>`);
 const initials = (n) => String(n || '?').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 
-// Hours in a shift like 10-6, 8-2, 4-cl or 10:30-4. Close (cl) counts as 11 PM;
-// a start before 7 is in the afternoon (4-cl is 4 PM to close).
+// RRA-091: the team's own quick shift buttons and close time (Settings →
+// Shift times). One list for everyone, kept in the team settings.
+export const DEFAULT_SHIFTS = ['8-2', '10-6', '11-7', '4-cl'].map((t) => ({ t, role: '' }));
+let CLOSE = 23;
+export async function shiftTimes() {
+  const s = await data.settings();
+  CLOSE = +s.closeAt || 23;
+  return { list: Array.isArray(s.shiftTimes) && s.shiftTimes.length ? s.shiftTimes : DEFAULT_SHIFTS, closeAt: CLOSE };
+}
+const hourName = (h) => { const x = h % 24; return `${x % 12 || 12} ${x < 12 ? 'AM' : 'PM'}`; };
+
+// Hours in a shift like 10-6, 8-2, 4-cl or 10:30-4. Close (cl) is the close
+// time in Shift times (11 PM unless changed); a start before 7 is in the
+// afternoon (4-cl is 4 PM to close).
 export function shiftHours(v) {
   if (!v || isOff(v)) return 0;
   const m = String(v).toLowerCase().match(/(\d{1,2})(?::(\d\d))?\s*(?:am?|pm?)?\s*[-–to ]+\s*(cl\w*|\d{1,2})(?::(\d\d))?/);
   if (!m) return 0;
   let a = +m[1] + (+m[2] || 0) / 60;
   if (a < 7) a += 12;
-  let b = m[3].startsWith('cl') ? 23 : +m[3] + (+m[4] || 0) / 60;
+  let b = m[3].startsWith('cl') ? CLOSE : +m[3] + (+m[4] || 0) / 60;
   while (b <= a) b += 12;
   const h = b - a;
   return h > 0 && h <= 16 ? h : 0;
@@ -147,6 +159,7 @@ const laterThisVisit = new Set();
 export async function swapPopups() {
   const seen = mySwapSeen();
   const mark = (k) => { seen.add(k); LS.set('swapSeen', [...seen].slice(-300)); };
+  await shiftTimes();
   const swaps = (await data.list('swap')).sort((a, b) => a.at - b.at);
   if (canApprove()) {
     for (const r of swaps.filter((s) => s.status === 'asked')) {
@@ -208,6 +221,8 @@ export async function scheduleView(focus) {
   const focusSwap = focus ? await data.get('swap', focus) : null;
   if (focusSwap?.week) scheduleView.week = focusSwap.week;
   const change = canChange('schedule');
+  const { list: quick } = await shiftTimes();
+  const quickFor = (role) => quick.filter((x) => !x.role || x.role === role).map((x) => x.t);
   const wk = scheduleView.week || data.weekStart();
   const staff = await staffList();
   const week = (await data.get('week', wk)) || { id: wk, shifts: {}, published: false };
@@ -257,6 +272,7 @@ export async function scheduleView(focus) {
     <div class="group" style="margin-top:14px">
       ${me && week.published ? '<button class="row nav" id="ask" type="button"><span class="grow">Ask for a shift swap</span></button>' : ''}
       ${change ? `<a class="row" href="#/staff"><span class="grow">Add or remove staff</span><span class="meta">${staff.length}</span></a>` : ''}
+      ${change ? '<a class="row" href="#/shifts"><span class="grow">Shift times</span><span class="meta">Quick buttons</span></a>' : ''}
       ${staff.length ? '<button class="row nav" id="print-weeks" type="button"><span class="grow">Print schedule</span></button>' : ''}
     </div>
     <p class="muted small center">${change ? 'Tap a day to set a shift, like 10-6 or 4-cl (close), or time off. Colors follow each person\'s position in Staff.' : 'Ask a manager about changes.'}</p>`;
@@ -269,8 +285,11 @@ export async function scheduleView(focus) {
       const r = await sheet({
         title: `Open shift · ${DAYS[d]} ${label(addDays(wk, d))}`, right: 'Add',
         body: `<label class="field"><span>Shift</span><input type="text" id="os-t" placeholder="e.g. 4-cl"></label>
+          <div class="btn-row">${quick.map((x) => `<button class="btn tonal small" type="button" data-oq="${esc(x.t)}" data-or="${esc(x.role || '')}">${esc(x.t)}${x.role ? ` · ${esc(x.role)}` : ''}</button>`).join('')}</div>
           <label class="field"><span>Role</span><select id="os-r">${ROLE_GROUPS.map((g) => `<option value="${g.k}">${g.k}</option>`).join('')}</select></label>`,
-        onMount: (api) => { api.onRight = () => { const t = $('#os-t', api.el).value.trim(); if (t) api.close({ t, role: $('#os-r', api.el).value }); }; },
+        onMount: (api) => {
+          $$('[data-oq]', api.el).forEach((q) => { q.onclick = () => { $('#os-t', api.el).value = q.dataset.oq; if (q.dataset.or) $('#os-r', api.el).value = q.dataset.or; }; });
+          api.onRight = () => { const t = $('#os-t', api.el).value.trim(); if (t) api.close({ t, role: $('#os-r', api.el).value }); }; },
       });
       if (!r) return;
       (week.open[d] ||= []).push(r);
@@ -317,7 +336,7 @@ export async function scheduleView(focus) {
       const v = await sheet({
         title: `${s.name} · ${DAYS[d]} ${label(addDays(wk, d))}`, right: 'Save',
         body: `<label class="field"><span>Shift</span><input type="text" id="sh" value="${esc(cur)}" placeholder="e.g. 10-6, 4-cl, off"></label>
-          <div class="btn-row">${['8-2', '10-6', '11-7', '4-cl', 'Time off'].map((x) => `<button class="btn tonal small" type="button" data-q="${x}">${x}</button>`).join('')}</div>
+          <div class="btn-row">${[...quickFor(roleOf(s).k), 'Time off'].map((x) => `<button class="btn tonal small" type="button" data-q="${esc(x)}">${esc(x)}</button>`).join('')}</div>
           <button class="btn plain block" type="button" data-q="">Clear</button>`,
         onMount: (api) => {
           $$('[data-q]', api.el).forEach((b) => { b.onclick = () => api.close({ v: b.dataset.q }); });
@@ -370,24 +389,128 @@ export async function scheduleView(focus) {
 
 // ------------------------------------------------------------ staff (Settings)
 
+// RRA-091: Settings → Shift times. Anyone who can change the schedule edits
+// the quick buttons (optionally for one role) and what "cl" means.
+export async function shiftTimesView() {
+  setChrome({ tab: 'more', back: true });
+  setTitle('Shift times');
+  const change = canChange('schedule');
+  const cur = await shiftTimes();
+  let rows = cur.list.map((x) => ({ t: x.t, role: x.role || '' }));
+  let closeAt = cur.closeAt;
+  const dis = change ? '' : ' disabled';
+  const collect = () => {
+    $$('.st-row', view).forEach((el, i) => { rows[i] = { t: $('[data-t]', el).value.trim(), role: $('[data-r]', el).value }; });
+    const c = $('#st-close', view); if (c) closeAt = +c.value;
+  };
+  const hrs = (t) => { const h = shiftHours(t); return h ? `${Math.round(h * 10) / 10} h` : ''; };
+  const draw = () => {
+    view.innerHTML = `
+      <p class="muted small">These are the quick buttons when you set someone's shift or add an open shift. Pick a position to show a button only for that position. Typing any other time still works. One list for the whole team.</p>
+      <div class="group">${rows.map((r, i) => `<div class="row st-row">
+        <input type="text" data-t value="${esc(r.t)}" placeholder="e.g. 10-6"${dis} aria-label="Shift time">
+        <select data-r${dis} aria-label="For"><option value="">Everyone</option>${ROLE_GROUPS.map((g) => `<option value="${esc(g.k)}"${g.k === r.role ? ' selected' : ''}>${esc(g.k)}</option>`).join('')}</select>
+        <span class="meta" data-h>${hrs(r.t)}</span>
+        ${change ? `<span class="st-acts"><button class="btn plain small" type="button" data-up="${i}" aria-label="Move up"${i ? '' : ' disabled'}>↑</button><button class="btn plain small" type="button" data-dn="${i}" aria-label="Move down"${i < rows.length - 1 ? '' : ' disabled'}>↓</button><button class="btn plain small danger-text" type="button" data-x="${i}" aria-label="Remove">✕</button></span>` : ''}
+      </div>`).join('') || '<div class="row"><span class="muted small">No quick buttons. Add one below.</span></div>'}</div>
+      ${change ? '<button class="btn tonal block" type="button" id="st-add">+ Add a shift time</button>' : ''}
+      <label class="field" style="margin-top:14px"><span>"cl" (close) means</span><select id="st-close"${dis}>${[20, 21, 22, 23, 24, 25, 26].map((h) => `<option value="${h}"${h === closeAt ? ' selected' : ''}>${hourName(h)}</option>`).join('')}</select></label>
+      <p class="muted small">Hours for swap checks and the 40-hour check count a shift that ends at close as ending at this time.</p>
+      ${change ? `<button class="btn block" type="button" id="st-save">Save</button>
+        <button class="btn plain block" type="button" id="st-reset">Back to the standard times</button>` : '<p class="muted small center">Ask a manager to change these.</p>'}`;
+    if (!change) return;
+    $$('.st-row [data-t]', view).forEach((inp) => { inp.oninput = () => { inp.closest('.st-row').querySelector('[data-h]').textContent = hrs(inp.value); }; });
+    $('#st-add').onclick = () => { collect(); rows.push({ t: '', role: '' }); draw(); $$('.st-row [data-t]', view).pop()?.focus(); };
+    $$('[data-up]', view).forEach((b) => { b.onclick = () => { collect(); const i = +b.dataset.up; [rows[i - 1], rows[i]] = [rows[i], rows[i - 1]]; draw(); }; });
+    $$('[data-dn]', view).forEach((b) => { b.onclick = () => { collect(); const i = +b.dataset.dn; [rows[i + 1], rows[i]] = [rows[i], rows[i + 1]]; draw(); }; });
+    $$('[data-x]', view).forEach((b) => { b.onclick = () => { collect(); rows.splice(+b.dataset.x, 1); draw(); }; });
+    $('#st-close').onchange = () => { collect(); CLOSE = closeAt; $$('.st-row', view).forEach((el) => { $('[data-h]', el).textContent = hrs($('[data-t]', el).value); }); };
+    $('#st-save').onclick = async () => {
+      collect();
+      const list = rows.filter((r) => r.t);
+      await data.saveSettings({ ...(await data.settings()), shiftTimes: list, closeAt });
+      CLOSE = closeAt; toast('Shift times saved for everyone'); shiftTimesView();
+    };
+    $('#st-reset').onclick = () => { rows = DEFAULT_SHIFTS.map((x) => ({ ...x })); closeAt = 23; CLOSE = 23; draw(); toast('Tap Save to keep the standard times'); };
+  };
+  draw();
+}
+
+// RRA-092: hours (and the pay rate and shifts) left behind by someone who was
+// removed from Staff, and moving them onto a current staff member.
+const normName = (n) => String(n || '').trim().toLowerCase().replace(/\s+/g, ' ');
+export async function orphanHistory() {
+  if (!canTime()) return [];
+  const ids = new Set((await staffList()).map((s) => s.id));
+  const out = {};
+  for (const p of await data.list('punch')) {
+    if (!p.staffId || ids.has(p.staffId)) continue;
+    const g = (out[p.staffId] ||= { id: p.staffId, name: p.name || 'Someone', n: 0, hours: 0 });
+    g.n++; if (p.out) g.hours += (p.out - p.in) / 3600000;
+  }
+  return Object.values(out);
+}
+export const sameName = (a, b) => normName(a) === normName(b);
+export async function moveHistory(fromId, to) {
+  const ps = (await data.list('punch')).filter((p) => p.staffId === fromId);
+  for (const p of ps) await data.put('punch', { ...p, staffId: to.id, name: to.name });
+  const old = await data.get('payrate', fromId);
+  if (old && +old.rate > 0) {
+    const cur = await data.get('payrate', to.id);
+    if (!(+cur?.rate > 0)) await data.put('payrate', { id: to.id, staffId: to.id, rate: old.rate });
+  }
+  for (const w of await data.list('week')) {
+    const from = w.shifts?.[fromId];
+    if (!from) continue;
+    const mine = w.shifts[to.id] || Array(7).fill('');
+    w.shifts[to.id] = mine.map((v, i) => v || from[i] || '');
+    delete w.shifts[fromId];
+    await data.put('week', w);
+  }
+  for (const r of await data.list('swap')) {
+    if (r.from !== fromId && r.to !== fromId) continue;
+    await data.put('swap', { ...r, ...(r.from === fromId ? { from: to.id, fromName: to.name } : {}), ...(r.to === fromId ? { to: to.id, toName: to.name } : {}) });
+  }
+  return ps.length;
+}
+const hoursText = (h) => `${Math.round(h * 10) / 10} hour${Math.round(h * 10) / 10 === 1 ? '' : 's'}`;
+export async function offerMerge(g, to) {
+  const ok = await sheet({ title: 'Same person?', left: 'No', right: 'Move hours',
+    body: `<p>An earlier <b>${esc(g.name)}</b> was removed from Staff and still has <b>${g.n} punch${g.n === 1 ? '' : 'es'}</b> (${hoursText(g.hours)}).</p>
+      <p>If this is the same person, move their hours, pay rate and shifts to <b>${esc(to.name)}</b>, so payroll shows one person.</p>` });
+  if (!ok) return false;
+  const n = await moveHistory(g.id, to);
+  toast(`Moved ${n} punch${n === 1 ? '' : 'es'} to ${to.name}`);
+  return true;
+}
+
 export async function staffView() {
   setChrome({ tab: 'more', back: true });
   setTitle('Staff');
   const staff = await staffList();
   const change = canChange('schedule') || canChange('settings');
+  // RRA-092: a removed person's hours that match someone on the list by name.
+  const orphans = change ? await orphanHistory() : [];
+  const matches = orphans.map((g) => ({ g, to: staff.find((s) => sameName(s.name, g.name)) })).filter((x) => x.to);
   view.innerHTML = `
+    ${matches.map((x, i) => `<div class="hint small"><b>${esc(x.to.name)}</b> may have hours from an earlier record (${x.g.n} punch${x.g.n === 1 ? '' : 'es'}, ${hoursText(x.g.hours)}). <button class="btn tonal small" type="button" data-merge="${i}">Same person? Move them</button></div>`).join('')}
     <div class="group">${staff.map((s) => `<div class="row">${change ? `<button class="rm" type="button" data-rm="${s.id}" aria-label="Remove ${esc(s.name)}">−</button>` : ''}
       <span class="grow"${change ? ` data-edit="${s.id}" style="cursor:pointer"` : ''}><span class="title">${esc(s.name)}</span><span class="sub">${esc(s.position || '')} · ${esc(ROLES[s.role] || 'Staff')}${s.dev ? '' : ` ${chipHtml('Not linked', 'warn')}`}</span></span></div>`).join('') || '<div class="row muted">No staff yet.</div>'}</div>
     ${change ? '<button class="btn tonal block" id="add" type="button">+ Add staff</button>' : ''}
     <p class="muted small">Not linked: this person hasn't opened the app on their phone yet, so Change role isn't available for them.</p>
-    <p class="muted small">Staff appear on the schedule. To give someone the app on their phone, send an invite from Settings → Invite and approve phones. Removing someone takes them off the schedule${isHost() ? '; to end their app access now, also withdraw their invite' : ''}.</p>`;
+    <p class="muted small">Staff appear on the schedule. To give someone the app on their phone, send an invite from Settings → Invite and approve phones. Removing someone takes them off the schedule and ends their app access. Their hours stay in Time sheets.</p>`;
+  $$('[data-merge]', view).forEach((b) => { b.onclick = async () => { const x = matches[+b.dataset.merge]; if (await offerMerge(x.g, x.to)) staffView(); }; });
   $('#add')?.addEventListener('click', () => staffDialog());
   $$('[data-edit]', view).forEach((el) => { el.onclick = () => staffDialog(staff.find((s) => s.id === el.dataset.edit)); });
   $$('[data-rm]', view).forEach((b) => {
     b.onclick = async () => {
       const s = staff.find((x) => x.id === b.dataset.rm);
-      const ok = await sheet({ title: 'Remove staff?', right: 'Remove', body: `<p>Remove <b>${esc(s.name)}</b> from the staff list and the schedule?</p>` });
-      if (ok) { await data.remove('staff', s.id); toast('Removed'); staffView(); }
+      const ok = await sheet({ title: 'Remove staff?', right: 'Remove', body: `<p>Remove <b>${esc(s.name)}</b> from the staff list and the schedule?</p>
+        ${s.iid ? `<div class="hint small"><b>This also ends ${esc(s.name)}'s app access.</b> Their phone locks the next time it opens or connects, and they'll need a new invite to come back. Their hours stay in Time sheets.</div>` : ''}` });
+      if (!ok) return;
+      // RRA-090: the team settings list removed phones; that phone locks itself.
+      if (s.iid) { const set = await data.settings(); await data.saveSettings({ ...set, removed: { ...(set.removed || {}), [s.iid]: { name: s.name, at: Date.now(), by: session.profile?.name } } }); }
+      await data.remove('staff', s.id); toast(s.iid ? 'Removed, and their app access ended' : 'Removed'); staffView();
     };
   });
 }
@@ -413,12 +536,15 @@ async function staffDialog(existing) {
   if (ok === 'role') { location.hash = `#/person/${s.id}`; return; }
   await data.put('staff', s);
   if (seeRate && canChange('payrates') && String(rate) !== String(pay?.rate ?? '')) await data.put('payrate', { id: s.id, staffId: s.id, rate: rate === '' ? '' : +rate || 0 });
+  // RRA-092: added back with the same name as a removed person who has hours.
+  if (!existing) for (const g of (await orphanHistory()).filter((x) => sameName(x.name, s.name))) await offerMerge(g, s);
   staffView();
 }
 
 export async function ensureStaffFor(profile) {
   // The person using this phone is on the staff list once they have access.
   if (!profile || profile.role === 'owner') return;
+  if ((await data.settings()).removed?.[profile.iid]) return; // RRA-090: removed, don't add back
   const staff = await staffList();
   const ek = await myEcdhPublic(); // so a manager's fix to my hours reaches this phone
   const dev = await myPublicKey(); // so the Admin can change my role (RRA-066)

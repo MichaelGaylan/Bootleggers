@@ -2,10 +2,20 @@
 // Bump VERSION and BUILD on every release, and add one line to WHATS_NEW.
 
 export const APP_NAME = 'Bootleggers Kitchen';
-export const VERSION = '0.5.7';
-export const BUILD = '2026.11.21-7';
+export const VERSION = '0.5.8';
+export const BUILD = '2026.11.22-1';
 
 export const WHATS_NEW = [
+  {
+    version: '0.5.8', build: '2026.11.22-1', date: '2026-11-22',
+    lines: [
+      'Report a problem now also goes to the Admin and managers in the app. They can reply, and you get a pop-up with the answer. Settings → Problem reports lists them, with Mark fixed and Close.',
+      'Notices on the message board have a Remove button, and the welcome notice is now "Welcome to Bootleggers Message Board".',
+      'Removing someone from Staff ends their app access: their phone locks and goes back to the enter-invite screen.',
+      'Settings → Shift times: set your own quick shift buttons (optionally per position) and what time "cl" (close) means. One list for the whole team.',
+      'Someone removed and added back: Staff and Time sheets offer to move their old hours, pay rate and shifts onto the current record.',
+    ],
+  },
   {
     version: '0.5.7', build: '2026.11.21-7', date: '2026-11-21',
     lines: [

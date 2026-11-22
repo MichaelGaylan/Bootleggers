@@ -10,7 +10,7 @@ import { canChange, canSee, myStaff, isHost, canTime } from './perms.js';
 import { payKeyInfo } from './access.js';
 import { unreadPosts, sendPost } from './board.js';
 import { canSeePost, isPrivate } from './audience.js';
-import { staffList, roleOf, pill, swapBadge } from './schedule.js';
+import { staffList, roleOf, pill, swapBadge, moveHistory, sameName } from './schedule.js';
 import { printButtons, wirePrint } from './pdf.js';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -70,7 +70,7 @@ export async function loungeView() {
   const todayIdx = (new Date().getDay() + 6) % 7;
   const myShifts = me && (week.published || canChange('schedule')) ? week.shifts?.[me.id] || [] : [];
   const unread = await unreadPosts();
-  const posts = canSee('board') ? (await data.list('post')).filter(canSeePost).sort((a, b) => b.at - a.at).slice(0, 3) : [];
+  const posts = canSee('board') ? (await data.list('post')).filter((p) => canSeePost(p) && !p.about?.report).sort((a, b) => b.at - a.at).slice(0, 3) : [];
   const notices = (session.notices || []).slice(0, 1);
   const items = await data.list('prepitem');
   const done = (await data.get('prepday', data.today()))?.done || {};
@@ -217,7 +217,7 @@ export async function timesheetsView() {
   // Punches from someone no longer on the staff list still count.
   for (const p of all) if (!staff.some((s) => s.id === p.staffId)) {
     let g = people.find((x) => x.st.id === p.staffId);
-    if (!g) { g = { st: { id: p.staffId, name: `${p.name} (removed)` }, ps: [] }; people.push(g); }
+    if (!g) { g = { st: { id: p.staffId, name: `${p.name} (removed)`, was: p.name, removed: true }, ps: [] }; people.push(g); }
     g.ps.push(p);
   }
   const withHours = people.filter((x) => x.ps.length);
@@ -242,7 +242,7 @@ export async function timesheetsView() {
       <div class="section-label">Punches</div>` : ''}
     ${blocks.map(({ st, b }) => `
       <button class="acc-head${open === st.id ? ' open' : ''}" type="button" data-g="${st.id}"><span class="grow">${esc(st.name)}</span><span class="meta">${hrs(b.total)}${b.pay !== null ? ` · ${money(b.pay)}` : ''}</span></button>
-      ${b.html.replace('<div class="group acc-body ts-body">', `<div class="group acc-body ts-body"${open === st.id ? '' : ' hidden'}>`)}`).join('') || '<div class="empty">No staff yet.</div>'}
+      ${b.html.replace('<div class="group acc-body ts-body">', `<div class="group acc-body ts-body"${open === st.id ? '' : ' hidden'}>${st.removed && editTime ? `<div class="row no-print"><span class="grow muted small">No longer on the Staff list. Same person as someone who is?</span><button class="btn tonal small" type="button" data-merge="${st.id}">Merge…</button></div>` : ''}`)}`).join('') || '<div class="empty">No staff yet.</div>'}
     ${printButtons()}
     <button class="btn plain block no-print" id="copy" type="button">Copy to send</button>
     <p class="muted small center">${editTime ? 'Tap a punch to fix a time. ' : ''}${editRates ? 'Tap the hourly rate to change it. ' : ''}Totals count open punches up to now. Only managers the Admin allows can see this page.</p>`;
@@ -271,6 +271,24 @@ export async function timesheetsView() {
       if (!v) return;
       await data.put('payrate', { id: st.id, staffId: st.id, rate: v.v === '' ? '' : +v.v || 0 });
       toast('Rate saved');
+      timesheetsView();
+    };
+  });
+  // RRA-092: move a removed person's punches onto someone on the Staff list.
+  $$('[data-merge]', view).forEach((b) => {
+    b.onclick = async (e) => {
+      e.stopPropagation();
+      const g = people.find((x) => x.st.id === b.dataset.merge).st;
+      const list = [...staff].sort((a, c) => (sameName(c.name, g.was) - sameName(a.name, g.was)) || a.name.localeCompare(c.name));
+      const to = await sheet({ title: `Merge ${g.was}'s hours`, right: 'Merge',
+        body: `<p class="small">Move all of ${esc(g.was)}'s punches (every week), pay rate and shifts to:</p>
+          <label class="field"><span>Staff member</span><select id="mg-to">${list.map((s) => `<option value="${s.id}">${esc(s.name)}${sameName(s.name, g.was) ? ' (same name)' : ''}</option>`).join('')}</select></label>
+          <p class="muted small">Use this when it's the same person, for example someone removed and then added back.</p>`,
+        onMount: (api) => { api.onRight = () => api.close($('#mg-to', api.el).value); } });
+      if (!to) return;
+      const st = staff.find((s) => s.id === to);
+      const n = await moveHistory(g.id, st);
+      toast(`Moved ${n} punch${n === 1 ? '' : 'es'} to ${st.name}`);
       timesheetsView();
     };
   });
