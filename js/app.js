@@ -21,6 +21,8 @@ import { costsView } from './costs.js';
 import { loungeView, timesheetView, timesheetsView, canTime } from './lounge.js';
 import { settingsView, listView, rolesView, personView, dedupeView } from './settings.js';
 import { applyMenu, applyVendors, applySupplies } from './menu.js';
+import { payrollView, payRunView, payRunDoneView, payHistoryView, myPayView, tipRulesView, paySettingsView } from './payroll.js';
+import { payrollSettings, hasPayroll } from './paycalc.js';
 
 import { $, $$, esc, view, dlg, LS, isIOS, standalone, toast, copy, share, pasteInto, sheet, setTitle, setChrome, fmtDate, session, wideMQ, THEMES, getTheme } from './ui.js';
 
@@ -179,6 +181,8 @@ async function updateBadge() {
 }
 
 // Sidebar for tablets and computers (RRA-051): every section, no More tab.
+// Payroll menu entries (RRA-095): known once settings are read.
+async function payFlags() { const ok = hasPayroll(await payrollSettings()); renderSide.pay = ok; moreView.pay = ok; return ok; }
 function renderSide() {
   const link = (r, label, extra = '') => `<a href="#/${r}" data-r="${r}"><span class="grow">${label}</span>${extra}</a>`;
   const items = [
@@ -191,6 +195,8 @@ function renderSide() {
     canSee('board') ? link('board', '<span class="sub-l">Bulletin board</span>') : '',
     canSee('schedule') ? link('schedule', '<span class="sub-l">Schedule</span>') : '',
     canTime() ? link('timesheets', '<span class="sub-l">Time sheets</span>') : link('timesheet', '<span class="sub-l">My time sheet</span>'),
+    myStaff() ? link('mypay', '<span class="sub-l">My pay &amp; tips</span>') : '',
+    renderSide.pay ? link('payroll', 'Payroll') : '',
     canSee('events') ? link('events', 'Events (BEOs)') : '',
     canSee('costs') ? link('costs', 'Costs and waste') : '',
     '<hr>',
@@ -219,6 +225,8 @@ function moreView() {
       <p class="muted small">${profile.role === 'owner' ? 'Admin phone. Access does not expire.' : `Access stays on while you use it. It ends after ${daysLeft} days without opening the app.`}</p>
     </div>
     <div class="group">
+      ${moreView.pay ? '<a class="row" href="#/payroll"><span class="grow">Payroll</span></a>' : ''}
+      ${myStaff() ? '<a class="row" href="#/mypay"><span class="grow">My pay &amp; tips</span></a>' : ''}
       ${canSee('schedule') ? '<a class="row" href="#/schedule"><span class="grow">Schedule</span></a>' : ''}
       ${canSee('events') ? '<a class="row" href="#/events"><span class="grow">Events (BEOs)</span></a>' : ''}
       ${canSee('costs') ? '<a class="row" href="#/costs"><span class="grow">Costs and waste</span></a>' : ''}
@@ -705,6 +713,14 @@ const routes = {
   lounge: () => loungeView(),
   timesheet: () => timesheetView(),
   timesheets: () => timesheetsView(),
+  // Payroll (RRA-095)
+  payroll: (arg) => payrollView(arg),
+  payrun: (arg) => payRunView(arg),
+  'payrun-done': (id) => payRunDoneView(id),
+  payhistory: () => payHistoryView(),
+  mypay: () => myPayView(),
+  tiprules: () => tipRulesView(),
+  paysettings: () => paySettingsView(),
   notices: () => boardView(),
   schedule: (arg) => scheduleView(arg),
   'schedule-print': (arg) => schedulePrintView(arg),
@@ -754,6 +770,9 @@ async function checkRoleGrant() {
     // Others' hours and every pay rate leave this phone (only here, not for the team).
     for (const r of await data.list('payrate')) await data.applyRemote('payrate', r.id, null);
     for (const p of await data.list('punch')) if (p.staffId !== me.id) await data.applyRemote('punch', p.id, null);
+    // Payroll (RRA-095): everyone else's pay leaves too; their own stays.
+    for (const c of ['payrun', 'possales']) for (const d of await data.list(c)) await data.applyRemote(c, d.id, null);
+    for (const c of ['paystub', 'advance', 'tipshare']) for (const d of await data.list(c)) if (d.staffId !== me.id) await data.applyRemote(c, d.id, null);
   }
   if (from !== next.role) {
     sheet({ title: 'Your role changed', left: null, right: 'OK', body: `<p>You're now <b>${esc(access.ROLES[next.role])}</b>. The app has updated what you can see and change.</p>` });
@@ -794,6 +813,7 @@ async function route() {
   }
   await checkRoleGrant();
   if (isHost()) await adminPayKeyCheck();
+  await payFlags();
   renderSide();
   const at = location.hash;
   await (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
