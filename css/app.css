@@ -935,3 +935,8 @@ label.btn { cursor: pointer; }
 .pos-addcpn .btn { padding-left: 0; padding-right: 0; }
 button.row.cpn-disc { width: 100%; text-align: left; background: var(--card-2); border: 0; border-radius: 12px; margin: 0 0 8px; padding: 12px 14px; font: inherit; color: var(--text); cursor: pointer; }
 button.row.cpn-disc:disabled { opacity: .55; cursor: default; }
+
+/* Areas sized to the room (RRA-129): a small area stays small and centered. */
+@media (min-width: 768px) { .floor { margin-left: auto; margin-right: auto; } }
+/* "+ Area" is a pill like the area tabs, not the small round "+" used elsewhere. */
+.fl-areas .add { display: inline-flex; width: auto; height: auto; border: 0; border-radius: 999px; font-size: inherit; white-space: nowrap; }
