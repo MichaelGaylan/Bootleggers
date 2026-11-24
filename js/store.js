@@ -1,5 +1,5 @@
 // Encrypted on-device storage (RRA-021).
-// IndexedDB (named in js/brand.js, "bootleggers" for Bootleggers) holds two stores:
+// IndexedDB (named in js/brand.js, dbName) holds two stores:
 //   keys:  the device signing key pair and the AES data key (non-extractable)
 //   vault: app records, each sealed with AES-GCM before it is written
 // Wiping access deletes the whole database, which destroys the keys too.

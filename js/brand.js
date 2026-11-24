@@ -23,6 +23,8 @@ self.BRAND = {
   icon180: 'assets/app-icon-180.png',      // iPhone home-screen icon
   icon192: 'assets/app-icon-192.png',
   icon512: 'assets/app-icon-512.png',
+  iconMaskable: 'assets/app-icon-maskable-512.png', // Android round/shaped icon
+  iconSource: 'assets/app-icon.png',       // original icon art (not loaded by the app)
   favicon: 'assets/favicon-32.png',
   introVideo: 'assets/intro.mp4',          // startup clip; '' = skip straight to the card
 
@@ -35,10 +37,25 @@ self.BRAND = {
   dbName: 'bootleggers',                   // encrypted on-phone database
   teamId: 'bootleggers',                   // shared data folder: teams/<teamId> in Firebase
   reportPrefix: 'Bootleggers —',           // subject start for Report a problem emails
+  reportKey: '003383c6-4896-4f71-bdec-f7ada99ae0ec', // Web3Forms key for this restaurant's report inbox (public; never put the inbox address here)
+
+  // Shared team data (RRA-031): this restaurant's Firebase web config (Firebase
+  // console → Project settings → Your apps → Web). Public by design; records are
+  // encrypted with the team key first. null = data stays on each phone only.
+  // After a changeout, run `node tools/changeout.mjs sync` to rewrite firestore.rules.
+  firebase: {
+    apiKey: 'AIzaSyDXZuUDplTUfzB1WN58Qk5mE2TVf4Q_aPU',
+    authDomain: 'bootleggers-kitchen.firebaseapp.com',
+    projectId: 'bootleggers-kitchen',
+    storageBucket: 'bootleggers-kitchen.firebasestorage.app',
+    messagingSenderId: '49283173779',
+    appId: '1:49283173779:web:9193c90d1cb752fdfc2c66',
+  },
 
   // Menu (RRA-108): sections, dish names and prices, as sent by the Admin on
   // 2026-11-19. The Recipe archive and the Point of sale are filled from it.
-  // Change MENU_VERSION in js/menu.js after editing so phones pick it up.
+  // Change menuVersion after editing so phones pick it up.
+  menuVersion: '2026-11-19',               // change after editing the menu so phones pick it up
   menu: [
     { section: 'Appetizers', items: [
       ['Fried Mushrooms', '7.99'], ['Fried Pickles', '7.99'], ['Mozzarella Sticks', '7.99'], ['Tots', '6.49'], ['Fries', '5.50'],
@@ -78,6 +95,97 @@ self.BRAND = {
       ['Orange Juice', '2.75'], ['Pineapple Juice', '2.75'], ['Red Bull', '4.25'], ['Red Bull Sugar Free', '4.25'], ['Sprite', '2.75'],
       ['Sweet Tea', '2.75'], ['Unsweet Tea', '2.75'],
     ] },
+  ],
+
+  // Example dish name shown in the Recipes "Name" box.
+  dishExample: 'The Bootlegger',
+
+  // Starter stock list (RRA-024, moved here in RRA-123): groups and items
+  // added once on the Admin phone. [name, unit, what it's for].
+  stockStatus: 'Draft from the online menu. Waiting for chef review.',
+  starterStock: [
+    { group: 'Proteins', items: [
+      ['Jumbo chicken wings, bone-in', 'case (40 lb)', 'Almost Famous Jumbo Wings, Wing Basket, Buffalo Salad'],
+      ['Chicken tenders/fingers', 'case', 'Chicken Finger Basket, Buffalo Chicken Sandwich/Wrap, salads'],
+      ['Chicken breast, boneless', 'case', 'Chicken Sandwich, Bacon Ranch Chicken, Quesadilla, Tex Mex Salad'],
+      ['Ground beef burger patties', 'case', 'All burgers'],
+      ['Veggie burger patties', 'case', 'Veggie Burger'],
+      ['Taco meat (ground beef)', 'lb', 'Tacos, Nachos, Tex Mex Salad'],
+      ['Hot dogs', 'pack', 'Hot Dog Basket'],
+      ['Bacon', 'case', 'Black & Blue, Farmhouse, The Bootlegger, BLT, Bacon Ranch, clubs'],
+      ['Shaved steak (Philly)', 'lb', 'Philly Melt'],
+      ['Deli turkey', 'lb', 'Mile High Club, Grilled Cheese Club, Chef Salad'],
+      ['Deli ham', 'lb', 'Mile High Club, Chef Salad'],
+      ['Eggs', 'flat', 'Farmhouse Burger (likely), Chef Salad'],
+    ] },
+    { group: 'Dairy and cheese', items: [
+      ['American cheese, sliced', 'case'], ['Cheddar, shredded', 'bag'], ['Blue cheese crumbles', 'tub'],
+      ['Pepper jack, sliced', 'case'], ['Provolone or Swiss, sliced', 'case'], ['Mozzarella sticks, frozen breaded', 'case'],
+      ['Nacho cheese sauce', 'can/bag'], ['Shredded Parmesan', 'bag'], ['Sour cream', 'tub'], ['Butter / butter blend', 'case'],
+    ] },
+    { group: 'Frozen and fried', items: [
+      ['French fries', 'case'], ['Tater tots', 'case'], ['Breaded mushrooms', 'case'],
+      ['Breaded/battered pickle chips', 'case'], ['Fryer oil', 'jug (35 lb)'],
+    ] },
+    { group: 'Produce', items: [
+      ['Iceberg / romaine lettuce', 'case'], ['Romaine (Caesar)', 'case'], ['Tomatoes', 'case'], ['Red/yellow onions', 'bag'],
+      ['Jalapeños', 'lb'], ['Pickles (sliced)', 'pail'], ['Celery and carrots (wing sides)', 'case'], ['Cucumbers', 'case'], ['Lemons/limes', 'case'],
+    ] },
+    { group: 'Bakery and dry goods', items: [
+      ['Burger buns', 'case'], ['Hoagie rolls (Philly)', 'case'], ['Sandwich bread (white/Texas toast)', 'case'], ['Hot dog buns', 'case'],
+      ['Flour tortillas (quesadilla, wrap)', 'case'], ['Taco shells', 'case'], ['Tortilla chips', 'case'], ['Croutons', 'bag'],
+      ['Wing breading/flour, seasonings, salt, pepper', 'each'],
+    ] },
+    { group: 'Sauces and dressings', items: [
+      ['Ranch', 'jug'], ['Blue Cheese', 'jug'], ['BBQ', 'jug'], ['Honey Mustard', 'jug'], ['Honey Sriracha', 'jug'],
+      ['Mild Buffalo', 'jug'], ['Medium Buffalo', 'jug'], ['Hot Buffalo', 'jug'],
+      ['Italian', 'jug'], ['Caesar dressing', 'jug'], ['Ketchup', 'case'], ['Mayo', 'jug'], ['Mustard', 'jug'], ['Salsa', 'jug'], ['House wing sauces', '', 'See House recipes'],
+    ] },
+    { group: 'Non-alcoholic beverages', items: [
+      ['Bottled water', ''], ['Coca-Cola', ''], ['Diet Coke', ''], ['Sprite', ''], ['Ginger Ale', ''], ['Cranberry juice', ''],
+      ['Orange juice', ''], ['Pineapple juice', ''], ['Red Bull', 'case'], ['Red Bull Sugar Free', 'case'], ['Iced tea bags', 'box'], ['Sugar', 'bag'],
+    ] },
+    { group: 'Bar', items: [
+      ['Draft beer, bottles and cans, liquor, wine, mixers, garnishes', '', 'To fill in: not on the website'],
+    ] },
+    // Non-food supplies (RRA-058): each has its own tab at the top of Stock.
+    { group: 'Cleaning and chemicals', items: [
+      ['Dish machine detergent', 'jug'], ['Dish machine rinse aid', 'jug'], ['Sanitizer (quat)', 'jug'], ['Sanitizer test strips', 'pack'],
+      ['Degreaser', 'jug'], ['Floor cleaner', 'jug'], ['Glass cleaner', 'bottle'], ['Oven and grill cleaner', 'can'], ['Fryer boil-out', 'pack'],
+      ['Bleach', 'jug'], ['Hand soap refill', 'each'], ['Scrub pads and sponges', 'pack'], ['Trash bags, large', 'case'],
+    ] },
+    { group: 'Paper and to-go', items: [
+      ['To-go clamshells', ''], ['Sauce cups, small', 'sleeve'], ['Sauce cups, large', 'sleeve'], ['Sauce cup lids, small', 'sleeve'], ['Sauce cup lids, large', 'sleeve'], ['Foil', ''], ['Napkins', ''], ['Wet wipes', ''],
+      ['To-go bags', ''], ['Gloves', ''], ['Deli paper', ''],
+      ['To-go cups and lids', 'sleeve'], ['Straws', 'box'], ['Plastic cutlery kits', 'case'], ['Food boats and basket liners', 'case'],
+      ['Plastic wrap', 'roll'], ['Paper towels', 'case'], ['Toilet paper', 'case'],
+    ] },
+    { group: 'Smallwares', items: [
+      ['Hotel pans (1/3, 1/6, 1/9)', 'each'], ['Sheet pans', 'each'], ['Ramekins', 'each'], ['Serving baskets', 'each'], ['Fryer baskets', 'each'],
+      ['Tongs', 'each'], ['Spatulas', 'each'], ['Ladles and portion scoops', 'each'], ['Knives', 'each'], ['Cutting boards', 'each'],
+      ['Squeeze bottles', 'each'], ['Food storage containers and lids', 'each'], ['Food thermometers', 'each'], ['Measuring cups and spoons', 'set'],
+    ] },
+    { group: 'Linens and uniforms', items: [
+      ['Bar towels', 'bundle'], ['Kitchen side towels', 'bundle'], ['Aprons', 'each'], ['Chef coats', 'each'], ['Staff shirts', 'each'],
+      ['Hats and hair nets', 'box'], ['Oven mitts', 'pair'], ['Cut-resistant gloves', 'each'], ['Floor mats', 'each'],
+    ] },
+  ],
+  // Starter items a menu update split or renamed; removed from a phone's
+  // list only while still untouched. [] for a new restaurant.
+  replacedStock: ['Buffalo base (mild/medium/hot)', 'Unsweet tea (tea bags and sugar)', 'Sauce cups and lids', 'Sweet tea'],
+
+  // Preset vendors (RRA-044, moved here in RRA-123): [name, what they carry].
+  presetVendors: [
+    ['Sysco', 'Broadline: proteins, frozen, dairy, produce, dry goods, paper'],
+    ['US Foods', 'Broadline: proteins, frozen, dairy, produce, dry goods, paper'],
+    ['Performance Foodservice (PFG)', 'Broadline: wings, burgers, fryer items, paper'],
+    ['Gordon Food Service', 'Broadline and Gordon stores: frozen, dairy, dry goods'],
+    ["Restaurant Depot", 'Cash and carry: anything short between deliveries'],
+    ["Sam's Club", 'Cash and carry: drinks, snacks, paper, cleaning'],
+    ['Coca-Cola bottler', 'Coca-Cola, Diet Coke, Sprite, Ginger Ale, juices'],
+    ['Red Bull distributor', 'Red Bull, Red Bull Sugar Free'],
+    ['Ecolab', 'Dish machine chemicals, sanitizer, cleaning'],
+    ['Cintas', 'Linens, towels, aprons, mats, first aid'],
   ],
 
   // Point of sale choices asked for when a dish is added (RRA-108).

@@ -2,7 +2,7 @@
 
 import {
   BRAND, APP_NAME, VERSION, BUILD, WHATS_NEW, ROOT_KEYS, INACTIVITY_DAYS, INVITE_HOURS,
-  WEB3FORMS_KEY, REPORT_PREFIX, NOTIFICATIONS_URL,
+  WEB3FORMS_KEY, REPORT_PREFIX, NOTIFICATIONS_URL, brandText,
 } from './config.js';
 import * as access from './access.js';
 import * as store from './store.js';
@@ -139,6 +139,8 @@ async function loadNotices() {
     const r = await fetch(NOTIFICATIONS_URL, { cache: 'no-store' });
     if (r.ok) { notices = (await r.json()).messages || []; LS.set('noticesCache', notices); }
   } catch { notices = LS.get('noticesCache', []); }
+  // RRA-123: {name} and friends in a notice become this restaurant's names.
+  notices = notices.map((n) => ({ ...n, title: brandText(n.title), body: brandText(n.body), from: brandText(n.from) }));
   // RRA-089: notices someone removed stay hidden on their phone.
   const hidden = new Set(LS.get('hiddenNotices', []));
   session.notices = notices.filter((x) => !hidden.has(x.id));

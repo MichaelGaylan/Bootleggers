@@ -1,7 +1,7 @@
 {
   "name": "Bootleggers Kitchen",
   "short_name": "Bootleggers",
-  "description": "House recipes and kitchen notes for Bootleggers Bar & Grill, Augusta.",
+  "description": "Recipes and kitchen notes for Bootleggers Bar & Grill, Augusta.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
