@@ -151,6 +151,7 @@ self.BRAND = {
     "Nachos (Half)": "nachos-half.jpg",
     "Orange Juice": "orange-juice.jpg",
     "Philly Melt with Fries": "philly-melt-with-fries.jpg",
+    "Pineapple Juice": "pineapple-juice.jpg",
     "Quesadilla": "quesadilla.jpg",
     "Quesadilla Burger with Fries": "quesadilla-burger-with-fries.jpg",
     "Ranch Large": "ranch-sauce-cup.jpg",
