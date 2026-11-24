@@ -850,3 +850,10 @@ label.btn { cursor: pointer; }
 .pos-ttabs a.on small { color: inherit; opacity: .85; }
 .pos-ttabs a.add { justify-content: center; color: var(--accent); font-weight: 700; min-width: 70px; }
 .pos-ttabs a.add { flex-direction: row; align-items: center; white-space: nowrap; border: 0; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent); }
+/* Seating areas (RRA-119) */
+.fl-areas { padding-top: 0; }
+.fl-areas i { font-style: normal; font-size: .72rem; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; display: inline-grid; place-items: center; background: var(--danger); color: #fff; margin-left: 4px; }
+.fl-areas .add { background: transparent; color: var(--accent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent); }
+.fl-t.k-high { border-radius: 50%; transform: scale(.88); }
+.fl-t.k-patio { border-radius: 30%; background: color-mix(in srgb, var(--ok) 10%, #f5d76e33); }
+.fl-t.k-patio.busy { background: var(--accent); }

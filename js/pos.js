@@ -85,21 +85,37 @@ const openChecks = async () => (await data.list('check')).filter((c) => !c.close
 const staffName = (id, staff) => (id === 'admin' ? 'Admin' : staff.find((s) => s.id === id)?.name || 'Staff');
 
 // ------------------------------------------------------------ seating (RRA-114)
-// The dining room as a grid of tables the Admin or a manager lays out under
-// Seating. Tapping a free table asks for the number of guests (tap a number),
-// then opens the menu; tapping a table with an open check brings that check up.
+// The restaurant as areas (Dining room, Bar, Outside…), each a grid of tables
+// the Admin or a manager lays out under Seating. Tapping a free table asks for
+// the number of guests (tap a number), then opens the menu; tapping a table
+// with an open check brings that check up.
 export const FLOOR = { cols: 10, rows: 7 };
-const KINDS = { table: 'Table', booth: 'Booth', bar: 'Bar' };
+const KINDS = { table: 'Table', booth: 'Booth', high: 'High top', bar: 'Bar', patio: 'Patio' };
+const SHORT = { table: '', booth: 'Bo', high: 'H', bar: 'B', patio: 'P' };
 const tableName = (t) => `${KINDS[t.kind] || 'Table'} ${t.no}`;
+const STARTER_AREAS = [{ id: 'dining', name: 'Dining room' }, { id: 'bar', name: 'Bar' }, { id: 'patio', name: 'Outside' }];
 function starterTables() {
   const t = [];
   let no = 1;
-  for (const y of [0, 2, 4]) for (const x of [0, 2, 4, 6]) t.push({ id: 't' + no, kind: 'table', no: no++, seats: 4, x, y });
-  for (let i = 0; i < 3; i++) t.push({ id: 'b' + (i + 1), kind: 'booth', no: i + 1, seats: 6, x: 9, y: i * 2 });
-  for (let i = 0; i < 8; i++) t.push({ id: 'r' + (i + 1), kind: 'bar', no: i + 1, seats: 1, x: i, y: 6 });
+  for (const y of [0, 2, 4]) for (const x of [0, 2, 4, 6]) t.push({ id: 't' + no, area: 'dining', kind: 'table', no: no++, seats: 4, x, y });
+  for (let i = 0; i < 3; i++) t.push({ id: 'b' + (i + 1), area: 'dining', kind: 'booth', no: i + 1, seats: 6, x: 9, y: i * 2 });
+  for (let i = 0; i < 10; i++) t.push({ id: 'r' + (i + 1), area: 'bar', kind: 'bar', no: i + 1, seats: 1, x: i, y: 0 });
+  for (let i = 0; i < 4; i++) t.push({ id: 'h' + (i + 1), area: 'bar', kind: 'high', no: i + 1, seats: 4, x: 1 + i * 2, y: 3 });
+  for (let i = 0; i < 8; i++) t.push({ id: 'p' + (i + 1), area: 'patio', kind: 'patio', no: i + 1, seats: 4, x: (i % 4) * 2 + 1, y: i < 4 ? 1 : 4 });
   return t;
 }
-const tablesOf = (P) => (Array.isArray(P.tables) && P.tables.length ? P.tables : starterTables());
+const areasOf = (P) => (Array.isArray(P.areas) && P.areas.length ? P.areas : STARTER_AREAS);
+// Older layouts had no areas: bar seats go to the Bar, the rest to the first area.
+const tablesOf = (P) => {
+  const areas = areasOf(P);
+  const list = Array.isArray(P.tables) && P.tables.length ? P.tables : starterTables();
+  return list.map((t) => (areas.some((a) => a.id === t.area) ? t : { ...t, area: t.kind === 'bar' && areas.some((a) => a.id === 'bar') ? 'bar' : areas[0].id }));
+};
+const areaTabs = (areas, cur, tables, checks, extra = '') => `<div class="pos-secs fl-areas" role="tablist">${areas.map((a) => {
+  const n = checks.filter((c) => tables.some((t) => t.area === a.id && (c.tableId === t.id || (!c.tableId && c.name === tableName(t))))).length;
+  return `<button type="button" role="tab" data-area="${esc(a.id)}" class="${a.id === cur ? 'on' : ''}">${esc(a.name)}${n ? ` <i>${n}</i>` : ''}</button>`;
+}).join('')}${extra}</div>`;
+const curArea = (areas) => { const a = LS.get('posArea', areas[0].id); return areas.some((x) => x.id === a) ? a : areas[0].id; };
 const numPick = (name, n, on, taken = []) => `<div class="num-pick" data-pick="${name}">${Array.from({ length: n }, (_, i) => i + 1).map((v) => `<button type="button" data-v="${v}" class="${v === on ? 'on' : ''}" ${taken.includes(v) && v !== on ? 'disabled' : ''}>${v}</button>`).join('')}</div>`;
 const wirePick = (el, name, set) => $$(`[data-pick="${name}"] button`, el).forEach((b) => b.onclick = () => { $$(`[data-pick="${name}"] button`, el).forEach((x) => x.classList.toggle('on', x === b)); set(+b.dataset.v); });
 
@@ -112,7 +128,7 @@ function floorHtml(tables, checks, P, edit) {
     const c = checks.find((k) => k.tableId === t.id || (!k.tableId && k.name === tableName(t)));
     const tot = c ? totals(c, P.tax).total : 0;
     h += `<button type="button" class="fl-t k-${t.kind}${c ? ' busy' : ''}" data-t="${t.id}" style="grid-column:${x + 1};grid-row:${y + 1}">
-      <b>${esc(t.kind === 'table' ? String(t.no) : (t.kind === 'bar' ? 'B' : 'Bo') + t.no)}</b>
+      <b>${esc((SHORT[t.kind] || '') + t.no)}</b>
       <small>${c ? `${c.guests} · ${mins(c.opened)}m` : `${t.seats} seat${t.seats > 1 ? 's' : ''}`}</small>${c ? `<small class="fl-amt">${money(tot)}</small>` : ''}</button>`;
   }
   return `<div class="floor${edit ? ' edit' : ''}" style="--cols:${FLOOR.cols};--rows:${FLOOR.rows}">${h}</div>`;
@@ -124,24 +140,27 @@ export async function posView() {
   setTitle('Seating');
   if (!canOrder()) { view.innerHTML = lock('Orders are for servers, bartenders, managers and the Admin.'); return; }
   const P = await posSettings(), staff = await data.list('staff');
-  const tables = tablesOf(P);
+  const all = tablesOf(P), areas = areasOf(P), area = curArea(areas);
+  const tables = all.filter((t) => t.area === area);
   const open = await openChecks();
   const mine = open.filter((c) => boss() || c.server === meId());
   setTitle('Seating', `<button class="btn small" id="pos-cur" type="button">Current orders${mine.length ? ` (${mine.length})` : ''}</button>`);
   const today = new Date().toDateString();
   const closedToday = (await data.list('check')).filter((c) => c.closed && new Date(c.closed).toDateString() === today).length;
   view.innerHTML = `
-    <p class="muted small" style="margin-top:0">Tap a free table to seat guests. Tap a busy table to bring up its order.</p>
+    ${areaTabs(areas, area, all, open)}
     ${floorHtml(tables, open, P, false)}
+    <p class="muted small center" style="margin:0 0 6px">Tap a free table to seat guests. Tap a seated table to bring up its order.</p>
     <div class="fl-key small muted"><span><i class="fl-dot"></i> Free</span><span><i class="fl-dot busy"></i> Seated</span></div>
     <div class="group">
-      ${boss() ? '<a class="row nav" href="#/seating"><span class="grow"><span class="title">Change the seating layout</span><span class="sub">Add, move, number and remove tables, booths and bar seats</span></span></a>' : ''}
+      ${boss() ? '<a class="row nav" href="#/seating"><span class="grow"><span class="title">Change the seating layout</span><span class="sub">Areas (dining room, bar, outside) and their tables, booths and seats</span></span></a>' : ''}
       ${canKitchen() ? '<a class="row nav" href="#/tickets"><span class="grow">Kitchen and bar screen</span></a>' : ''}
       ${canSales() ? '<a class="row nav" href="#/possales"><span class="grow">Today\'s sales</span></a>' : ''}
       ${BRAND.giftCards?.url ? '<a class="row nav" href="#/giftcards"><span class="grow">Gift cards</span></a>' : ''}
     </div>
     <p class="muted small center">${closedToday} check${closedToday === 1 ? '' : 's'} closed today · cards through ${esc(payService(P).name)}</p>`;
   $('#pos-cur').onclick = () => currentOrders(staff, P);
+  $$('[data-area]').forEach((b) => b.onclick = () => { LS.set('posArea', b.dataset.area); posView(); });
   $$('[data-t]').forEach((b) => b.onclick = async () => {
     const t = tables.find((x) => x.id === b.dataset.t);
     const c = open.find((k) => k.tableId === t.id || (!k.tableId && k.name === tableName(t)));
@@ -208,37 +227,70 @@ export async function posMenu() {
   if (go) location.hash = go;
 }
 
-// Seating layout editor (managers and the Admin).
+// Seating layout editor (managers and the Admin): areas and their tables.
 export async function seatingView() {
   setChrome({ tab: 'more', back: true });
   setTitle('Seating layout');
   if (!boss()) { view.innerHTML = lock('Managers and the Admin set up the seating.'); return; }
   const P = await posSettings();
-  const tables = tablesOf(P).map((t) => ({ ...t }));
-  const moving = seatingView.moving && tables.find((t) => t.id === seatingView.moving);
+  const areas = areasOf(P).map((a) => ({ ...a })), area = curArea(areas);
+  const all = tablesOf(P).map((t) => ({ ...t }));
+  const tables = all.filter((t) => t.area === area);
+  const here = areas.find((a) => a.id === area);
+  const moving = seatingView.moving && all.find((t) => t.id === seatingView.moving);
   view.innerHTML = `
-    <p class="muted small" style="margin-top:0">${moving ? `<b>Moving ${esc(tableName(moving))}:</b> tap an empty square.` : 'Tap an empty square (+) to add a table, booth or bar seat. Tap one to change, move or remove it.'}</p>
+    ${areaTabs(areas, area, all, [], '<button type="button" id="ar-add" class="add">+ Area</button>')}
+    <p class="muted small" style="margin-top:0">${moving ? `<b>Moving ${esc(tableName(moving))}:</b> tap an empty square${moving.area !== area ? ` (it moves to ${esc(here.name)})` : ''}, or pick another area above.` : `Tap an empty square (+) to add a table, booth, high top, bar seat or patio table to <b>${esc(here.name)}</b>. Tap one to change, move or remove it.`}</p>
     ${floorHtml(tables, [], P, true)}
     ${moving ? '<button class="btn tonal block" id="mv-x" type="button">Cancel move</button>' : ''}
-    <p class="muted small">${tables.length} places: ${Object.entries(KINDS).map(([k, l]) => `${tables.filter((t) => t.kind === k).length} ${l.toLowerCase()}${k === 'bar' ? ' seats' : 's'}`).join(', ')}. The layout is shared by every phone.</p>
+    <div class="btn-row"><button class="btn tonal" id="ar-ren" type="button">Rename ${esc(here.name)}</button><button class="btn tonal" id="ar-rm" type="button" style="color:var(--danger)" ${areas.length < 2 ? 'disabled' : ''}>Remove area</button></div>
+    <p class="muted small">${areas.length} area${areas.length > 1 ? 's' : ''}, ${all.length} places in all. ${esc(here.name)}: ${Object.entries(KINDS).map(([k, l]) => [tables.filter((t) => t.kind === k).length, l]).filter(([n]) => n).map(([n, l]) => `${n} ${l.toLowerCase()}${l === 'Bar' ? ' seat' : ''}${n > 1 ? 's' : ''}`).join(', ') || 'empty'}. The layout is shared by every phone.</p>
     <button class="btn plain block" id="fl-reset" type="button">Start over with the starter layout</button>`;
-  const save = async (list) => { await savePos({ tables: list }); seatingView(); };
+  const save = async (list, ars = areas) => { await savePos({ tables: list, areas: ars }); seatingView(); };
+  $$('[data-area]').forEach((b) => b.onclick = () => { LS.set('posArea', b.dataset.area); seatingView(); });
   $('#mv-x')?.addEventListener('click', () => { seatingView.moving = null; seatingView(); });
-  $('#fl-reset').onclick = async () => { if (await sheet({ title: 'Starter layout?', right: 'Start over', body: '<p>Put back the starter tables (12 tables, 3 booths, 8 bar seats)? Open checks stay open.</p>' })) save(starterTables()); };
+  $('#fl-reset').onclick = async () => { if (await sheet({ title: 'Starter layout?', right: 'Start over', body: '<p>Put back the starter areas and tables (Dining room: 12 tables and 3 booths; Bar: 10 bar seats and 4 high tops; Outside: 8 patio tables)? Open checks stay open.</p>' })) { LS.set('posArea', 'dining'); save(starterTables(), STARTER_AREAS); } };
+  $('#ar-add').onclick = async () => {
+    const name = await areaName('', areas);
+    if (!name) return;
+    const id = Math.random().toString(36).slice(2, 8);
+    LS.set('posArea', id); save(all, [...areas, { id, name }]);
+  };
+  $('#ar-ren').onclick = async () => { const name = await areaName(here.name, areas.filter((a) => a.id !== area)); if (name) save(all, areas.map((a) => (a.id === area ? { ...a, name } : a))); };
+  $('#ar-rm').onclick = async () => {
+    if (areas.length < 2) return;
+    const ok = await sheet({ title: `Remove ${here.name}?`, right: 'Remove', body: `<p>This removes the area and its ${tables.length} place${tables.length === 1 ? '' : 's'} from the layout. Open checks stay open.</p>` });
+    if (ok) { LS.set('posArea', areas.find((a) => a.id !== area).id); save(all.filter((t) => t.area !== area), areas.filter((a) => a.id !== area)); }
+  };
   $$('[data-cell]').forEach((b) => b.onclick = async () => {
     const [x, y] = b.dataset.cell.split(',').map(Number);
-    if (moving) { seatingView.moving = null; return save(tables.map((t) => (t.id === moving.id ? { ...t, x, y } : t))); }
-    const t = await tableSheet({ kind: 'table', seats: 4, x, y }, tables);
-    if (t) save([...tables, { ...t, id: Math.random().toString(36).slice(2, 9) }]);
+    if (moving) { seatingView.moving = null; return save(all.map((t) => (t.id === moving.id ? { ...t, x, y, area } : t))); }
+    const kind = /bar/i.test(here.name) ? 'bar' : /out|patio|deck|porch|garden/i.test(here.name) ? 'patio' : 'table';
+    const t = await tableSheet({ kind, seats: kind === 'bar' ? 1 : 4, x, y, area }, all);
+    if (t) save([...all, { ...t, id: Math.random().toString(36).slice(2, 9) }]);
   });
   $$('[data-t]').forEach((b) => b.onclick = async () => {
-    const t = tables.find((x) => x.id === b.dataset.t);
+    const t = all.find((x) => x.id === b.dataset.t);
     if (moving) { toast('Pick an empty square'); return; }
-    const r = await tableSheet(t, tables);
+    const r = await tableSheet(t, all);
     if (!r) return;
     if (r === 'move') { seatingView.moving = t.id; seatingView(); return; }
-    if (r === 'remove') return save(tables.filter((x) => x.id !== t.id));
-    save(tables.map((x) => (x.id === t.id ? r : x)));
+    if (r === 'remove') return save(all.filter((x) => x.id !== t.id));
+    save(all.map((x) => (x.id === t.id ? r : x)));
+  });
+}
+
+// Name an area: tap a common name, or type one.
+function areaName(cur, others) {
+  const COMMON = ['Dining room', 'Bar', 'Outside', 'Patio', 'Deck', 'Upstairs', 'Private room', 'Front porch'].filter((n) => !others.some((a) => a.name === n));
+  return sheet({
+    title: cur ? 'Rename area' : 'New area', right: 'Save',
+    body: `<div class="pos-choices">${COMMON.map((n) => `<button type="button" class="btn tonal" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>
+      <label class="field"><span>Or type a name</span><input type="text" id="an" value="${esc(cur)}" placeholder="e.g. Side patio"></label>`,
+    onMount(api) {
+      $$('[data-n]', api.el).forEach((b) => b.onclick = () => api.close(b.dataset.n));
+      api.onRight = () => { const v = $('#an', api.el).value.trim(); if (!v) { toast('Pick or type a name'); return; } if (others.some((a) => a.name.toLowerCase() === v.toLowerCase())) { toast('There is already an area with that name'); return; } api.close(v); };
+    },
   });
 }
 
@@ -250,7 +302,7 @@ function tableSheet(t, tables) {
   if (!no) no = firstFree(kind);
   return sheet({
     title: isNew ? 'Add a place' : tableName(t), right: 'Save',
-    body: `<div class="segmented" id="tk">${Object.entries(KINDS).map(([k, l]) => `<button type="button" data-k="${k}" class="${k === kind ? 'on' : ''}">${l}${k === 'bar' ? ' seat' : ''}</button>`).join('')}</div>
+    body: `<div class="pos-secs" id="tk" style="flex-wrap:wrap">${Object.entries(KINDS).map(([k, l]) => `<button type="button" data-k="${k}" class="${k === kind ? 'on' : ''}">${l}${k === 'bar' ? ' seat' : ''}</button>`).join('')}</div>
       <div class="pr-lab">Number</div><div id="tn">${numPick('n', 40, no, taken(kind))}</div>
       <div class="pr-lab">Seats</div>${numPick('s', 12, seats)}
       ${isNew ? '' : `<div class="btn-row" style="margin-top:12px"><button class="btn tonal" type="button" id="t-mv">Move</button><button class="btn tonal" type="button" id="t-rm" style="color:var(--danger)">Remove</button></div>`}`,
