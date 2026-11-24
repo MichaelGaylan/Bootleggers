@@ -289,7 +289,8 @@ export async function posCheckView(id) {
   // picture tiles on the right with the menu sections as tabs above them (RRA-116).
   view.innerHTML = `<div class="pos-wrap">
     <div class="pos-left">
-    <div class="card pos-check">
+    <div class="card pos-check${LS.get('posFold', true) && c.items.length ? ' folded' : ''}">
+      ${c.items.length ? `<button type="button" class="pos-fold" id="fold">${c.items.reduce((n, x) => n + (x.voided ? 0 : x.qty || 1), 0)} item${c.items.length === 1 && (c.items[0].qty || 1) === 1 ? '' : 's'} on this check <span>${LS.get('posFold', true) ? 'Show ▾' : 'Hide ▴'}</span></button>` : ''}
       <div class="pos-head"><span>Item</span><span>Qty</span><span>Amount</span></div>
       ${c.items.length ? seats.map((s) => `<div class="pos-seat">${c.guests > 1 ? `<div class="pr-lab">Seat ${s}</div>` : ''}${c.items.filter((x) => x.seat === s).map((x) => `
         <div class="pos-line${x.voided ? ' void' : ''}">
@@ -322,6 +323,7 @@ export async function posCheckView(id) {
   $$('[data-minus]').forEach((b) => b.onclick = () => bump(c, b.dataset.minus, -1));
   $('#send').onclick = async () => { await send(c); toast('Sent to the kitchen and bar'); posCheckView(id); };
   $('#pay').onclick = () => { location.hash = '#/pospay/' + c.id; };
+  $('#fold')?.addEventListener('click', () => { LS.set('posFold', !LS.get('posFold', true)); posCheckView(id); });
   $('#free')?.addEventListener('click', async () => { await data.remove('check', c.id); toast(c.name + ' is free again'); location.hash = '#/pos'; });
 }
 
