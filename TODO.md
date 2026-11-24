@@ -18,7 +18,9 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-099 · Payroll: connect a real payroll service and POS through the restaurant's server (keys, pulls, money movement) — needs the server first · Infra · L
 
 ## 🟣 Done
-### 0.8.0 · build 2026.11.24-11
+### 0.8.0 · build 2026.11.24-12
+- [x] RRA-120 · POS: once everything on a check is sent, the Send button shows ✓ Sent in a dull orange so it stands apart from Send (Gaylan, 2026-11-24) · UX · S
+- [x] RRA-121 · POS: Pay opens a popup over the check (split, then card or cash) instead of a separate Pay page (Gaylan, 2026-11-24) · UX · S
 - [x] RRA-112 · Dish pictures for the POS tiles and Recipes · Content · S. Gaylan sent photos of every dish, sauce and drink (2026-11-24); resized to 480px in assets/menu/, mapped in js/brand.js menuPhotos. Chicken Sandwich with Fries still uses a colored tile until its photo arrives
 - [x] RRA-114 · POS seating: tapping POS shows the restaurant's own seating layout (tables, booths, bar seats). Tap a free table, tap the number of guests (clickable numbers, no typing), then the menu opens; tapping a seated table brings its order back up. Managers and the Admin lay out the tables under Seating (add, number, seats, move, remove), shared by every phone (Gaylan, 2026-11-24, screenshot of Table 1) · Feature · M · added 2026-11-24. OK'd by Gaylan on the 0.8.0 sample
 - [x] RRA-115 · Stock count: remove the All tab; keep one tab per group, open on the first group, and opening another section collapses the previous one (Gaylan, 2026-11-24) · UX · S · added 2026-11-24. OK'd by Gaylan on the 0.8.0 sample

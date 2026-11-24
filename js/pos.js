@@ -356,7 +356,7 @@ export async function posCheckView(id) {
       <div class="pos-tot big"><span>Total</span><span>${money(t.total)}</span></div>
       ${t.paid ? `<div class="pos-tot"><span>Paid</span><span>−${money(t.paid)}</span></div><div class="pos-tot big"><span>Due</span><span>${money(t.due)}</span></div>` : ''}
       <div class="btn-row pos-actions">
-        <button class="btn tonal" id="send" type="button" ${unsent.length ? '' : 'disabled'}>Send${nUnsent ? ` (${nUnsent})` : ''}</button>
+        ${unsent.length || !c.items.length ? `<button class="btn tonal" id="send" type="button" ${unsent.length ? '' : 'disabled'}>Send${nUnsent ? ` (${nUnsent})` : ''}</button>` : '<button class="btn pos-sent" id="send" type="button" disabled>✓ Sent</button>'}
         <button class="btn" id="pay" type="button" ${c.items.some((x) => !x.voided) ? '' : 'disabled'}>Pay ${money(t.due)}</button>
       </div>
     </div>
@@ -375,7 +375,9 @@ export async function posCheckView(id) {
   $$('[data-plus]').forEach((b) => b.onclick = () => bump(c, b.dataset.plus, +1));
   $$('[data-minus]').forEach((b) => b.onclick = () => bump(c, b.dataset.minus, -1));
   $('#send').onclick = async () => { await send(c); toast('Sent to the kitchen and bar'); posCheckView(id); };
-  $('#pay').onclick = () => { location.hash = '#/pospay/' + c.id; };
+  // Pay opens a popup over the check (Gaylan, 2026-11-24), not a separate page.
+  $('#pay').onclick = async () => { if (await payPopup(c.id)) location.hash = '#/pos'; else posCheckView(id); };
+  if (posCheckView.pay === c.id) { posCheckView.pay = null; $('#pay').click(); }
   // Switching tables replaces this screen, so Back still goes to Seating.
   $$('.pos-ttabs a[role=tab]').forEach((a) => a.onclick = (e) => { e.preventDefault(); if (!a.classList.contains('on')) location.replace(a.getAttribute('href')); });
   $('#fold')?.addEventListener('click', () => { LS.set('posFold', !LS.get('posFold', true)); posCheckView(id); });
@@ -471,27 +473,39 @@ function parts(c, tax) {
   return ps.map((p) => ({ ...p, paid: paidFor(p.key), due: r2(Math.max(0, p.amount - paidFor(p.key))) }));
 }
 
-export async function posPayView(id) {
-  setChrome({ tab: 'more', back: true });
-  const c = await data.get('check', id);
-  if (!c || c.closed) { location.hash = '#/pos'; return; }
-  if (!canOrder()) { setTitle('Pay'); view.innerHTML = lock('Taking payment is for servers, bartenders and managers.'); return; }
-  const P = await posSettings();
-  setTitle('Pay · ' + c.name);
-  const t = totals(c, P.tax), ps = parts(c, P.tax), mode = c.split?.mode || 'whole', locked = (c.payments || []).length > 0, svc = payService(P);
-  view.innerHTML = `
+// Old links to the Pay page open the check with the Pay popup.
+export function posPayView(id) { posCheckView.pay = id; location.replace('#/poscheck/' + id); }
+
+// The Pay popup: split, pick a part, take card or cash. Returns true once
+// the check is paid and closed.
+async function payPopup(id) {
+  for (;;) {
+    const c = await data.get('check', id);
+    if (!c || c.closed) return true;
+    if (!canOrder()) { toast('Taking payment is for servers, bartenders and managers'); return false; }
+    const P = await posSettings();
+    const t = totals(c, P.tax), ps = parts(c, P.tax), mode = c.split?.mode || 'whole', locked = (c.payments || []).length > 0, svc = payService(P);
+    const r = await sheet({
+      title: 'Pay · ' + c.name, left: 'Close',
+      body: `
     <div class="card center"><div class="pr-lab">Total with tax</div><div class="pr-big">${money(t.total)}</div><div class="pr-lab">${t.paid ? `${money(t.paid)} paid · <b>${money(t.due)} due</b>` : `${c.items.filter((x) => !x.voided).length} items · ${c.guests} guest${c.guests > 1 ? 's' : ''}`}</div></div>
     <div class="pr-lab" style="margin-bottom:4px">Split</div>
     <div class="segmented">${[['whole', 'One check'], ['even', 'Evenly'], ['seat', 'By seat']].map(([k, l]) => `<button type="button" data-mode="${k}" class="${mode === k ? 'on' : ''}" ${locked && mode !== k ? 'disabled' : ''}>${l}</button>`).join('')}</div>
     ${mode === 'even' ? `<div class="row" style="padding:0 0 10px"><span class="grow">Ways</span><span class="stepper"><button type="button" id="nm" ${locked ? 'disabled' : ''}>−</button><b>${c.split.n}</b><button type="button" id="np" ${locked ? 'disabled' : ''}>+</button></span></div>` : ''}
     <div class="group">${ps.map((p) => `<button class="row ${p.due ? 'nav' : ''}" type="button" data-part="${p.key}" ${p.due ? '' : 'disabled'}><span class="grow"><span class="title">${esc(p.label)}</span><span class="sub">${p.due ? `${money(p.due)} due` : 'Paid'}</span></span><span class="meta">${p.due ? money(p.amount) : '<span class="pill okp">Paid</span>'}</span></button>`).join('')}</div>
     ${(c.payments || []).length ? `<div class="section-label">Payments</div><div class="group">${c.payments.map((p) => `<div class="row"><span class="grow"><span class="title">${p.method === 'cash' ? 'Cash' : esc((PAYMENT_SERVICES.find((s) => s.id === p.provider) || {}).name || 'Card')}${p.tip ? ` · tip ${money(p.tip)}` : ''}</span><span class="sub">${tm(p.at)} · ${esc(p.ref || '')}</span></span><span class="meta">${money(p.amount)}</span></div>`).join('')}</div>` : ''}
-    <p class="muted small center">Cards go through ${esc(svc.name)}${svc.device ? ' on the ' + esc(svc.device) : ''}. ${svc.id === 'practice' ? 'Practice: nothing is charged.' : 'Not connected yet: simulated, nothing is charged.'}</p>`;
-  const save = (patch) => data.put('check', { ...c, ...patch }).then(() => posPayView(id));
-  $$('[data-mode]').forEach((b) => b.onclick = () => { if (!locked) save({ split: b.dataset.mode === 'whole' ? null : { mode: b.dataset.mode, n: c.split?.n || 2 } }); });
-  $('#nm')?.addEventListener('click', () => save({ split: { ...c.split, n: Math.max(2, c.split.n - 1) } }));
-  $('#np')?.addEventListener('click', () => save({ split: { ...c.split, n: Math.min(10, c.split.n + 1) } }));
-  $$('[data-part]').forEach((b) => b.onclick = () => payPart(c, ps.find((p) => p.key === b.dataset.part), P));
+    <p class="muted small center">Cards go through ${esc(svc.name)}${svc.device ? ' on the ' + esc(svc.device) : ''}. ${svc.id === 'practice' ? 'Practice: nothing is charged.' : 'Not connected yet: simulated, nothing is charged.'}</p>`,
+      onMount(api) {
+        $$('[data-mode]', api.el).forEach((b) => b.onclick = () => { if (!locked) api.close({ split: b.dataset.mode === 'whole' ? null : { mode: b.dataset.mode, n: c.split?.n || 2 } }); });
+        $('#nm', api.el)?.addEventListener('click', () => api.close({ split: { ...c.split, n: Math.max(2, c.split.n - 1) } }));
+        $('#np', api.el)?.addEventListener('click', () => api.close({ split: { ...c.split, n: Math.min(10, c.split.n + 1) } }));
+        $$('[data-part]', api.el).forEach((b) => b.onclick = () => api.close({ part: b.dataset.part }));
+      },
+    });
+    if (!r) return false;
+    if ('split' in r) { await data.put('check', { ...c, split: r.split }); continue; }
+    if (await payPart(c, ps.find((p) => p.key === r.part), P)) return true;
+  }
 }
 
 async function payPart(c, part, P) {
@@ -501,16 +515,17 @@ async function payPart(c, part, P) {
     body: `<div class="stack"><button class="btn block" type="button" data-h="card">Card · ${esc(svc.name)}</button><button class="btn block tonal" type="button" data-h="cash">Cash</button></div>`,
     onMount(api) { $$('[data-h]', api.el).forEach((b) => b.onclick = () => api.close(b.dataset.h)); },
   });
-  if (!how) return;
+  if (!how) return false;
   const pay = how === 'cash' ? await cashSheet(part) : svc.how === 'handoff' ? await toastSheet(c, part) : await terminalSheet(part, P);
-  if (!pay) return;
+  if (!pay) return false;
   const cur = await data.get('check', c.id);
   const payments = [...(cur.payments || []), { id: lid(), part: part.key, amount: part.due, at: Date.now(), by: meId(), byName: meName(), ...pay }];
   const next = { ...cur, payments };
   if (totals(next, P.tax).due <= 0.004) {
     await data.put('check', { ...next, closed: Date.now(), closedDate: data.today() });
-    toast(`${c.name} paid and closed`); location.hash = '#/pos';
-  } else { await data.put('check', next); toast('Payment recorded'); posPayView(c.id); }
+    toast(`${c.name} paid and closed`); return true;
+  }
+  await data.put('check', next); toast('Payment recorded'); return false;
 }
 
 function terminalSheet(part, P) {

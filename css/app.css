@@ -857,3 +857,6 @@ label.btn { cursor: pointer; }
 .fl-t.k-high { border-radius: 50%; transform: scale(.88); }
 .fl-t.k-patio { border-radius: 30%; background: color-mix(in srgb, var(--ok) 10%, #f5d76e33); }
 .fl-t.k-patio.busy { background: var(--accent); }
+
+/* Send turns a dull orange once everything on the check has gone to the kitchen (Gaylan, 2026-11-24). */
+.pos-actions .btn.pos-sent, .pos-actions .btn.pos-sent:disabled { background: #b8743a; color: #fff; opacity: 1; }
