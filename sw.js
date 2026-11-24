@@ -1,6 +1,6 @@
 // Bootleggers Kitchen service worker: works offline, updates on request.
 // Bump CACHE with every release (it follows the app version).
-const CACHE = 'blg-0.8.0-2026.11.24-7';
+const CACHE = 'blg-0.8.0-2026.11.24-8';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'js/brand.js', 'js/app.js', 'js/config.js', 'js/access.js', 'js/crypto.js', 'js/store.js', 'js/starter-stock.js', 'js/menu.js', 'js/pdf.js', 'js/lounge.js',
@@ -41,6 +41,23 @@ const SHELL = [
   'assets/menu/tots.jpg',
   'assets/menu/veggie-burger-with-fries.jpg',
   'assets/menu/wing-basket.jpg',
+  'assets/menu/hot-buffalo-sauce-cup.jpg',
+  'assets/menu/italian-dressing-cup.jpg',
+  'assets/menu/ketchup-cup.jpg',
+  'assets/menu/mayo-cup.jpg',
+  'assets/menu/mustard-cup.jpg',
+  'assets/menu/sour-cream-cup.jpg',
+  'assets/menu/bottle-water.jpg',
+  'assets/menu/coca-cola.jpg',
+  'assets/menu/cranberry-juice.jpg',
+  'assets/menu/diet-coke.jpg',
+  'assets/menu/ginger-ale.jpg',
+  'assets/menu/orange-juice.jpg',
+  'assets/menu/red-bull.jpg',
+  'assets/menu/red-bull-sugar-free.jpg',
+  'assets/menu/sprite.jpg',
+  'assets/menu/sweet-tea.jpg',
+  'assets/menu/unsweet-tea.jpg',
   'assets/menu/honey-mustard-sauce-cup.jpg',
   'assets/menu/honey-sriracha-sauce-cup.jpg',
   'assets/menu/buffalo-sauce-cup.jpg',
