@@ -46,18 +46,29 @@ const meName = () => session.profile?.name || 'Me';
 
 // ---------- menu from the Recipe archive ----------
 const STATION = (section) => /bar|beverage|drink|beer|wine|cocktail/i.test(section) ? 'Bar' : 'Kitchen';
+// Choices asked for when a dish is added; the lists live in js/brand.js.
 export function modsFor(name, section) {
-  if (/wing/i.test(name) || /wings/i.test(section)) return { title: 'Sauce', options: ['Mild Buffalo', 'Med Buffalo', 'Hot Buffalo', 'BBQ', 'Honey Sriracha', 'Honey Mustard', 'Plain'] };
-  if (/burger/i.test(section) && !/veggie/i.test(name)) return { title: 'Temperature', options: ['Medium rare', 'Medium', 'Medium well', 'Well done'] };
-  if (/salad/i.test(section)) return { title: 'Dressing', options: ['Ranch', 'Blue Cheese', 'Honey Mustard', 'Italian', 'None'] };
+  const C = BRAND.posChoices || {};
+  if (/wing/i.test(name) || /wings/i.test(section)) return C.wings || null;
+  if (/burger/i.test(section) && !/veggie/i.test(name)) return C.burger || null;
+  if (/salad/i.test(section)) return C.salad || null;
   return null;
 }
+// Shorter names on tiles and tickets (e.g. without "with Fries").
+const short = (n) => (BRAND.posTrim || []).reduce((t, w) => t.replace(w, ''), String(n || ''));
+// RRA-108: the dish's picture. A Recipes photo wins, then js/brand.js menuPhotos.
+function photoOf(d) {
+  if (d.photo) return d.photo;
+  const f = (BRAND.menuPhotos || {})[d.name];
+  return f ? (/[/:]/.test(f) ? f : (BRAND.menuPhotoDir || '') + f) : '';
+}
+const tint = (s) => COLORS[[...String(s)].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
 async function menu() {
   const s = await data.settings();
   const order = s.sections || [];
   const dishes = (await data.list('recipe')).filter((r) => r.kind === 'dish' && r.section && +r.price > 0);
   const secs = [...new Set(dishes.map((d) => d.section))].sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
-  return secs.map((section) => ({ section, items: dishes.filter((d) => d.section === section).sort((a, b) => (a.menuOrder ?? 999) - (b.menuOrder ?? 999) || a.name.localeCompare(b.name)).map((d) => ({ id: d.id, name: d.name, price: +d.price, section, station: STATION(section) })) }));
+  return secs.map((section) => ({ section, items: dishes.filter((d) => d.section === section).sort((a, b) => (a.menuOrder ?? 999) - (b.menuOrder ?? 999) || a.name.localeCompare(b.name)).map((d) => ({ id: d.id, name: d.name, price: +d.price, section, station: STATION(section), photo: photoOf(d) })) }));
 }
 
 // ---------- checks ----------
@@ -94,6 +105,7 @@ export async function posView() {
     <div class="group">
       ${canKitchen() ? '<a class="row nav" href="#/tickets"><span class="grow">Kitchen and bar screen</span></a>' : ''}
       ${canSales() ? '<a class="row nav" href="#/possales"><span class="grow">Today\'s sales</span></a>' : ''}
+      ${BRAND.giftCards?.url ? '<a class="row nav" href="#/giftcards"><span class="grow">Gift cards</span></a>' : ''}
     </div>
     <p class="muted small center">${closedToday} check${closedToday === 1 ? '' : 's'} closed today · cards through ${esc(payService(P).name)}</p>`;
   $$('[data-all]').forEach((b) => b.onclick = () => { LS.set('posAll', b.dataset.all === '1'); posView(); });
@@ -136,39 +148,71 @@ export async function posCheckView(id) {
   const t = totals(c, P.tax), unsent = c.items.filter((x) => !x.sent && !x.voided);
   const seats = [...new Set(c.items.map((x) => x.seat))].sort((a, b) => a - b);
   const items = M.find((m) => m.section === section)?.items || [];
-  view.innerHTML = `
+  const nUnsent = unsent.reduce((n, x) => n + (x.qty || 1), 0);
+  // RRA-108: the open check on the left (item, qty with − and +, amount),
+  // picture tiles on the right with the menu sections as tabs under them.
+  view.innerHTML = `<div class="pos-wrap">
+    <div class="pos-left">
     <div class="card pos-check">
+      <div class="pos-head"><span>Item</span><span>Qty</span><span>Amount</span></div>
       ${c.items.length ? seats.map((s) => `<div class="pos-seat">${c.guests > 1 ? `<div class="pr-lab">Seat ${s}</div>` : ''}${c.items.filter((x) => x.seat === s).map((x) => `
-        <button class="pos-line${x.voided ? ' void' : ''}" type="button" data-line="${x.id}"><span class="grow">${esc(x.name)}${x.mods?.length ? `<span class="pos-mod">${esc(x.mods.join(', '))}</span>` : ''}${x.note ? `<span class="pos-mod">“${esc(x.note)}”</span>` : ''}</span>
-          <span class="pos-st">${x.voided ? 'void' : x.sent ? '✓ sent' : '<b style="color:var(--warn)">new</b>'}</span><span class="pos-price">${money(lineTotal(x))}</span></button>`).join('')}</div>`).join('')
-      : '<p class="muted center" style="margin:6px 0">No items yet. Pick from the menu below.</p>'}
+        <div class="pos-line${x.voided ? ' void' : ''}">
+          <button class="pos-name" type="button" data-line="${x.id}"><span>${esc(short(x.name))}</span>${x.mods?.length ? `<span class="pos-mod">${esc(x.mods.join(', '))}</span>` : ''}${x.note ? `<span class="pos-mod">“${esc(x.note)}”</span>` : ''}<span class="pos-st">${x.voided ? 'void' : x.sent ? '✓ sent' : '<b style="color:var(--warn)">new</b>'}</span></button>
+          <span class="pos-qty">${x.voided ? `<b>${x.qty || 1}</b>` : `<button type="button" data-minus="${x.id}" aria-label="One less">−</button><b>${x.qty || 1}</b><button type="button" data-plus="${x.id}" aria-label="One more">+</button>`}</span>
+          <span class="pos-price">${money(lineTotal(x))}</span></div>`).join('')}</div>`).join('')
+      : '<p class="muted center" style="margin:6px 0">No items yet. Tap a dish to add it.</p>'}
       <div class="pos-tot"><span>Subtotal</span><span>${money(t.sub)}</span></div>
       <div class="pos-tot"><span>Tax ${((c.tax ?? P.tax) * 100).toFixed(1)}%</span><span>${money(t.tax)}</span></div>
       <div class="pos-tot big"><span>Total</span><span>${money(t.total)}</span></div>
       ${t.paid ? `<div class="pos-tot"><span>Paid</span><span>−${money(t.paid)}</span></div><div class="pos-tot big"><span>Due</span><span>${money(t.due)}</span></div>` : ''}
-    </div>
-    <div class="btn-row pos-actions">
-      <button class="btn tonal" id="send" type="button" ${unsent.length ? '' : 'disabled'}>Send${unsent.length ? ` (${unsent.length})` : ''}</button>
-      <button class="btn" id="pay" type="button" ${c.items.some((x) => !x.voided) ? '' : 'disabled'}>Pay ${money(t.due)}</button>
+      <div class="btn-row pos-actions">
+        <button class="btn tonal" id="send" type="button" ${unsent.length ? '' : 'disabled'}>Send${nUnsent ? ` (${nUnsent})` : ''}</button>
+        <button class="btn" id="pay" type="button" ${c.items.some((x) => !x.voided) ? '' : 'disabled'}>Pay ${money(t.due)}</button>
+      </div>
     </div>
     ${c.guests > 1 ? `<div class="pr-lab" style="margin:12px 0 4px">Adding to</div><div class="segmented">${Array.from({ length: c.guests }, (_, i) => `<button type="button" data-seat="${i + 1}" class="${seat === i + 1 ? 'on' : ''}">Seat ${i + 1}</button>`).join('')}</div>` : ''}
-    <div class="pos-secs">${M.map((m) => `<button type="button" data-sec="${esc(m.section)}" class="${m.section === section ? 'on' : ''}">${esc(m.section)}</button>`).join('')}</div>
-    <div class="pos-grid">${items.map((x) => { const out = P.eightySix[x.id]; return `<button type="button" class="pos-item${out ? ' out' : ''}" data-item="${x.id}" ${out ? 'disabled' : ''}><span>${esc(x.name.replace(' with Fries', ''))}</span><small>${out ? '86’d' : money(x.price)}</small></button>`; }).join('') || '<p class="muted small">No dishes with a price in this section. Add prices in Recipes.</p>'}</div>`;
+    </div>
+    <div class="pos-right">
+    <div class="pos-grid">${items.map((x) => { const out = P.eightySix[x.id]; return `<button type="button" class="pos-tile${out ? ' out' : ''}${x.photo ? '' : ' nopic'}" data-item="${x.id}" ${out ? 'disabled' : ''} style="--tile:${tint(x.section + x.name)}">
+      <span class="pos-pic">${x.photo ? `<img src="${esc(x.photo)}" alt="" loading="lazy">` : `<span>${esc(short(x.name))}</span>`}</span>
+      <span class="pos-cap"><span class="pos-tn">${esc(short(x.name))}</span><small>${out ? '86’d' : money(x.price)}</small></span></button>`; }).join('') || '<p class="muted small">No dishes with a price in this section. Add prices in Recipes.</p>'}</div>
+    <div class="pos-secs pos-tabs">${M.map((m) => `<button type="button" data-sec="${esc(m.section)}" class="${m.section === section ? 'on' : ''}">${esc(m.section)}</button>`).join('')}</div>
+    </div></div>`;
   $$('[data-sec]').forEach((b) => b.onclick = () => { LS.set('posSec', b.dataset.sec); posCheckView(id); });
   $$('[data-seat]').forEach((b) => b.onclick = () => { posCheckView.seat = +b.dataset.seat; posCheckView(id); });
   $$('[data-item]').forEach((b) => b.onclick = () => addItem(c, items.find((x) => x.id === b.dataset.item), seat));
   $$('[data-line]').forEach((b) => b.onclick = () => lineSheet(c, c.items.find((x) => x.id === b.dataset.line)));
+  $$('[data-plus]').forEach((b) => b.onclick = () => bump(c, b.dataset.plus, +1));
+  $$('[data-minus]').forEach((b) => b.onclick = () => bump(c, b.dataset.minus, -1));
   $('#send').onclick = async () => { await send(c); toast('Sent to the kitchen and bar'); posCheckView(id); };
   $('#pay').onclick = () => { location.hash = '#/pospay/' + c.id; };
+}
+
+// RRA-108: − and + on a line. Lines not sent yet change their quantity; a sent
+// line gets a new "one more" line, and taking one off a sent line is a void.
+async function bump(c, lineId, d) {
+  const cur = await data.get('check', c.id);
+  const x = cur.items.find((y) => y.id === lineId);
+  if (!x) return;
+  let items = cur.items;
+  if (!x.sent) {
+    const q = (x.qty || 1) + d;
+    items = q > 0 ? items.map((y) => (y.id === x.id ? { ...y, qty: q } : y)) : items.filter((y) => y.id !== x.id);
+  } else if (d > 0) {
+    const same = items.find((y) => !y.sent && !y.voided && y.menuId === x.menuId && y.seat === x.seat && (y.mods || []).join() === (x.mods || []).join() && (y.note || '') === (x.note || ''));
+    items = same ? items.map((y) => (y === same ? { ...y, qty: (y.qty || 1) + 1 } : y)) : [...items, { ...x, id: lid(), qty: 1, sent: false, voided: false }];
+  } else { lineSheet(c, x); return; }
+  await data.put('check', { ...cur, items });
+  posCheckView(c.id);
 }
 
 const lid = () => Math.random().toString(36).slice(2, 9);
 async function addItem(c, x, seat) {
   const m = modsFor(x.name, x.section);
-  let line = { id: lid(), menuId: x.id, name: x.name, price: x.price, station: x.station, mods: [], note: '', seat, sent: false };
+  let line = { id: lid(), menuId: x.id, name: x.name, price: x.price, station: x.station, mods: [], note: '', seat, qty: 1, sent: false };
   if (m) {
     const pick = await sheet({
-      title: x.name.replace(' with Fries', ''), left: 'Cancel',
+      title: short(x.name), left: 'Cancel',
       body: `<div class="pr-lab">${esc(m.title)}</div><div class="pos-choices">${m.options.map((o) => `<button type="button" class="btn tonal" data-o="${esc(o)}">${esc(o)}</button>`).join('')}</div>
         <label class="field"><span>Note for the kitchen (optional)</span><input type="text" id="nt" placeholder="e.g. no onions"></label>`,
       onMount(api) { $$('[data-o]', api.el).forEach((b) => b.onclick = () => api.close({ mod: b.dataset.o, note: $('#nt', api.el).value.trim() })); },
@@ -177,14 +221,16 @@ async function addItem(c, x, seat) {
     line = { ...line, mods: [pick.mod], note: pick.note };
   }
   const cur = await data.get('check', c.id);
-  await data.put('check', { ...cur, items: [...cur.items, line] });
+  // The same dish again on the same seat, not sent yet: one more of it.
+  const same = !line.mods.length && !line.note && cur.items.find((y) => !y.sent && !y.voided && y.menuId === x.id && y.seat === seat && !(y.mods || []).length && !y.note);
+  await data.put('check', { ...cur, items: same ? cur.items.map((y) => (y === same ? { ...y, qty: (y.qty || 1) + 1 } : y)) : [...cur.items, line] });
   posCheckView(c.id);
 }
 
 async function lineSheet(c, x) {
   const act = await sheet({
     title: x.name, left: 'Close',
-    body: `<p class="muted small">${money(x.price)} · seat ${x.seat}${x.mods?.length ? ' · ' + esc(x.mods.join(', ')) : ''} · ${x.sent ? 'sent to the ' + x.station.toLowerCase() : 'not sent yet'}</p>
+    body: `<p class="muted small">${(x.qty || 1) > 1 ? `${x.qty} × ` : ''}${money(x.price)} · seat ${x.seat}${x.mods?.length ? ' · ' + esc(x.mods.join(', ')) : ''} · ${x.sent ? 'sent to the ' + x.station.toLowerCase() : 'not sent yet'}</p>
       <div class="stack">
         ${c.guests > 1 ? `<div class="pr-lab">Move to seat</div><div class="segmented">${Array.from({ length: c.guests }, (_, i) => `<button type="button" data-mv="${i + 1}" class="${x.seat === i + 1 ? 'on' : ''}">${i + 1}</button>`).join('')}</div>` : ''}
         ${!x.sent ? '<button class="btn block tonal" type="button" data-a="remove" style="color:var(--danger)">Remove (not sent yet)</button>' : ''}
@@ -209,7 +255,7 @@ async function send(c) {
   const unsent = cur.items.filter((x) => !x.sent && !x.voided);
   for (const st of ['Kitchen', 'Bar']) {
     const its = unsent.filter((x) => x.station === st);
-    if (its.length) await data.put('ticket', { checkId: cur.id, checkName: cur.name, server: cur.serverName || '', station: st, at: Date.now(), items: its.map((x) => ({ name: x.name, mods: x.mods || [], note: x.note || '', seat: x.seat, done: false })) });
+    if (its.length) await data.put('ticket', { checkId: cur.id, checkName: cur.name, server: cur.serverName || '', station: st, at: Date.now(), items: its.map((x) => ({ name: x.name, qty: x.qty || 1, mods: x.mods || [], note: x.note || '', seat: x.seat, done: false })) });
   }
   await data.put('check', { ...cur, items: cur.items.map((x) => (unsent.includes(x) ? { ...x, sent: true } : x)) });
 }
@@ -329,7 +375,7 @@ export async function ticketsView() {
       <div class="card pos-ticket ${m >= 15 ? 'late' : m >= 8 ? 'warm' : ''}">
         <div class="pos-th"><b>${esc(t.checkName)}</b><span>${m} min</span></div>
         <div class="pr-lab">${esc((t.server || '').split(' ')[0])} · ${tm(t.at)}</div>
-        ${t.items.map((it, i) => `<button type="button" class="pos-ti${it.done ? ' done' : ''}" data-t="${t.id}" data-i="${i}"><span>${esc(it.name.replace(' with Fries', ''))}${it.mods?.length ? `<em>${esc(it.mods.join(', '))}</em>` : ''}${it.note ? `<em>“${esc(it.note)}”</em>` : ''}</span><small>S${it.seat}</small></button>`).join('')}
+        ${t.items.map((it, i) => `<button type="button" class="pos-ti${it.done ? ' done' : ''}" data-t="${t.id}" data-i="${i}"><span>${(it.qty || 1) > 1 ? `<b class="pos-x">${it.qty}×</b> ` : ''}${esc(short(it.name))}${it.mods?.length ? `<em>${esc(it.mods.join(', '))}</em>` : ''}${it.note ? `<em>“${esc(it.note)}”</em>` : ''}</span><small>S${it.seat}</small></button>`).join('')}
         <button class="btn block small" type="button" data-bump="${t.id}">Bump</button>
       </div>`; }).join('') || `<div class="empty">No ${station.toLowerCase()} tickets right now.</div>`}</div>
     <p class="muted small center">Tap an item when it's up. Bump clears the ticket. Tickets turn orange at 8 minutes and red at 15.</p>`;
@@ -367,7 +413,7 @@ export async function posSalesView() {
     const t = totals(c, P.tax); net += t.sub; tax += t.tax;
     const s = (by[c.serverName || 'Staff'] ||= { net: 0, card: 0, cash: 0, checks: 0 }); s.net += t.sub; s.checks++;
     for (const p of c.payments || []) { if (p.method === 'cash') { cash += p.amount; cashTips += p.tip || 0; s.cash += p.tip || 0; } else { card += p.amount; cardTips += p.tip || 0; s.card += p.tip || 0; } }
-    for (const x of c.items) if (!x.voided) items[x.name] = (items[x.name] || 0) + 1;
+    for (const x of c.items) if (!x.voided) items[x.name] = (items[x.name] || 0) + (x.qty || 1);
   }
   const top = Object.entries(items).sort((a, b) => b[1] - a[1]).slice(0, 6);
   const open = checks.filter((c) => !c.closed);

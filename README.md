@@ -6,7 +6,7 @@ No build step: it is plain HTML, CSS and JavaScript modules, served as static fi
 
 ## Layout
 - `index.html`, `css/app.css`: the app and its iOS/Android look (light and dark)
-- `js/brand.js`: the restaurant's names, logo, icons, intro video, accent color, © credit line and data names (one file per restaurant; keep `index.html` and `manifest.webmanifest` in step)
+- `js/brand.js`: the restaurant's names, logo, icons, intro video, accent color, © credit line, data names, menu and dish pictures, POS choices, gift card shop and radio stations (one file per restaurant; keep `index.html` and `manifest.webmanifest` in step)
 - `js/config.js`: version, build, Admin keys, expiry days, Report a problem key
 - `js/access.js`: invite, approval and activation codes; inactivity expiry
 - `js/crypto.js`, `js/store.js`: device keys and encrypted on-phone storage
@@ -14,6 +14,7 @@ No build step: it is plain HTML, CSS and JavaScript modules, served as static fi
 - `js/ui.js`, `js/data.js`, `js/perms.js`: shared helpers, team data collections (sync hook), roles and permissions
 - `js/recipes.js`, `js/prep.js`, `js/stock.js`, `js/board.js`, `js/schedule.js`, `js/events.js`, `js/costs.js`, `js/settings.js`: the screens
 - `js/pos.js`: Point of sale (RRA-101): checks, kitchen and bar screen, 86 list, splits and payments, today's sales, POS settings (merged from the Bootleggers POS test app)
+- `js/giftcards.js`, `js/music.js`, `js/cleardata.js`: Gift cards link screen (RRA-111), Music with MP3s and internet radio (RRA-109), Clear test data for the Admin (RRA-106)
 - `js/payroll.js`, `js/paycalc.js`, `js/provider.js`: Payroll (RRA-095): pay runs, My pay & tips, tip rules, payroll settings; pay math; payroll service and POS list (merged from the stand-alone Bootleggers Payroll app)
 - `data/notifications.json`: notices sent to everyone
 - `data/access.json`: revoked invite ids
