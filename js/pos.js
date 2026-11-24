@@ -287,7 +287,11 @@ export async function posCheckView(id) {
   const nUnsent = unsent.reduce((n, x) => n + (x.qty || 1), 0);
   // RRA-108: the open check on the left (item, qty with − and +, amount),
   // picture tiles on the right with the menu sections as tabs above them (RRA-116).
-  view.innerHTML = `<div class="pos-wrap">
+  // RRA-118: the open tables as tabs at the top; tap one to jump to its order.
+  const openTabs = (await openChecks()).filter((k) => boss() || k.server === meId() || k.id === c.id)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  view.innerHTML = `<div class="pos-ttabs" role="tablist">${openTabs.map((k) => `<a role="tab" href="#/poscheck/${k.id}" class="${k.id === c.id ? 'on' : ''}" aria-selected="${k.id === c.id}"><b>${esc(k.name)}</b><small>${k.guests} · ${money(totals(k, P.tax).total)}</small></a>`).join('')}<a href="#/pos" class="add" aria-label="Seat another table">+ Seat</a></div>
+  <div class="pos-wrap">
     <div class="pos-left">
     <div class="card pos-check${LS.get('posFold', true) && c.items.length ? ' folded' : ''}">
       ${c.items.length ? `<button type="button" class="pos-fold" id="fold">${c.items.reduce((n, x) => n + (x.voided ? 0 : x.qty || 1), 0)} item${c.items.length === 1 && (c.items[0].qty || 1) === 1 ? '' : 's'} on this check <span>${LS.get('posFold', true) ? 'Show ▾' : 'Hide ▴'}</span></button>` : ''}
@@ -323,6 +327,8 @@ export async function posCheckView(id) {
   $$('[data-minus]').forEach((b) => b.onclick = () => bump(c, b.dataset.minus, -1));
   $('#send').onclick = async () => { await send(c); toast('Sent to the kitchen and bar'); posCheckView(id); };
   $('#pay').onclick = () => { location.hash = '#/pospay/' + c.id; };
+  // Switching tables replaces this screen, so Back still goes to Seating.
+  $$('.pos-ttabs a[role=tab]').forEach((a) => a.onclick = (e) => { e.preventDefault(); if (!a.classList.contains('on')) location.replace(a.getAttribute('href')); });
   $('#fold')?.addEventListener('click', () => { LS.set('posFold', !LS.get('posFold', true)); posCheckView(id); });
   $('#free')?.addEventListener('click', async () => { await data.remove('check', c.id); toast(c.name + ' is free again'); location.hash = '#/pos'; });
 }
