@@ -11,7 +11,7 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
-- [ ] RRA-129 · Editable seating area size: the Admin can edit an area to change its size (how much floor it has) and add or remove spaces (tables, booths, seats) inside it, so a small area that only fits 2 tables shows as small, with only those 2 spaces, instead of a full-size floor (Gaylan, 2026-11-24) · Feature · S · added 2026-11-24 · built in the 0.8.4 sample, waiting for Gaylan's OK
+- [ ] RRA-129 · Editable seating area size: the Admin can edit an area to change its size (how much floor it has) and add or remove spaces (tables, booths, seats) inside it, so a small area that only fits 2 tables shows as small, with only those 2 spaces, instead of a full-size floor (Gaylan, 2026-11-24) · Feature · S · added 2026-11-24 · in 0.8.4, Gaylan OK'd the sample 2026-11-24
 
 ## 🟡 Hold
 - [ ] RRA-104 · POS: live card payments through the restaurant's service (Square Terminal API, Clover REST Pay Display, or Toast order handoff) via the restaurant's server; bar menu with drink prices · Infra · L
