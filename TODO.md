@@ -11,6 +11,7 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
+- [ ] RRA-122 · Coupons: managers/Admin create coupons (percent off, dollar off, free item, BOGO/combo) with rules (min spend, start/end dates, days/hours, dine-in/takeout, stackable or not, one per guest / total uses). Each coupon can be a typed code, a QR code or a barcode (Code 128), or unique one-time codes per customer; the app makes the QR/barcode image to text, email, print or show in "My offers". At the POS check, a Coupon button scans the QR/barcode with the camera (BarcodeDetector + ZXing fallback for iPhone, reuse Sourced's scanner) or takes the typed code, checks the rules and adds the discount as a line on the check; redemptions logged (who, when, which check, amount) and shown in sales. Food only by default (alcohol discount rules); coupon text and labels in js/brand.js (Gaylan, 2026-11-24) · Feature · M · added 2026-11-24
 
 ## 🟡 Hold
 - [ ] RRA-104 · POS: live card payments through the restaurant's service (Square Terminal API, Clover REST Pay Display, or Toast order handoff) via the restaurant's server; bar menu with drink prices · Infra · L
