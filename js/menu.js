@@ -11,6 +11,15 @@ export const MENU_VERSION = '2026-11-19';
 // The menu itself (names, sections, prices) lives in js/brand.js (RRA-108).
 export const MENU = globalThis.BRAND.menu;
 
+// The dish's picture: a Recipes photo wins, then js/brand.js menuPhotos.
+export function dishPhoto(d) {
+  if (!d) return '';
+  if (d.photo) return d.photo;
+  const B = globalThis.BRAND || {};
+  const f = (B.menuPhotos || {})[d.name];
+  return f ? (/[/:]/.test(f) ? f : (B.menuPhotoDir || '') + f) : '';
+}
+
 export const MENU_SECTIONS = MENU.map((m) => m.section);
 const OLD_DEFAULT_SECTIONS = ['Wings', 'Burgers', 'Sandwiches', 'Baskets', 'Salads', 'Appetizers', 'Sides', 'Desserts'];
 const key = (s) => String(s || '').trim().toLowerCase();

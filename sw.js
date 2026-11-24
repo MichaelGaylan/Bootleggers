@@ -1,6 +1,6 @@
 // Bootleggers Kitchen service worker: works offline, updates on request.
 // Bump CACHE with every release (it follows the app version).
-const CACHE = 'blg-0.8.0-2026.11.24-1';
+const CACHE = 'blg-0.8.0-2026.11.24-2';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'js/brand.js', 'js/app.js', 'js/config.js', 'js/access.js', 'js/crypto.js', 'js/store.js', 'js/starter-stock.js', 'js/menu.js', 'js/pdf.js', 'js/lounge.js',
@@ -8,6 +8,39 @@ const SHELL = [
   'js/schedule.js', 'js/events.js', 'js/costs.js', 'js/settings.js', 'js/sync.js', 'js/audience.js', 'js/dedupe.js', 'js/reports.js',
   'js/payroll.js', 'js/paycalc.js', 'js/provider.js', 'js/pos.js', 'js/giftcards.js', 'js/music.js', 'js/cleardata.js',
   'assets/bootleggers-logo.png', 'assets/app-icon-192.png', 'assets/app-icon-512.png', 'assets/app-icon-180.png', 'assets/favicon-32.png',
+  // Dish pictures (js/brand.js menuPhotos).
+  'assets/menu/10-jumbo-wings-bone-in.jpg',
+  'assets/menu/15-jumbo-wings-bone-in.jpg',
+  'assets/menu/20-jumbo-wings-bone-in.jpg',
+  'assets/menu/30-jumbo-wings-bone-in.jpg',
+  'assets/menu/5-jumbo-wings-bone-in.jpg',
+  'assets/menu/50-jumbo-wings-bone-in.jpg',
+  'assets/menu/bacon-ranch-chicken-sandwich-with-fries.jpg',
+  'assets/menu/black-blue-with-fries.jpg',
+  'assets/menu/blt-with-fries.jpg',
+  'assets/menu/buffalo-chicken-sandwich-or-wrap-with-fries.jpg',
+  'assets/menu/classic-burger-with-fries.jpg',
+  'assets/menu/farmhouse-burger-with-fries.jpg',
+  'assets/menu/fried-mushrooms.jpg',
+  'assets/menu/fried-pickles.jpg',
+  'assets/menu/fries.jpg',
+  'assets/menu/grilled-cheese-club-with-fries.jpg',
+  'assets/menu/grilled-cheese-with-fries.jpg',
+  'assets/menu/hot-dog-basket-with-side.jpg',
+  'assets/menu/mile-high-club-with-fries.jpg',
+  'assets/menu/mozzarella-sticks.jpg',
+  'assets/menu/nachos-full.jpg',
+  'assets/menu/nachos-half.jpg',
+  'assets/menu/philly-melt-with-fries.jpg',
+  'assets/menu/quesadilla-burger-with-fries.jpg',
+  'assets/menu/quesadilla.jpg',
+  'assets/menu/single-taco-no-side.jpg',
+  'assets/menu/some-like-it-hot-with-fries.jpg',
+  'assets/menu/the-grilled-cheese-incident-with-fries.jpg',
+  'assets/menu/tortilla-chips-salsa.jpg',
+  'assets/menu/tots.jpg',
+  'assets/menu/veggie-burger-with-fries.jpg',
+  'assets/menu/wing-basket.jpg',
 ];
 
 // A new version takes over as soon as it has downloaded; the page reloads

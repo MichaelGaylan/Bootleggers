@@ -13,6 +13,7 @@ import * as data from './data.js';
 import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session, LS } from './ui.js';
 import { canSee, canChange, isHost, myStaff } from './perms.js';
 import { BRAND } from './config.js';
+import { dishPhoto } from './menu.js';
 
 const money = (n) => (n < 0 ? '−' : '') + '$' + Math.abs(+n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const r2 = (n) => Math.round(n * 100) / 100;
@@ -57,11 +58,7 @@ export function modsFor(name, section) {
 // Shorter names on tiles and tickets (e.g. without "with Fries").
 const short = (n) => (BRAND.posTrim || []).reduce((t, w) => t.replace(w, ''), String(n || ''));
 // RRA-108: the dish's picture. A Recipes photo wins, then js/brand.js menuPhotos.
-function photoOf(d) {
-  if (d.photo) return d.photo;
-  const f = (BRAND.menuPhotos || {})[d.name];
-  return f ? (/[/:]/.test(f) ? f : (BRAND.menuPhotoDir || '') + f) : '';
-}
+const photoOf = dishPhoto;
 const tint = (s) => COLORS[[...String(s)].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
 async function menu() {
   const s = await data.settings();
