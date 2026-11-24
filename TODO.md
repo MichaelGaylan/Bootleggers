@@ -17,6 +17,8 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-116 · POS menu: section tabs across the top (Appetizers, Baskets, Beverages…), no All tab (Gaylan, 2026-11-24) · UX · S · added 2026-11-24 · built in the 0.8.0 sample, waiting for Gaylan's OK
 - [ ] RRA-117 · Orders: tapping Orders opens a popup with Seating and the current orders (tap one to bring it up), plus the kitchen screen and sales (Gaylan, 2026-11-24) · UX · S · added 2026-11-24 · built in the 0.8.0 sample, waiting for Gaylan's OK
 
+- [ ] RRA-118 · POS check screen: the open tables show as tabs across the top (Table 2, Table 4, Table 7…), the current one highlighted; tap one to jump to its order, + Seat goes back to Seating (Gaylan, 2026-11-24, mockup) · UX · S · added 2026-11-24 · built in the 0.8.0 sample, waiting for Gaylan's OK
+
 ## 🟡 Hold
 - [ ] RRA-104 · POS: live card payments through the restaurant's service (Square Terminal API, Clover REST Pay Display, or Toast order handoff) via the restaurant's server; bar menu with drink prices · Infra · L
 - [ ] RRA-098 · Payroll: Crew Hub (profiles, onboarding checklists, permit expiry alerts) — was BPAY-011 · Feature · L
