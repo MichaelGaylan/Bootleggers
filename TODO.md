@@ -16,7 +16,6 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-115 · Stock count: remove the All tab; keep one tab per group, open on the first group, and opening another section collapses the previous one (Gaylan, 2026-11-24) · UX · S · added 2026-11-24 · built in the 0.8.0 sample, waiting for Gaylan's OK
 - [ ] RRA-116 · POS menu: section tabs across the top (Appetizers, Baskets, Beverages…), no All tab (Gaylan, 2026-11-24) · UX · S · added 2026-11-24 · built in the 0.8.0 sample, waiting for Gaylan's OK
 - [ ] RRA-117 · Orders: tapping Orders opens a popup with Seating and the current orders (tap one to bring it up), plus the kitchen screen and sales (Gaylan, 2026-11-24) · UX · S · added 2026-11-24 · built in the 0.8.0 sample, waiting for Gaylan's OK
-
 - [ ] RRA-118 · POS check screen: the open tables show as tabs across the top (Table 2, Table 4, Table 7…), the current one highlighted; tap one to jump to its order, + Seat goes back to Seating (Gaylan, 2026-11-24, mockup) · UX · S · added 2026-11-24 · built in the 0.8.0 sample, waiting for Gaylan's OK
 
 ## 🟡 Hold
