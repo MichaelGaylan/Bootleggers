@@ -8,46 +8,17 @@ import { STARTER_STOCK, REPLACED_STOCK, NON_FOOD } from './starter-stock.js';
 
 export const MENU_VERSION = '2026-11-19';
 
-export const MENU = [
-  { section: 'Appetizers', items: [
-    ['Fried Mushrooms', '7.99'], ['Fried Pickles', '7.99'], ['Mozzarella Sticks', '7.99'], ['Tots', '6.49'], ['Fries', '5.50'],
-    ['Nachos (Half)', '6.99'], ['Nachos (Full)', '10.99'], ['Quesadilla', '11.99'], ['Single Taco (No Side)', '5.99'],
-    ['Tortilla Chips & Salsa', '4.49'],
-  ] },
-  { section: 'Baskets', items: [
-    ['Chicken Finger Basket with Fries', '14.49'], ['Hot Dog Basket with Side', '6.99'], ['Taco Basket with Side', '11.99'], ['Wing Basket', '14.99'],
-  ] },
-  { section: 'Jumbo Wings', items: [
-    ['5 Jumbo Wings (Bone-In)', '9.99'], ['10 Jumbo Wings (Bone-In)', '17.99'], ['15 Jumbo Wings (Bone-In)', '25.99'],
-    ['20 Jumbo Wings (Bone-In)', '33.99'], ['30 Jumbo Wings (Bone-In)', '48.99'], ['50 Jumbo Wings (Bone-In)', '80.99'],
-  ] },
-  { section: 'Burgers', items: [
-    ['Black & Blue with Fries', '14.99'], ['Classic Burger with Fries', '11.99'], ['Farmhouse Burger with Fries', '15.99'],
-    ['Quesadilla Burger with Fries', '15.99'], ['Some Like it Hot with Fries', '14.99'], ['The Bootlegger with Fries', '17.49'],
-    ['Veggie Burger with Fries', '13.99'],
-  ] },
-  { section: 'Sandwiches', items: [
-    ['Bacon Ranch Chicken Sandwich with Fries', '14.99'], ['BLT with Fries', '10.99'], ['Buffalo Chicken Sandwich (or Wrap) with Fries', '15.99'],
-    ['Chicken Sandwich with Fries', '14.99'], ['Grilled Cheese with Fries', '9.99'], ['Grilled Cheese Club with Fries', '13.99'],
-    ['Mile High Club with Fries', '15.49'], ['Philly Melt with Fries', '13.99'], ['The Grilled Cheese Incident with Fries', '14.49'],
-  ] },
-  { section: 'Salads', items: [
-    ['Buffalo Salad', '15.59'], ['Caesar Salad', '9.99'], ['Chef Salad', '15.99'], ['House Salad', '10.99'], ['Side Salad', '6.99'], ['Tex Mex Salad', '15.99'],
-  ] },
-  { section: 'Extra Sauce', items: [
-    ['Ranch Small', '0.50'], ['Ranch Large', '1.00'], ['Blue Cheese Small', '0.50'], ['Blue Cheese Large', '1.00'],
-    ['BBQ Sauce Small', '0.50'], ['BBQ Sauce Large', '1.00'], ['Honey Mustard Small', '0.50'], ['Honey Mustard Large', '1.00'],
-    ['Honey Sriracha Small', '0.50'], ['Honey Sriracha Large', '1.00'], ['Mild Buffalo Small', '0.50'], ['Mild Buffalo Large', '1.00'],
-    ['Med Buffalo Small', '0.50'], ['Med Buffalo Large', '1.00'], ['Hot Buffalo Small', '0.50'], ['Hot Buffalo Large', '1.00'],
-    ['Italian Dressing Small', '0.50'], ['Italian Dressing Large', '1.00'], ['Ketchup Small', '0.50'], ['Ketchup Large', '1.00'],
-    ['Mayo Small', '0.50'], ['Mayo Large', '1.00'], ['Mustard Small', '0.50'], ['Sour Cream Small', '0.50'], ['Sour Cream Large', '1.00'],
-  ] },
-  { section: 'N/A Beverages', items: [
-    ['Bottle Water', '2.00'], ['Coca-Cola', '2.75'], ['Cranberry Juice', '2.75'], ['Diet Coke', '2.75'], ['Ginger Ale', '2.75'],
-    ['Orange Juice', '2.75'], ['Pineapple Juice', '2.75'], ['Red Bull', '4.25'], ['Red Bull Sugar Free', '4.25'], ['Sprite', '2.75'],
-    ['Sweet Tea', '2.75'], ['Unsweet Tea', '2.75'],
-  ] },
-];
+// The menu itself (names, sections, prices) lives in js/brand.js (RRA-108).
+export const MENU = globalThis.BRAND.menu;
+
+// The dish's picture: a Recipes photo wins, then js/brand.js menuPhotos.
+export function dishPhoto(d) {
+  if (!d) return '';
+  if (d.photo) return d.photo;
+  const B = globalThis.BRAND || {};
+  const f = (B.menuPhotos || {})[d.name];
+  return f ? (/[/:]/.test(f) ? f : (B.menuPhotoDir || '') + f) : '';
+}
 
 export const MENU_SECTIONS = MENU.map((m) => m.section);
 const OLD_DEFAULT_SECTIONS = ['Wings', 'Burgers', 'Sandwiches', 'Baskets', 'Salads', 'Appetizers', 'Sides', 'Desserts'];
