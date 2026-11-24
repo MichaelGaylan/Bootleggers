@@ -4,8 +4,8 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.8.2';
-export const BUILD = '2026.11.24-17';
+export const VERSION = '0.8.3';
+export const BUILD = '2026.11.24-18';
 
 // Text that names the restaurant uses tokens, so it reads right after a
 // changeout (RRA-123): {name} = short name, {restaurant} = full name,
@@ -14,6 +14,13 @@ export const brandText = (s) => String(s ?? '')
   .replace(/\{name\}/g, BRAND.shortName).replace(/\{restaurant\}/g, BRAND.restaurant).replace(/\{app\}/g, BRAND.appName);
 
 const WHATS_NEW_RAW = [
+  {
+    version: '0.8.3', build: '2026.11.24-18', date: '2026-11-24',
+    lines: [
+      'Coupons (More → Coupons, managers and the Admin): make a coupon for percent off, dollars off, a free dish, or buy one get one, with dates, days, hours, a minimum, food only, a use limit and one-time codes. Send it as a framed {name} coupon picture with a QR code or barcode and the offer printed under it.',
+      'At the table, tap Add a coupon on the check and scan the coupon with the camera (works on iPhone) or type the code. The app checks the rules, takes the discount off before tax, and shows coupons in Today\'s sales. Net sales in Payroll count the discount.',
+    ],
+  },
   {
     version: '0.8.2', build: '2026.11.24-17', date: '2026-11-24',
     lines: [

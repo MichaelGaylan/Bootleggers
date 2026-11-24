@@ -126,7 +126,7 @@ const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } 
 function oldWords(O, B, allow = []) {
   const w = new Set();
   const add = (s) => { s = String(s || '').trim(); if (s.length >= 4) w.add(s); };
-  [O.appName, O.shortName, O.restaurant, O.location, O.teamId, O.dbName, O.dishExample, O.radioSearchArea,
+  [O.coupon?.title, O.coupon?.tagline, O.appName, O.shortName, O.restaurant, O.location, O.teamId, O.dbName, O.dishExample, O.radioSearchArea,
     host(O.websiteUrl), host(O.giftCards?.url), O.firebase?.projectId, O.reportKey,
     String(O.reportPrefix || '').replace(/[\s—–-]+$/, '')].forEach(add);
   // "Bootleggers" also catches "The Bootlegger".
@@ -192,6 +192,7 @@ function check(oldBrandPath, allow = []) {
     if (B.firebase && O.firebase && B.firebase.projectId === O.firebase.projectId) {
       problems.push(`brand.js firebase is still the old project (${B.firebase.projectId}); fine only if teamId is new, but its own project is safer`);
     }
+    if (B.coupon?.tag && B.coupon.tag === O.coupon?.tag) problems.push(`brand.js coupon.tag is still "${B.coupon.tag}": the old restaurant's coupons would scan here`);
     if (B.reportKey && B.reportKey === O.reportKey) problems.push('brand.js reportKey is the old one: problem reports would go to the old restaurant\'s inbox');
     const revoked = JSON.parse(read('data/access.json')).revoked || [];
     if (revoked.length) problems.push(`data/access.json lists ${revoked.length} revoked invite(s) from the old restaurant: empty the list`);

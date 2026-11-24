@@ -25,6 +25,7 @@ import { payrollView, payRunView, payRunDoneView, payHistoryView, myPayView, tip
 import { payrollSettings, hasPayroll } from './paycalc.js';
 import { posView, posCheckView, posPayView, ticketsView, posSalesView, posSettingsView, canOrder, canKitchen, canSales, posMenu, seatingView, startPickups, showPickups } from './pos.js';
 import { giftCardsView } from './giftcards.js';
+import { couponsView, couponView } from './coupons.js';
 import { musicView } from './music.js';
 import { clearDataView } from './cleardata.js';
 
@@ -208,6 +209,7 @@ function renderSide() {
     renderSide.pay ? link('payroll', 'Payroll') : '',
     canOrder() ? link('pos', 'Orders (POS)', '<i class="sbadge pos-badge" hidden></i>').replace('<a ', '<a data-pospop ') : '',
     canKitchen() ? link('tickets', '<span class="sub-l">Kitchen and bar screen</span>') : '',
+    canSee('coupons') ? link('coupons', 'Coupons') : '',
     BRAND.giftCards?.url ? link('giftcards', 'Gift cards') : '',
     link('music', 'Music'),
     canSee('events') ? link('events', 'Events (BEOs)', '<i id="ev-badge" class="sbadge" hidden></i>') : '',
@@ -241,6 +243,7 @@ function moreView() {
       ${canOrder() ? '<a class="row" href="#/pos" data-pospop><span class="grow">Orders (POS)</span><i class="sbadge pos-badge" hidden></i></a>' : ''}
       ${canKitchen() ? '<a class="row" href="#/tickets"><span class="grow">Kitchen and bar screen</span></a>' : ''}
       ${canSales() ? '<a class="row" href="#/possales"><span class="grow">Today\'s sales</span></a>' : ''}
+      ${canSee('coupons') ? '<a class="row" href="#/coupons"><span class="grow">Coupons</span></a>' : ''}
       ${BRAND.giftCards?.url ? '<a class="row" href="#/giftcards"><span class="grow">Gift cards</span></a>' : ''}
       <a class="row" href="#/music"><span class="grow">Music</span></a>
       ${moreView.pay ? '<a class="row" href="#/payroll"><span class="grow">Payroll</span></a>' : ''}
@@ -376,6 +379,7 @@ function aboutView() {
       <p><b>Prep:</b> today's prep list by station. Tap an item when it's done.</p>
       <p><b>Stock:</b> count with + and −, then Save count. Needed shows what's below par, and Order guides splits it by vendor.</p>
       <p><b>Board:</b> messages for everyone, the kitchen or managers, plus notices from management. A red dot means something new.</p>
+      <p><b>Coupons:</b> managers make a coupon under More → Coupons and send it as a picture (QR code or barcode, with the offer printed under it) to text, email, print or post. At the table, tap <b>Add a coupon</b> on the check and scan it with the camera, or type the code. The discount comes off before tax.</p>
       <p><b>More:</b> schedule, events, costs and waste, Settings, and this page.</p>
       <p><b>Access:</b> the app opens only on the phone a manager approved. It locks itself after ${INACTIVITY_DAYS} days without use.</p>
       <p><b>Install it:</b> on iPhone, tap Share, then Add to Home Screen. On Android, tap the menu, then Install app.</p>
@@ -748,6 +752,8 @@ const routes = {
   posset: () => posSettingsView(),
   seating: () => seatingView(), // RRA-114
   giftcards: () => giftCardsView(), // RRA-111
+  coupons: () => couponsView(), // RRA-122
+  coupon: (id) => couponView(id),
   music: () => musicView(), // RRA-109
   cleardata: () => clearDataView(), // RRA-106
   notices: () => boardView(),

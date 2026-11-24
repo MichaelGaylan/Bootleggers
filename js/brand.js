@@ -286,6 +286,11 @@ self.BRAND = {
     "Wing Basket": "wing-basket.jpg",
   },
 
+  // Coupons (RRA-122): the name on top of the coupon picture, the line under
+  // it, and the short tag inside every coupon's QR code or barcode. The tag
+  // must be different for every restaurant, so their coupons can't be swapped.
+  coupon: { title: 'Bootleggers', tagline: 'Bar and Grill', tag: 'BLG' },
+
   // Gift cards (RRA-111): the restaurant's online gift card shop (Shift4 Shop).
   giftCards: {
     url: 'https://313b30113192392.s4shops.com/giftcard.html',
