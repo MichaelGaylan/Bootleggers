@@ -1,4 +1,4 @@
-// The Bootleggers menu, as sent by the Admin on 2026-11-19.
+// The restaurant's menu (js/brand.js menu).
 // applyMenu() adds each item to the Recipe archive once, under its menu
 // section with its menu price, and brings the stock list in line with it.
 
@@ -6,7 +6,7 @@ import * as data from './data.js';
 import * as store from './store.js';
 import { STARTER_STOCK, REPLACED_STOCK, NON_FOOD } from './starter-stock.js';
 
-export const MENU_VERSION = '2026-11-19';
+export const MENU_VERSION = globalThis.BRAND.menuVersion || '1';
 
 // The menu itself (names, sections, prices) lives in js/brand.js (RRA-108).
 export const MENU = globalThis.BRAND.menu;
@@ -66,20 +66,10 @@ export async function applyMenu({ shared = false, host = false } = {}) {
   await store.put('menu', { version: MENU_VERSION, at: Date.now() });
 }
 
-// Preset vendors (RRA-044): common food-service suppliers for what Bootleggers
-// stocks. Added once on the Admin phone; edit or take out any you don't use.
-export const PRESET_VENDORS = [
-  ['Sysco', 'Broadline: proteins, frozen, dairy, produce, dry goods, paper'],
-  ['US Foods', 'Broadline: proteins, frozen, dairy, produce, dry goods, paper'],
-  ['Performance Foodservice (PFG)', 'Broadline: wings, burgers, fryer items, paper'],
-  ['Gordon Food Service', 'Broadline and Gordon stores: frozen, dairy, dry goods'],
-  ["Restaurant Depot", 'Cash and carry: anything short between deliveries'],
-  ["Sam's Club", 'Cash and carry: drinks, snacks, paper, cleaning'],
-  ['Coca-Cola bottler', 'Coca-Cola, Diet Coke, Sprite, Ginger Ale, juices'],
-  ['Red Bull distributor', 'Red Bull, Red Bull Sugar Free'],
-  ['Ecolab', 'Dish machine chemicals, sanitizer, cleaning'],
-  ['Cintas', 'Linens, towels, aprons, mats, first aid'],
-];
+// Preset vendors (RRA-044): common food-service suppliers for what the
+// restaurant stocks (js/brand.js presetVendors). Added once on the Admin
+// phone; edit or take out any you don't use.
+export const PRESET_VENDORS = globalThis.BRAND.presetVendors || [];
 const VENDOR_PRESET_VERSION = 1;
 
 export async function applyVendors({ shared = false, host = false } = {}) {

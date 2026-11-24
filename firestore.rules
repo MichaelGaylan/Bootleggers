@@ -1,5 +1,6 @@
 rules_version = '2';
-// Bootleggers Kitchen (RRA-031). Paste into Firebase console → Firestore → Rules → Publish.
+// Bootleggers Kitchen (RRA-031). Written by tools/changeout.mjs sync from js/brand.js (teamId).
+// Paste into Firebase console → Firestore → Rules → Publish.
 // Phones sign in anonymously. Every record is encrypted on the phone with the
 // team key before it is written, so these rules only keep out the public and
 // cap the size of each record.

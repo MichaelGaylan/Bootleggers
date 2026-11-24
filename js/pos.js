@@ -1,4 +1,4 @@
-// Point of sale (RRA-101): merged from the stand-alone Bootleggers POS test app
+// Point of sale (RRA-101): merged from the stand-alone POS test app
 // (BPAY-025). Menu = the Recipe archive's dishes (section and price), people and
 // roles = Staff and perms.js, 86 list and card settings = team settings.
 // Checks and tickets are shared team data, so the kitchen and bar screens
