@@ -11,7 +11,7 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
-- [ ] RRA-124 · Order-up alert: when the kitchen or bar bumps a ticket, send a "Pick up Table #" alert with a small on-screen notification and a badge. Who gets it is still open: only the server who rang it in, or every server on the clock (Gaylan, 2026-11-24) · Feature · S · added 2026-11-24
+- [ ] RRA-124 · Order-up alert: when the kitchen or bar bumps a ticket, send a "Pick up Table #" alert with a small on-screen notification and a badge. It goes first to the server who took the order; if nobody taps "Picked up" within 2 minutes, it goes to every server on the clock with a red border (Gaylan, 2026-11-24) · Feature · S · added 2026-11-24
 - [ ] RRA-123 · Music radio dial: a radio-style tuning dial with an AM/FM switch to tune between stations (turn the dial to move through the AM or FM stations that stream online; frequency shown like a real radio). Station frequencies come from the station list, so only stations that stream on the internet can be on it. The Admin can program presets by frequency (e.g. 104.3 FM), each linked to that station's online stream, as preset buttons beside the dial (Gaylan, 2026-11-24) · UX · M · added 2026-11-24 · built in the 0.8.1 sample, waiting for Gaylan's OK
 - [ ] RRA-122 · Music: no sound (Gaylan, 2026-11-24). Added a Test sound button, a status line (connecting, or why it isn't playing, instead of showing ⏸ when a station failed), and backup SomaFM servers for the built-in stations · Bug · S · added 2026-11-24 · built in the 0.8.1 sample, waiting for Gaylan's OK
 
