@@ -14,6 +14,7 @@ No build step: it is plain HTML, CSS and JavaScript modules, served as static fi
 - `js/ui.js`, `js/data.js`, `js/perms.js`: shared helpers, team data collections (sync hook), roles and permissions
 - `js/recipes.js`, `js/prep.js`, `js/stock.js`, `js/board.js`, `js/schedule.js`, `js/events.js`, `js/costs.js`, `js/settings.js`: the screens
 - `js/pos.js`: Point of sale (RRA-101): checks, kitchen and bar screen, 86 list, splits and payments, today's sales, POS settings (merged from the Bootleggers POS test app)
+- `assets/menu/`: dish, sauce and drink photos (480 px JPEGs) for the POS tiles and Recipes, named in `js/brand.js` menuPhotos
 - `js/giftcards.js`, `js/music.js`, `js/cleardata.js`: Gift cards link screen (RRA-111), Music with MP3s and internet radio (RRA-109), Clear test data for the Admin (RRA-106)
 - `js/payroll.js`, `js/paycalc.js`, `js/provider.js`: Payroll (RRA-095): pay runs, My pay & tips, tip rules, payroll settings; pay math; payroll service and POS list (merged from the stand-alone Bootleggers Payroll app)
 - `data/notifications.json`: notices sent to everyone
