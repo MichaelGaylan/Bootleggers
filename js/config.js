@@ -4,8 +4,8 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.8.3';
-export const BUILD = '2026.11.24-18';
+export const VERSION = '0.8.4';
+export const BUILD = '2026.11.24-19';
 
 // Text that names the restaurant uses tokens, so it reads right after a
 // changeout (RRA-123): {name} = short name, {restaurant} = full name,
@@ -14,6 +14,12 @@ export const brandText = (s) => String(s ?? '')
   .replace(/\{name\}/g, BRAND.shortName).replace(/\{restaurant\}/g, BRAND.restaurant).replace(/\{app\}/g, BRAND.appName);
 
 const WHATS_NEW_RAW = [
+  {
+    version: '0.8.4', build: '2026.11.24-19', date: '2026-11-24',
+    lines: [
+      'Seating areas can be sized to fit the room: in Seating layout, tap Size and pick how many squares wide and deep the area is (a small nook can be 2 by 1). Tap an empty square to add a table, tap one to remove it.',
+    ],
+  },
   {
     version: '0.8.3', build: '2026.11.24-18', date: '2026-11-24',
     lines: [

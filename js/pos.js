@@ -93,6 +93,8 @@ const staffName = (id, staff) => (id === 'admin' ? 'Admin' : staff.find((s) => s
 // the number of guests (tap a number), then opens the menu; tapping a table
 // with an open check brings that check up.
 export const FLOOR = { cols: 10, rows: 7 };
+// Each area can have its own size (RRA-129): a small nook might be 2 wide, 1 deep.
+const sizeOf = (a) => ({ cols: Math.min(12, Math.max(1, a?.cols || FLOOR.cols)), rows: Math.min(10, Math.max(1, a?.rows || FLOOR.rows)) });
 const KINDS = { table: 'Table', booth: 'Booth', high: 'High top', bar: 'Bar', patio: 'Patio' };
 const SHORT = { table: '', booth: 'Bo', high: 'H', bar: 'B', patio: 'P' };
 const tableName = (t) => `${KINDS[t.kind] || 'Table'} ${t.no}`;
@@ -122,10 +124,10 @@ const curArea = (areas) => { const a = LS.get('posArea', areas[0].id); return ar
 const numPick = (name, n, on, taken = []) => `<div class="num-pick" data-pick="${name}">${Array.from({ length: n }, (_, i) => i + 1).map((v) => `<button type="button" data-v="${v}" class="${v === on ? 'on' : ''}" ${taken.includes(v) && v !== on ? 'disabled' : ''}>${v}</button>`).join('')}</div>`;
 const wirePick = (el, name, set) => $$(`[data-pick="${name}"] button`, el).forEach((b) => b.onclick = () => { $$(`[data-pick="${name}"] button`, el).forEach((x) => x.classList.toggle('on', x === b)); set(+b.dataset.v); });
 
-function floorHtml(tables, checks, P, edit) {
+function floorHtml(tables, checks, P, edit, size = FLOOR) {
   const cell = (x, y) => tables.find((t) => t.x === x && t.y === y);
   let h = '';
-  for (let y = 0; y < FLOOR.rows; y++) for (let x = 0; x < FLOOR.cols; x++) {
+  for (let y = 0; y < size.rows; y++) for (let x = 0; x < size.cols; x++) {
     const t = cell(x, y);
     if (!t) { h += edit ? `<button type="button" class="fl-cell fl-empty" data-cell="${x},${y}" style="grid-column:${x + 1};grid-row:${y + 1}" aria-label="Add a table here">+</button>` : ''; continue; }
     const c = checks.find((k) => k.tableId === t.id || (!k.tableId && k.name === tableName(t)));
@@ -134,7 +136,8 @@ function floorHtml(tables, checks, P, edit) {
       <b>${esc((SHORT[t.kind] || '') + t.no)}</b>
       <small>${c ? `${c.guests} · ${mins(c.opened)}m` : `${t.seats} seat${t.seats > 1 ? 's' : ''}`}</small>${c ? `<small class="fl-amt">${money(tot)}</small>` : ''}</button>`;
   }
-  return `<div class="floor${edit ? ' edit' : ''}" style="--cols:${FLOOR.cols};--rows:${FLOOR.rows}">${h}</div>`;
+  // Small areas stay small: each square is at most about 96px wide.
+  return `<div class="floor${edit ? ' edit' : ''}" style="--cols:${size.cols};--rows:${size.rows};max-width:${size.cols * 104 + 24}px">${h}</div>`;
 }
 
 // Orders (POS): the seating layout.
@@ -152,7 +155,7 @@ export async function posView() {
   const closedToday = (await data.list('check')).filter((c) => c.closed && new Date(c.closed).toDateString() === today).length;
   view.innerHTML = `
     ${areaTabs(areas, area, all, open)}
-    ${floorHtml(tables, open, P, false)}
+    ${floorHtml(tables, open, P, false, sizeOf(areas.find((a) => a.id === area)))}
     <p class="muted small center" style="margin:0 0 6px">Tap a free table to seat guests. Tap a seated table to bring up its order.</p>
     <div class="fl-key small muted"><span><i class="fl-dot"></i> Free</span><span><i class="fl-dot busy"></i> Seated</span></div>
     <div class="group">
@@ -239,14 +242,14 @@ export async function seatingView() {
   const areas = areasOf(P).map((a) => ({ ...a })), area = curArea(areas);
   const all = tablesOf(P).map((t) => ({ ...t }));
   const tables = all.filter((t) => t.area === area);
-  const here = areas.find((a) => a.id === area);
+  const here = areas.find((a) => a.id === area), size = sizeOf(here);
   const moving = seatingView.moving && all.find((t) => t.id === seatingView.moving);
   view.innerHTML = `
     ${areaTabs(areas, area, all, [], '<button type="button" id="ar-add" class="add">+ Area</button>')}
     <p class="muted small" style="margin-top:0">${moving ? `<b>Moving ${esc(tableName(moving))}:</b> tap an empty square${moving.area !== area ? ` (it moves to ${esc(here.name)})` : ''}, or pick another area above.` : `Tap an empty square (+) to add a table, booth, high top, bar seat or patio table to <b>${esc(here.name)}</b>. Tap one to change, move or remove it.`}</p>
-    ${floorHtml(tables, [], P, true)}
+    ${floorHtml(tables, [], P, true, size)}
     ${moving ? '<button class="btn tonal block" id="mv-x" type="button">Cancel move</button>' : ''}
-    <div class="btn-row"><button class="btn tonal" id="ar-ren" type="button">Rename ${esc(here.name)}</button><button class="btn tonal" id="ar-rm" type="button" style="color:var(--danger)" ${areas.length < 2 ? 'disabled' : ''}>Remove area</button></div>
+    <div class="btn-row"><button class="btn tonal" id="ar-size" type="button">Size: ${size.cols} × ${size.rows}</button><button class="btn tonal" id="ar-ren" type="button">Rename ${esc(here.name)}</button><button class="btn tonal" id="ar-rm" type="button" style="color:var(--danger)" ${areas.length < 2 ? 'disabled' : ''}>Remove area</button></div>
     <p class="muted small">${areas.length} area${areas.length > 1 ? 's' : ''}, ${all.length} places in all. ${esc(here.name)}: ${Object.entries(KINDS).map(([k, l]) => [tables.filter((t) => t.kind === k).length, l]).filter(([n]) => n).map(([n, l]) => `${n} ${l.toLowerCase()}${l === 'Bar' ? ' seat' : ''}${n > 1 ? 's' : ''}`).join(', ') || 'empty'}. The layout is shared by every phone.</p>
     <button class="btn plain block" id="fl-reset" type="button">Start over with the starter layout</button>`;
   const save = async (list, ars = areas) => { await savePos({ tables: list, areas: ars }); seatingView(); };
@@ -257,7 +260,14 @@ export async function seatingView() {
     const name = await areaName('', areas);
     if (!name) return;
     const id = Math.random().toString(36).slice(2, 8);
-    LS.set('posArea', id); save(all, [...areas, { id, name }]);
+    LS.set('posArea', id); save(all, [...areas, { id, name, cols: FLOOR.cols, rows: FLOOR.rows }]);
+  };
+  $('#ar-size').onclick = async () => {
+    const r = await areaSize(here, tables);
+    if (!r) return;
+    const out = tables.filter((t) => t.x >= r.cols || t.y >= r.rows);
+    if (out.length && !(await sheet({ title: 'Remove places?', right: 'Remove', body: `<p>${out.map((t) => esc(tableName(t))).join(', ')} ${out.length === 1 ? 'is' : 'are'} outside the new size and will be removed. Open checks stay open.</p>` }))) return;
+    save(all.filter((t) => !out.includes(t)), areas.map((a) => (a.id === area ? { ...a, ...r } : a)));
   };
   $('#ar-ren').onclick = async () => { const name = await areaName(here.name, areas.filter((a) => a.id !== area)); if (name) save(all, areas.map((a) => (a.id === area ? { ...a, name } : a))); };
   $('#ar-rm').onclick = async () => {
@@ -280,6 +290,26 @@ export async function seatingView() {
     if (r === 'move') { seatingView.moving = t.id; seatingView(); return; }
     if (r === 'remove') return save(all.filter((x) => x.id !== t.id));
     save(all.map((x) => (x.id === t.id ? r : x)));
+  });
+}
+
+// Area size (RRA-129): how many squares wide and deep. Tap to pick, no typing.
+function areaSize(a, tables) {
+  let { cols, rows } = sizeOf(a);
+  const fits = (c, r) => tables.filter((t) => t.x < c && t.y < r).length;
+  const note = (el) => { const n = tables.length - fits(cols, rows); $('#as-n', el).textContent = `${cols} × ${rows} = ${cols * rows} square${cols * rows > 1 ? 's' : ''}` + (n ? ` · ${n} place${n > 1 ? 's' : ''} won't fit` : ''); };
+  return sheet({
+    title: `${a.name} size`, right: 'Save',
+    body: `<p class="muted small" style="margin-top:0">Make the area as big as the real room. Each square holds one table, booth, high top or seat.</p>
+      <div class="pr-lab">Wide</div>${numPick('aw', 12, cols)}
+      <div class="pr-lab">Deep</div>${numPick('ad', 10, rows)}
+      <p class="muted small" id="as-n"></p>`,
+    onMount(api) {
+      note(api.el);
+      wirePick(api.el, 'aw', (v) => { cols = v; note(api.el); });
+      wirePick(api.el, 'ad', (v) => { rows = v; note(api.el); });
+      api.onRight = () => api.close({ cols, rows });
+    },
   });
 }
 
