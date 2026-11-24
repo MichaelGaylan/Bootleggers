@@ -864,7 +864,7 @@ label.btn { cursor: pointer; }
 /* Music: what the player is doing (connecting, or why it isn't playing). */
 .mu-status { margin: 2px 0 4px; font-size: 14px; font-weight: 600; color: var(--warn, #b8743a); }
 
-/* Radio dial (RRA-123): a faceplate with an AM/FM switch, scale, needle, knob and presets. */
+/* Radio dial (RRA-126): a faceplate with an AM/FM switch, scale, needle, knob and presets. */
 .radio { margin: 0 0 14px; padding: 14px; border-radius: var(--radius); background: linear-gradient(#2a2622, #1b1815); color: #f3e6cf; box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 2px 10px rgba(0,0,0,.18); }
 .rd-top { display: flex; align-items: center; gap: 12px; }
 .rd-lcd { flex: 1; min-width: 0; display: grid; grid-template-columns: auto 1fr; align-items: baseline; column-gap: 8px; padding: 8px 12px; border-radius: 10px; background: #0f1a12; box-shadow: inset 0 2px 6px rgba(0,0,0,.6); color: #9ff0b4; font-variant-numeric: tabular-nums; }

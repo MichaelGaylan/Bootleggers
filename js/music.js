@@ -1,7 +1,7 @@
 // Music (RRA-109): background music for the restaurant, built into the app.
 //   My music: MP3s from a USB drive or this computer (pick a folder or songs),
 //             with play, pause, skip, shuffle and volume.
-//   Radio:    a radio dial with an AM/FM switch and presets (RRA-123), and
+//   Radio:    a radio dial with an AM/FM switch and presets (RRA-126), and
 //             internet streams of AM/FM and online stations. The built-in list
 //             lives in js/brand.js (BRAND.radio); Find a station searches the
 //             free Radio Browser directory (radio-browser.info).
@@ -223,7 +223,7 @@ async function findStation() {
   $('#mu-q').onkeydown = (e) => { if (e.key === 'Enter') go(); };
 }
 
-// ---------------------------------------------------------- radio dial (RRA-123)
+// ---------------------------------------------------------- radio dial (RRA-126)
 // A radio faceplate: AM/FM switch, a tuning scale with a needle, a knob to
 // turn, seek buttons, and presets. Turning to a frequency that has a station
 // plays it. Stations are the presets the Admin or a manager programs (shared by
