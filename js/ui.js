@@ -145,7 +145,7 @@ export function setTitle(text, actionHtml = '') {
 // RRA-107: work screens that use the whole width on an iPad or computer. The
 // left menu hides while one is open; the back arrow (top left) goes back and
 // the menu returns. Phones have no left menu, so nothing changes there.
-export const FULL_SCREENS = ['pos', 'poscheck', 'pospay', 'tickets', 'schedule', 'timesheets', 'payrun', 'stock', 'recipe'];
+export const FULL_SCREENS = ['pos', 'seating', 'poscheck', 'pospay', 'tickets', 'schedule', 'timesheets', 'payrun', 'stock', 'recipe'];
 
 export function setChrome({ locked = false, tab = null, back = false }) {
   document.body.classList.toggle('locked', locked);
@@ -155,7 +155,7 @@ export function setChrome({ locked = false, tab = null, back = false }) {
   const full = !locked && FULL_SCREENS.includes(name);
   document.body.classList.toggle('full', full);
   if (full && isWide()) back = true;
-  const SIDE = { cleardata: 'settings', recipe: 'recipes', print: 'recipes', 'stock-items': 'stock', 'schedule-print': 'schedule', notices: 'board', event: 'events', vendors: 'settings', staff: 'settings', list: 'settings', roles: 'settings', person: 'settings' };
+  const SIDE = { seating: 'pos', poscheck: 'pos', pospay: 'pos', cleardata: 'settings', recipe: 'recipes', print: 'recipes', 'stock-items': 'stock', 'schedule-print': 'schedule', notices: 'board', event: 'events', vendors: 'settings', staff: 'settings', list: 'settings', roles: 'settings', person: 'settings' };
   $$('#side a').forEach((a) => a.classList.toggle('on', a.dataset.r === (SIDE[name] || name)));
   $('#btn-bell').hidden = locked;
   $('#btn-back').hidden = !back;

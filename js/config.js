@@ -11,8 +11,10 @@ export const WHATS_NEW = [
   {
     version: '0.8.0', build: '2026.11.24-1', date: '2026-11-24',
     lines: [
-      'Point of sale picture menu: dishes are photo tiles with their name and price (a colored tile when a dish has no photo yet), the menu sections are tabs under them, and the open check sits on the left with − and + for each item. Add a photo to a dish in Recipes to see it on its tile.',
+      'Orders (POS) opens a popup: Seating, the kitchen screen, sales and your current orders. Seating shows the dining room laid out with its tables, booths and bar seats: tap a free table, tap the number of guests, and the menu opens. Tap a seated table to bring its order back up. Managers and the Admin arrange the tables under Change the seating layout. No typing needed.',
+      'Point of sale picture menu: dishes are photo tiles with their name and price (a colored tile when a dish has no photo yet), the menu sections are tabs across the top, and the open check sits on the left with − and + for each item. Add a photo to a dish in Recipes to see it on its tile.',
       'On an iPad or computer, work screens use the whole screen: Point of sale, a check and its Pay screen, the Kitchen and bar screen, Schedule, Time sheets, a Payroll run, Stock count and an open recipe. The back arrow at the top left brings the left menu back.',
+      'Stock count: the All tab is gone. It opens on the first group with its first section open, and opening another section closes the one before.',
       "Today's prep: when the last task in a tab is done, that tab goes away (with Undo), so only tabs with work left show.",
       'Music (More → Music): play MP3s from a USB drive or this computer with play, pause, skip, shuffle and volume, or internet radio. Find a station adds local AM/FM stations that stream online. Music keeps playing while you use the app.',
       'Gift cards (More → Gift cards): open the Bootleggers gift card shop for a guest, or send them the link.',

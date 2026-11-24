@@ -12,6 +12,10 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
+- [ ] RRA-114 · POS seating: tapping POS shows the restaurant's own seating layout (tables, booths, bar seats). Tap a free table, tap the number of guests (clickable numbers, no typing), then the menu opens; tapping a seated table brings its order back up. Managers and the Admin lay out the tables under Seating (add, number, seats, move, remove), shared by every phone (Gaylan, 2026-11-24, screenshot of Table 1) · Feature · M · added 2026-11-24 · built in the 0.8.0 sample, waiting for Gaylan's OK
+- [ ] RRA-115 · Stock count: remove the All tab; keep one tab per group, open on the first group, and opening another section collapses the previous one (Gaylan, 2026-11-24) · UX · S · added 2026-11-24 · built in the 0.8.0 sample, waiting for Gaylan's OK
+- [ ] RRA-116 · POS menu: section tabs across the top (Appetizers, Baskets, Beverages…), no All tab (Gaylan, 2026-11-24) · UX · S · added 2026-11-24 · built in the 0.8.0 sample, waiting for Gaylan's OK
+- [ ] RRA-117 · Orders: tapping Orders opens a popup with Seating and the current orders (tap one to bring it up), plus the kitchen screen and sales (Gaylan, 2026-11-24) · UX · S · added 2026-11-24 · built in the 0.8.0 sample, waiting for Gaylan's OK
 
 ## 🟡 Hold
 - [ ] RRA-104 · POS: live card payments through the restaurant's service (Square Terminal API, Clover REST Pay Display, or Toast order handoff) via the restaurant's server; bar menu with drink prices · Infra · L

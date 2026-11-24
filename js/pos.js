@@ -84,54 +84,190 @@ export function totals(c, tax) {
 const openChecks = async () => (await data.list('check')).filter((c) => !c.closed);
 const staffName = (id, staff) => (id === 'admin' ? 'Admin' : staff.find((s) => s.id === id)?.name || 'Staff');
 
-// ------------------------------------------------------------ Orders
+// ------------------------------------------------------------ seating (RRA-114)
+// The dining room as a grid of tables the Admin or a manager lays out under
+// Seating. Tapping a free table asks for the number of guests (tap a number),
+// then opens the menu; tapping a table with an open check brings that check up.
+export const FLOOR = { cols: 10, rows: 7 };
+const KINDS = { table: 'Table', booth: 'Booth', bar: 'Bar' };
+const tableName = (t) => `${KINDS[t.kind] || 'Table'} ${t.no}`;
+function starterTables() {
+  const t = [];
+  let no = 1;
+  for (const y of [0, 2, 4]) for (const x of [0, 2, 4, 6]) t.push({ id: 't' + no, kind: 'table', no: no++, seats: 4, x, y });
+  for (let i = 0; i < 3; i++) t.push({ id: 'b' + (i + 1), kind: 'booth', no: i + 1, seats: 6, x: 9, y: i * 2 });
+  for (let i = 0; i < 8; i++) t.push({ id: 'r' + (i + 1), kind: 'bar', no: i + 1, seats: 1, x: i, y: 6 });
+  return t;
+}
+const tablesOf = (P) => (Array.isArray(P.tables) && P.tables.length ? P.tables : starterTables());
+const numPick = (name, n, on, taken = []) => `<div class="num-pick" data-pick="${name}">${Array.from({ length: n }, (_, i) => i + 1).map((v) => `<button type="button" data-v="${v}" class="${v === on ? 'on' : ''}" ${taken.includes(v) && v !== on ? 'disabled' : ''}>${v}</button>`).join('')}</div>`;
+const wirePick = (el, name, set) => $$(`[data-pick="${name}"] button`, el).forEach((b) => b.onclick = () => { $$(`[data-pick="${name}"] button`, el).forEach((x) => x.classList.toggle('on', x === b)); set(+b.dataset.v); });
+
+function floorHtml(tables, checks, P, edit) {
+  const cell = (x, y) => tables.find((t) => t.x === x && t.y === y);
+  let h = '';
+  for (let y = 0; y < FLOOR.rows; y++) for (let x = 0; x < FLOOR.cols; x++) {
+    const t = cell(x, y);
+    if (!t) { h += edit ? `<button type="button" class="fl-cell fl-empty" data-cell="${x},${y}" style="grid-column:${x + 1};grid-row:${y + 1}" aria-label="Add a table here">+</button>` : ''; continue; }
+    const c = checks.find((k) => k.tableId === t.id || (!k.tableId && k.name === tableName(t)));
+    const tot = c ? totals(c, P.tax).total : 0;
+    h += `<button type="button" class="fl-t k-${t.kind}${c ? ' busy' : ''}" data-t="${t.id}" style="grid-column:${x + 1};grid-row:${y + 1}">
+      <b>${esc(t.kind === 'table' ? String(t.no) : (t.kind === 'bar' ? 'B' : 'Bo') + t.no)}</b>
+      <small>${c ? `${c.guests} · ${mins(c.opened)}m` : `${t.seats} seat${t.seats > 1 ? 's' : ''}`}</small>${c ? `<small class="fl-amt">${money(tot)}</small>` : ''}</button>`;
+  }
+  return `<div class="floor${edit ? ' edit' : ''}" style="--cols:${FLOOR.cols};--rows:${FLOOR.rows}">${h}</div>`;
+}
+
+// Orders (POS): the seating layout.
 export async function posView() {
   setChrome({ tab: 'more', back: true });
-  setTitle('Orders');
+  setTitle('Seating');
   if (!canOrder()) { view.innerHTML = lock('Orders are for servers, bartenders, managers and the Admin.'); return; }
-  setTitle('Orders', '<button class="btn small" id="pos-new" type="button">+ New check</button>');
   const P = await posSettings(), staff = await data.list('staff');
-  const showAll = boss() && LS.get('posAll', true);
-  const list = (await openChecks()).filter((c) => showAll || c.server === meId()).sort((a, b) => a.opened - b.opened);
+  const tables = tablesOf(P);
+  const open = await openChecks();
+  const mine = open.filter((c) => boss() || c.server === meId());
+  setTitle('Seating', `<button class="btn small" id="pos-cur" type="button">Current orders${mine.length ? ` (${mine.length})` : ''}</button>`);
   const today = new Date().toDateString();
   const closedToday = (await data.list('check')).filter((c) => c.closed && new Date(c.closed).toDateString() === today).length;
   view.innerHTML = `
-    ${boss() ? `<div class="segmented"><button type="button" data-all="1" class="${showAll ? 'on' : ''}">All checks</button><button type="button" data-all="0" class="${showAll ? '' : 'on'}">Mine</button></div>` : ''}
-    ${list.length ? `<div class="group">${list.map((c) => { const t = totals(c, P.tax); const n = c.items.filter((x) => !x.sent && !x.voided).length; const nm = staffName(c.server, staff); return `
-      <a class="row" href="#/poscheck/${c.id}">${avatar(nm)}<span class="grow"><span class="title">${esc(c.name)} <span class="muted small">#${c.no}</span></span>
-        <span class="sub">${esc(nm.split(' ')[0])} · ${c.guests} guest${c.guests > 1 ? 's' : ''} · open ${mins(c.opened)} min${n ? ` · <span style="color:var(--warn)">${n} not sent</span>` : ''}</span></span>
-        <span class="pr-num"><b>${money(t.total)}</b>${t.paid ? `<small class="muted">${money(t.due)} due</small>` : ''}</span></a>`; }).join('')}</div>`
-    : '<div class="empty">No open checks. Tap <b>+ New check</b> to start one.</div>'}
+    <p class="muted small" style="margin-top:0">Tap a free table to seat guests. Tap a busy table to bring up its order.</p>
+    ${floorHtml(tables, open, P, false)}
+    <div class="fl-key small muted"><span><i class="fl-dot"></i> Free</span><span><i class="fl-dot busy"></i> Seated</span></div>
     <div class="group">
+      ${boss() ? '<a class="row nav" href="#/seating"><span class="grow"><span class="title">Change the seating layout</span><span class="sub">Add, move, number and remove tables, booths and bar seats</span></span></a>' : ''}
       ${canKitchen() ? '<a class="row nav" href="#/tickets"><span class="grow">Kitchen and bar screen</span></a>' : ''}
       ${canSales() ? '<a class="row nav" href="#/possales"><span class="grow">Today\'s sales</span></a>' : ''}
       ${BRAND.giftCards?.url ? '<a class="row nav" href="#/giftcards"><span class="grow">Gift cards</span></a>' : ''}
     </div>
     <p class="muted small center">${closedToday} check${closedToday === 1 ? '' : 's'} closed today · cards through ${esc(payService(P).name)}</p>`;
-  $$('[data-all]').forEach((b) => b.onclick = () => { LS.set('posAll', b.dataset.all === '1'); posView(); });
-  $('#pos-new').onclick = newCheck;
+  $('#pos-cur').onclick = () => currentOrders(staff, P);
+  $$('[data-t]').forEach((b) => b.onclick = async () => {
+    const t = tables.find((x) => x.id === b.dataset.t);
+    const c = open.find((k) => k.tableId === t.id || (!k.tableId && k.name === tableName(t)));
+    if (c) { location.hash = '#/poscheck/' + c.id; return; }
+    seatTable(t);
+  });
 }
 
-async function newCheck() {
-  let kind = 'table', guests = 2;
-  const res = await sheet({
-    title: 'New check', right: 'Open',
-    body: `<div class="segmented" id="kind"><button type="button" data-k="table" class="on">Table</button><button type="button" data-k="tab">Bar tab</button></div>
-      <label class="field"><span id="nl">Table number</span><input type="text" id="nm" placeholder="e.g. 12"></label>
-      <div class="row" style="padding:0"><span class="grow">Guests</span><span class="stepper"><button type="button" id="gm">−</button><b id="gv">2</b><button type="button" id="gp">+</button></span></div>`,
-    onMount(api) {
-      $$('#kind button', api.el).forEach((b) => b.onclick = () => { kind = b.dataset.k; $$('#kind button', api.el).forEach((x) => x.classList.toggle('on', x === b)); $('#nl', api.el).textContent = kind === 'table' ? 'Table number' : 'Name on the tab'; if (kind === 'tab') { guests = 1; $('#gv', api.el).textContent = 1; } });
-      $('#gm', api.el).onclick = () => { guests = Math.max(1, guests - 1); $('#gv', api.el).textContent = guests; };
-      $('#gp', api.el).onclick = () => { guests = Math.min(20, guests + 1); $('#gv', api.el).textContent = guests; };
-      api.onRight = () => { const v = $('#nm', api.el).value.trim(); if (!v) { toast(kind === 'table' ? 'Enter a table number' : 'Enter a name'); return; } api.close({ name: kind === 'table' ? `Table ${v.replace(/^table\s*/i, '')}` : `Bar · ${v}`, kind, guests }); };
-    },
+// Tap a free table: pick the number of guests, then the menu opens.
+async function seatTable(t) {
+  let guests = Math.min(t.seats || 2, 2) || 1;
+  const max = Math.max(12, t.seats || 0);
+  const ok = await sheet({
+    title: `Seat ${tableName(t)}`, right: 'Open',
+    body: `<div class="pr-lab">How many guests?</div>${numPick('g', max, guests)}<p class="muted small">${t.seats} seat${t.seats > 1 ? 's' : ''} at this ${(KINDS[t.kind] || 'table').toLowerCase()}.</p>`,
+    onMount(api) { wirePick(api.el, 'g', (v) => { guests = v; api.close(true); }); }, // one tap opens the table
   });
-  if (!res) return;
+  if (!ok) return;
   const P = await posSettings();
   const no = (P.seq || 100) + 1;
   await savePos({ seq: no });
-  const c = await data.put('check', { no, ...res, server: meId(), serverName: meName(), opened: Date.now(), items: [], payments: [], tax: P.tax });
+  const c = await data.put('check', { no, name: tableName(t), tableId: t.id, kind: t.kind === 'bar' ? 'tab' : 'table', guests, server: meId(), serverName: meName(), opened: Date.now(), items: [], payments: [], tax: P.tax });
+  posCheckView.seat = 1;
   location.hash = '#/poscheck/' + c.id;
+}
+
+// The current orders, as a popup.
+async function currentOrders(staff, P) {
+  const showAll = boss() && LS.get('posAll', true);
+  const list = (await openChecks()).filter((c) => showAll || c.server === meId()).sort((a, b) => a.opened - b.opened);
+  const go = await sheet({
+    title: 'Current orders', left: 'Close',
+    body: `${boss() ? `<div class="segmented" id="cur-all"><button type="button" data-all="1" class="${showAll ? 'on' : ''}">All checks</button><button type="button" data-all="0" class="${showAll ? '' : 'on'}">Mine</button></div>` : ''}
+      ${list.length ? `<div class="group">${list.map((c) => { const t = totals(c, P.tax); const n = c.items.filter((x) => !x.sent && !x.voided).length; const nm = staffName(c.server, staff); return `
+      <button class="row nav" type="button" data-go="${c.id}">${avatar(nm)}<span class="grow"><span class="title">${esc(c.name)} <span class="muted small">#${c.no}</span></span>
+        <span class="sub">${esc(nm.split(' ')[0])} · ${c.guests} guest${c.guests > 1 ? 's' : ''} · ${mins(c.opened)} min${n ? ` · <span style="color:var(--warn)">${n} not sent</span>` : ''}</span></span>
+        <span class="pr-num"><b>${money(t.total)}</b></span></button>`; }).join('')}</div>` : '<div class="empty">No open orders. Tap a table on the seating layout to start one.</div>'}`,
+    onMount(api) {
+      $$('[data-go]', api.el).forEach((b) => b.onclick = () => api.close(b.dataset.go));
+      $$('#cur-all [data-all]', api.el).forEach((b) => b.onclick = () => { LS.set('posAll', b.dataset.all === '1'); api.close('again'); });
+    },
+  });
+  if (go === 'again') return currentOrders(staff, P);
+  if (go) location.hash = '#/poscheck/' + go;
+}
+
+// The Orders popup (RRA-114): opened from the menu, it offers Seating and
+// brings the current orders straight up.
+export async function posMenu() {
+  if (!canOrder() && !canKitchen()) { location.hash = '#/pos'; return; }
+  const P = await posSettings(), staff = await data.list('staff');
+  const list = canOrder() ? (await openChecks()).filter((c) => boss() || c.server === meId()).sort((a, b) => a.opened - b.opened) : [];
+  const go = await sheet({
+    title: 'Orders', left: 'Close',
+    body: `<div class="group">
+        ${canOrder() ? '<button class="row nav" type="button" data-go="#/pos"><span class="grow"><span class="title">Seating</span><span class="sub">Seat a table and take its order</span></span></button>' : ''}
+        ${canKitchen() ? '<button class="row nav" type="button" data-go="#/tickets"><span class="grow">Kitchen and bar screen</span></button>' : ''}
+        ${canSales() ? '<button class="row nav" type="button" data-go="#/possales"><span class="grow">Today\'s sales</span></button>' : ''}
+        ${boss() ? '<button class="row nav" type="button" data-go="#/seating"><span class="grow">Change the seating layout</span></button>' : ''}
+      </div>
+      ${canOrder() ? `<div class="section-label">Current orders</div>${list.length ? `<div class="group">${list.map((c) => { const nm = staffName(c.server, staff); return `<button class="row nav" type="button" data-go="#/poscheck/${c.id}">${avatar(nm)}<span class="grow"><span class="title">${esc(c.name)}</span><span class="sub">${c.guests} guest${c.guests > 1 ? 's' : ''} · ${mins(c.opened)} min</span></span><span class="pr-num"><b>${money(totals(c, P.tax).total)}</b></span></button>`; }).join('')}</div>` : '<p class="muted small">No open orders.</p>'}` : ''}`,
+    onMount(api) { $$('[data-go]', api.el).forEach((b) => b.onclick = () => api.close(b.dataset.go)); },
+  });
+  if (go) location.hash = go;
+}
+
+// Seating layout editor (managers and the Admin).
+export async function seatingView() {
+  setChrome({ tab: 'more', back: true });
+  setTitle('Seating layout');
+  if (!boss()) { view.innerHTML = lock('Managers and the Admin set up the seating.'); return; }
+  const P = await posSettings();
+  const tables = tablesOf(P).map((t) => ({ ...t }));
+  const moving = seatingView.moving && tables.find((t) => t.id === seatingView.moving);
+  view.innerHTML = `
+    <p class="muted small" style="margin-top:0">${moving ? `<b>Moving ${esc(tableName(moving))}:</b> tap an empty square.` : 'Tap an empty square (+) to add a table, booth or bar seat. Tap one to change, move or remove it.'}</p>
+    ${floorHtml(tables, [], P, true)}
+    ${moving ? '<button class="btn tonal block" id="mv-x" type="button">Cancel move</button>' : ''}
+    <p class="muted small">${tables.length} places: ${Object.entries(KINDS).map(([k, l]) => `${tables.filter((t) => t.kind === k).length} ${l.toLowerCase()}${k === 'bar' ? ' seats' : 's'}`).join(', ')}. The layout is shared by every phone.</p>
+    <button class="btn plain block" id="fl-reset" type="button">Start over with the starter layout</button>`;
+  const save = async (list) => { await savePos({ tables: list }); seatingView(); };
+  $('#mv-x')?.addEventListener('click', () => { seatingView.moving = null; seatingView(); });
+  $('#fl-reset').onclick = async () => { if (await sheet({ title: 'Starter layout?', right: 'Start over', body: '<p>Put back the starter tables (12 tables, 3 booths, 8 bar seats)? Open checks stay open.</p>' })) save(starterTables()); };
+  $$('[data-cell]').forEach((b) => b.onclick = async () => {
+    const [x, y] = b.dataset.cell.split(',').map(Number);
+    if (moving) { seatingView.moving = null; return save(tables.map((t) => (t.id === moving.id ? { ...t, x, y } : t))); }
+    const t = await tableSheet({ kind: 'table', seats: 4, x, y }, tables);
+    if (t) save([...tables, { ...t, id: Math.random().toString(36).slice(2, 9) }]);
+  });
+  $$('[data-t]').forEach((b) => b.onclick = async () => {
+    const t = tables.find((x) => x.id === b.dataset.t);
+    if (moving) { toast('Pick an empty square'); return; }
+    const r = await tableSheet(t, tables);
+    if (!r) return;
+    if (r === 'move') { seatingView.moving = t.id; seatingView(); return; }
+    if (r === 'remove') return save(tables.filter((x) => x.id !== t.id));
+    save(tables.map((x) => (x.id === t.id ? r : x)));
+  });
+}
+
+function tableSheet(t, tables) {
+  const isNew = !t.id;
+  let kind = t.kind || 'table', no = t.no, seats = t.seats || 4;
+  const taken = (k) => tables.filter((x) => x.kind === k && x.id !== t.id).map((x) => x.no);
+  const firstFree = (k) => { let n = 1; while (taken(k).includes(n)) n++; return n; };
+  if (!no) no = firstFree(kind);
+  return sheet({
+    title: isNew ? 'Add a place' : tableName(t), right: 'Save',
+    body: `<div class="segmented" id="tk">${Object.entries(KINDS).map(([k, l]) => `<button type="button" data-k="${k}" class="${k === kind ? 'on' : ''}">${l}${k === 'bar' ? ' seat' : ''}</button>`).join('')}</div>
+      <div class="pr-lab">Number</div><div id="tn">${numPick('n', 40, no, taken(kind))}</div>
+      <div class="pr-lab">Seats</div>${numPick('s', 12, seats)}
+      ${isNew ? '' : `<div class="btn-row" style="margin-top:12px"><button class="btn tonal" type="button" id="t-mv">Move</button><button class="btn tonal" type="button" id="t-rm" style="color:var(--danger)">Remove</button></div>`}`,
+    onMount(api) {
+      const wireN = () => wirePick(api.el, 'n', (v) => { no = v; });
+      $$('#tk button', api.el).forEach((b) => b.onclick = () => {
+        kind = b.dataset.k; $$('#tk button', api.el).forEach((x) => x.classList.toggle('on', x === b));
+        if (taken(kind).includes(no)) no = firstFree(kind);
+        if (kind === 'bar' && seats > 2) { seats = 1; $$('[data-pick="s"] button', api.el).forEach((x) => x.classList.toggle('on', +x.dataset.v === 1)); }
+        $('#tn', api.el).innerHTML = numPick('n', 40, no, taken(kind)); wireN();
+      });
+      wireN(); wirePick(api.el, 's', (v) => { seats = v; });
+      $('#t-mv', api.el)?.addEventListener('click', () => api.close('move'));
+      $('#t-rm', api.el)?.addEventListener('click', () => api.close('remove'));
+      api.onRight = () => api.close({ ...t, kind, no, seats });
+    },
+  });
 }
 
 // ------------------------------------------------------------ one check
@@ -150,7 +286,7 @@ export async function posCheckView(id) {
   const items = M.find((m) => m.section === section)?.items || [];
   const nUnsent = unsent.reduce((n, x) => n + (x.qty || 1), 0);
   // RRA-108: the open check on the left (item, qty with − and +, amount),
-  // picture tiles on the right with the menu sections as tabs under them.
+  // picture tiles on the right with the menu sections as tabs above them (RRA-116).
   view.innerHTML = `<div class="pos-wrap">
     <div class="pos-left">
     <div class="card pos-check">
@@ -160,7 +296,7 @@ export async function posCheckView(id) {
           <button class="pos-name" type="button" data-line="${x.id}"><span>${esc(short(x.name))}</span>${x.mods?.length ? `<span class="pos-mod">${esc(x.mods.join(', '))}</span>` : ''}${x.note ? `<span class="pos-mod">“${esc(x.note)}”</span>` : ''}<span class="pos-st">${x.voided ? 'void' : x.sent ? '✓ sent' : '<b style="color:var(--warn)">new</b>'}</span></button>
           <span class="pos-qty">${x.voided ? `<b>${x.qty || 1}</b>` : `<button type="button" data-minus="${x.id}" aria-label="One less">−</button><b>${x.qty || 1}</b><button type="button" data-plus="${x.id}" aria-label="One more">+</button>`}</span>
           <span class="pos-price">${money(lineTotal(x))}</span></div>`).join('')}</div>`).join('')
-      : '<p class="muted center" style="margin:6px 0">No items yet. Tap a dish to add it.</p>'}
+      : `<p class="muted center" style="margin:6px 0">No items yet. Tap a dish to add it.</p>${(c.payments || []).length ? '' : '<button class="btn plain block small" id="free" type="button">Seated by mistake? Free the table</button>'}`}
       <div class="pos-tot"><span>Subtotal</span><span>${money(t.sub)}</span></div>
       <div class="pos-tot"><span>Tax ${((c.tax ?? P.tax) * 100).toFixed(1)}%</span><span>${money(t.tax)}</span></div>
       <div class="pos-tot big"><span>Total</span><span>${money(t.total)}</span></div>
@@ -173,10 +309,10 @@ export async function posCheckView(id) {
     ${c.guests > 1 ? `<div class="pr-lab" style="margin:12px 0 4px">Adding to</div><div class="segmented">${Array.from({ length: c.guests }, (_, i) => `<button type="button" data-seat="${i + 1}" class="${seat === i + 1 ? 'on' : ''}">Seat ${i + 1}</button>`).join('')}</div>` : ''}
     </div>
     <div class="pos-right">
+    <div class="pos-secs pos-tabs">${M.map((m) => `<button type="button" data-sec="${esc(m.section)}" class="${m.section === section ? 'on' : ''}">${esc(m.section)}</button>`).join('')}</div>
     <div class="pos-grid">${items.map((x) => { const out = P.eightySix[x.id]; return `<button type="button" class="pos-tile${out ? ' out' : ''}${x.photo ? '' : ' nopic'}" data-item="${x.id}" ${out ? 'disabled' : ''} style="--tile:${tint(x.section + x.name)}">
       <span class="pos-pic">${x.photo ? `<img src="${esc(x.photo)}" alt="" loading="lazy">` : `<span>${esc(short(x.name))}</span>`}</span>
       <span class="pos-cap"><span class="pos-tn">${esc(short(x.name))}</span><small>${out ? '86’d' : money(x.price)}</small></span></button>`; }).join('') || '<p class="muted small">No dishes with a price in this section. Add prices in Recipes.</p>'}</div>
-    <div class="pos-secs pos-tabs">${M.map((m) => `<button type="button" data-sec="${esc(m.section)}" class="${m.section === section ? 'on' : ''}">${esc(m.section)}</button>`).join('')}</div>
     </div></div>`;
   $$('[data-sec]').forEach((b) => b.onclick = () => { LS.set('posSec', b.dataset.sec); posCheckView(id); });
   $$('[data-seat]').forEach((b) => b.onclick = () => { posCheckView.seat = +b.dataset.seat; posCheckView(id); });
@@ -186,6 +322,7 @@ export async function posCheckView(id) {
   $$('[data-minus]').forEach((b) => b.onclick = () => bump(c, b.dataset.minus, -1));
   $('#send').onclick = async () => { await send(c); toast('Sent to the kitchen and bar'); posCheckView(id); };
   $('#pay').onclick = () => { location.hash = '#/pospay/' + c.id; };
+  $('#free')?.addEventListener('click', async () => { await data.remove('check', c.id); toast(c.name + ' is free again'); location.hash = '#/pos'; });
 }
 
 // RRA-108: − and + on a line. Lines not sent yet change their quantity; a sent
