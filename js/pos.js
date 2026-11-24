@@ -376,7 +376,13 @@ export async function posCheckView(id) {
   $$('[data-minus]').forEach((b) => b.onclick = () => bump(c, b.dataset.minus, -1));
   $('#send').onclick = async () => { await send(c); toast('Sent to the kitchen and bar'); posCheckView(id); };
   // Pay opens a popup over the check (Gaylan, 2026-11-24), not a separate page.
-  $('#pay').onclick = async () => { if (await payPopup(c.id)) location.hash = '#/pos'; else posCheckView(id); };
+  // Once paid, go to the next open table's order; Seating only when none are open.
+  $('#pay').onclick = async () => {
+    if (!(await payPopup(c.id))) return posCheckView(id);
+    const next = (await openChecks()).filter((k) => k.id !== c.id && (boss() || k.server === meId()))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))[0];
+    location.replace(next ? '#/poscheck/' + next.id : '#/pos');
+  };
   if (posCheckView.pay === c.id) { posCheckView.pay = null; $('#pay').click(); }
   // Switching tables replaces this screen, so Back still goes to Seating.
   $$('.pos-ttabs a[role=tab]').forEach((a) => a.onclick = (e) => { e.preventDefault(); if (!a.classList.contains('on')) location.replace(a.getAttribute('href')); });

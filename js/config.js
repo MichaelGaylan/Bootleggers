@@ -5,11 +5,11 @@
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
 export const VERSION = '0.8.0';
-export const BUILD = '2026.11.24-12';
+export const BUILD = '2026.11.24-13';
 
 export const WHATS_NEW = [
   {
-    version: '0.8.0', build: '2026.11.24-12', date: '2026-11-24',
+    version: '0.8.0', build: '2026.11.24-13', date: '2026-11-24',
     lines: [
       'Orders (POS) opens a popup: Seating, the kitchen screen, sales and your current orders. Seating shows each area (Dining room, Bar, Outside) laid out with its tables, booths, high tops, bar seats and patio tables: tap a free table, tap the number of guests, and the menu opens. Tap a seated table to bring its order back up. Managers and the Admin add areas and arrange the tables under Change the seating layout. On a check, your open tables show as tabs across the top. No typing needed.',
       'Point of sale picture menu: dishes are photo tiles with their name and price using the real Bootleggers food, sauce and drink photos (also shown in Recipes), the menu sections are tabs across the top, and the open check sits on the left with − and + for each item. A photo added to a dish in Recipes takes the place of the standard one. Send turns orange (✓ Sent) once the order is in, and Pay opens a popup over the check for splitting and taking card or cash.',
