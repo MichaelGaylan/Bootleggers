@@ -894,3 +894,17 @@ label.btn { cursor: pointer; }
 .rd-presets .muted { color: #d9cbb2; }
 .radio .btn.tonal { background: rgba(255,255,255,.12); color: #f3e6cf; }
 @media (prefers-reduced-motion: reduce) { .rd-needle { transition: none; } }
+
+/* Order-up alerts (RRA-124): a small stack at the top of the screen. */
+.pickups { position: fixed; z-index: 40; top: calc(env(safe-area-inset-top) + 8px); right: 10px; display: flex; flex-direction: column; gap: 8px; width: min(360px, calc(100vw - 20px)); }
+.pickup { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 12px; border-radius: 14px; background: var(--card); border: 2px solid var(--accent); box-shadow: 0 6px 22px rgba(0,0,0,.22); animation: pk-in .25s ease-out; }
+.pickup b { display: block; font-size: 1rem; }
+.pickup small { display: block; color: var(--text-2); font-size: .8rem; }
+.pickup.late { border-color: #d1201b; box-shadow: 0 0 0 3px rgba(209,32,27,.25), 0 6px 22px rgba(0,0,0,.22); }
+.pickup.late .pk-i { animation: pk-ring 1s ease-in-out infinite; }
+.pickup.more { justify-content: center; font-size: .85rem; color: var(--text-2); padding: 6px; border-width: 1px; }
+.pk-i { font-size: 1.3rem; }
+@keyframes pk-in { from { transform: translateY(-8px); opacity: 0; } }
+@keyframes pk-ring { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-14deg); } 75% { transform: rotate(14deg); } }
+@media (prefers-reduced-motion: reduce) { .pickup, .pickup.late .pk-i { animation: none; } }
+@media print { .pickups { display: none !important; } }
