@@ -189,12 +189,13 @@ self.BRAND = {
   // Music (RRA-109): internet radio stations shown in the Music area. Only
   // stations that offer a public https stream. Add local AM/FM stations with
   // Find a station in the app, or list them here: { name, url, genre }.
+  // Radio stations (RRA-109). alts: backup addresses tried when the first won't play.
   radio: [
-    { name: 'Boot Liquor (SomaFM)', genre: 'Americana and roots', url: 'https://ice1.somafm.com/bootliquor-128-mp3' },
-    { name: 'Left Coast 70s (SomaFM)', genre: '70s rock', url: 'https://ice1.somafm.com/seventies-128-mp3' },
-    { name: 'Underground 80s (SomaFM)', genre: '80s', url: 'https://ice1.somafm.com/u80s-128-mp3' },
-    { name: 'Groove Salad (SomaFM)', genre: 'Chill', url: 'https://ice1.somafm.com/groovesalad-128-mp3' },
-    { name: 'Secret Agent (SomaFM)', genre: 'Lounge', url: 'https://ice1.somafm.com/secretagent-128-mp3' },
+    { name: 'Boot Liquor (SomaFM)', genre: 'Americana and roots', url: 'https://ice1.somafm.com/bootliquor-128-mp3', alts: ['https://ice2.somafm.com/bootliquor-128-mp3', 'https://ice4.somafm.com/bootliquor-128-mp3', 'https://ice6.somafm.com/bootliquor-128-mp3'] },
+    { name: 'Left Coast 70s (SomaFM)', genre: '70s rock', url: 'https://ice1.somafm.com/seventies-128-mp3', alts: ['https://ice2.somafm.com/seventies-128-mp3', 'https://ice4.somafm.com/seventies-128-mp3', 'https://ice6.somafm.com/seventies-128-mp3'] },
+    { name: 'Underground 80s (SomaFM)', genre: '80s', url: 'https://ice1.somafm.com/u80s-128-mp3', alts: ['https://ice2.somafm.com/u80s-128-mp3', 'https://ice4.somafm.com/u80s-128-mp3', 'https://ice6.somafm.com/u80s-128-mp3'] },
+    { name: 'Groove Salad (SomaFM)', genre: 'Chill', url: 'https://ice1.somafm.com/groovesalad-128-mp3', alts: ['https://ice2.somafm.com/groovesalad-128-mp3', 'https://ice4.somafm.com/groovesalad-128-mp3', 'https://ice6.somafm.com/groovesalad-128-mp3'] },
+    { name: 'Secret Agent (SomaFM)', genre: 'Lounge', url: 'https://ice1.somafm.com/secretagent-128-mp3', alts: ['https://ice2.somafm.com/secretagent-128-mp3', 'https://ice4.somafm.com/secretagent-128-mp3', 'https://ice6.somafm.com/secretagent-128-mp3'] },
   ],
   radioSearchArea: 'Augusta',              // Find a station starts with this
   radioSearchState: 'Georgia',

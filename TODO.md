@@ -11,6 +11,7 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-028 · Chef review of the starter stock list (items, units, bar list) · Content · S
 
 ## 🔵 Build list
+- [ ] RRA-122 · Music: no sound (Gaylan, 2026-11-24). Added a Test sound button, a status line (connecting, or why it isn't playing, instead of showing ⏸ when a station failed), and backup SomaFM servers for the built-in stations · Bug · S · added 2026-11-24 · built in the 0.8.1 sample, waiting for Gaylan's OK
 
 ## 🟡 Hold
 - [ ] RRA-104 · POS: live card payments through the restaurant's service (Square Terminal API, Clover REST Pay Display, or Toast order handoff) via the restaurant's server; bar menu with drink prices · Infra · L

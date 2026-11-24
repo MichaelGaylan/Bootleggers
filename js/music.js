@@ -17,6 +17,8 @@ let order = [];           // play order (indexes into tracks)
 let pos = -1;             // place in order
 let station = null;       // { name, url } while the radio plays
 let shuffle = LS.get('musicShuffle', false);
+let status = '';          // what the player is doing, shown under the title
+let tries = [];           // backup addresses left to try for this station
 audio.volume = LS.get('musicVol', 0.8);
 
 const isAudio = (f) => /\.(mp3|m4a|aac|wav|ogg|flac)$/i.test(f.name) || /^audio\//.test(f.type);
@@ -32,12 +34,30 @@ function makeOrder(start = 0) {
   } else pos = start;
 }
 
+// Plays what's loaded. A station that won't play tries its backup addresses
+// (BRAND.radio alts) before giving up; the reason shows on the player.
 async function play() {
-  try { await audio.play(); } catch (e) { if (e.name !== 'AbortError') toast(station ? 'This station would not play. Try another one.' : 'This file would not play.'); }
+  status = station ? 'Connecting…' : '';
+  refresh();
+  try { await audio.play(); status = ''; } catch (e) {
+    // A file or stream that can't load also fires the error event, which
+    // handles it (and tries a station's backups); only a blocked start lands here.
+    if (e.name === 'NotAllowedError') { audio.pause(); status = 'The browser blocked the sound. Tap ▶ to start it.'; }
+  }
+  refresh();
+}
+let lastFail = '';
+function failed(why) {
+  if (audio.src && audio.src === lastFail) return; // the error event and play() both report the same failure
+  lastFail = audio.src;
+  if (station && tries.length) { audio.src = tries.shift(); play(); return; }
+  audio.pause();
+  status = why || (station ? 'This station isn’t playing right now. Try another one.' : 'This file won’t play. MP3 and M4A files work best.');
+  toast(status);
   refresh();
 }
 function playTrack(i) {
-  station = null;
+  station = null; tries = []; lastFail = '';
   if (!order.length || order[pos] !== i) makeOrder(i);
   if (order[pos] !== i) pos = order.indexOf(i);
   audio.src = tracks[i].url;
@@ -45,6 +65,7 @@ function playTrack(i) {
 }
 function playStation(s) {
   station = s;
+  tries = [...(s.alts || [])]; lastFail = '';
   audio.src = s.url;
   play();
 }
@@ -61,6 +82,22 @@ function toggle() {
 audio.addEventListener('ended', () => next(1));
 audio.addEventListener('play', () => refresh());
 audio.addEventListener('pause', () => refresh());
+audio.addEventListener('playing', () => { if (status) { status = ''; refresh(); } });
+audio.addEventListener('error', () => { if (audio.getAttribute('src')) failed(); });
+
+// Test sound: a short beep straight from this device, to check the speaker
+// and volume apart from any song or station.
+function testSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = 660; g.gain.value = 0.25;
+    o.connect(g).connect(ctx.destination);
+    o.start(); o.stop(ctx.currentTime + 0.6);
+    o.onended = () => ctx.close();
+    toast(isIOS ? 'Beep! No beep? Turn off Silent mode and turn the volume up.' : 'Beep! No beep? Check the volume and that speakers are connected.');
+  } catch { toast('This browser can’t play a test sound.'); }
+}
 
 function addFiles(list) {
   const files = [...list].filter(isAudio).sort((a, b) => (a.webkitRelativePath || a.name).localeCompare(b.webkitRelativePath || b.name, undefined, { numeric: true }));
@@ -96,6 +133,7 @@ export function musicView() {
   view.innerHTML = `
     <div class="card mu-now">
       <div class="mu-title">${now ? esc(now.name) : 'Nothing playing'}</div>
+      ${status ? `<div class="mu-status">${esc(status)}</div>` : ''}
       <div class="muted small">${now ? (station ? `Radio${station.genre ? ' · ' + esc(station.genre) : ''}` : `Song ${pos + 1} of ${tracks.length}${now.folder ? ' · ' + esc(now.folder) : ''}`) : 'Pick songs or a radio station below.'}</div>
       <div class="mu-ctrl">
         <button type="button" id="mu-prev" aria-label="Previous" ${station || tracks.length < 2 ? 'disabled' : ''}>⏮</button>
@@ -103,6 +141,7 @@ export function musicView() {
         <button type="button" id="mu-next" aria-label="Next" ${station || tracks.length < 2 ? 'disabled' : ''}>⏭</button>
         <button type="button" id="mu-shuf" class="${shuffle ? 'on' : ''}" aria-label="Shuffle" ${station ? 'disabled' : ''}>🔀</button>
       </div>
+      <button class="btn plain small" id="mu-test" type="button">🔊 Test sound</button>
       ${isIOS ? '<p class="muted small center" style="margin:6px 0 0">Use the iPad or iPhone volume buttons.</p>' : `<label class="mu-vol"><span aria-hidden="true">🔈</span><input type="range" id="mu-vol" min="0" max="1" step="0.05" value="${audio.volume}" aria-label="Volume"><span aria-hidden="true">🔊</span></label>`}
     </div>
     <div class="segmented"><button type="button" data-mt="files" class="${tab === 'files' ? 'on' : ''}">My music</button><button type="button" data-mt="radio" class="${tab === 'radio' ? 'on' : ''}">Radio</button></div>
@@ -122,6 +161,7 @@ export function musicView() {
     <p class="muted small">Playing music for guests usually needs a business music license (for example ASCAP, BMI, SESAC and GMR), whichever source you use. Personal Spotify, Apple Music and Pandora accounts don't allow business use.</p>`;
   $$('[data-mt]').forEach((b) => b.onclick = () => { LS.set('musicTab', b.dataset.mt); musicView(); });
   $('#mu-play').onclick = toggle;
+  $('#mu-test').onclick = testSound;
   $('#mu-prev').onclick = () => next(-1);
   $('#mu-next').onclick = () => next(1);
   $('#mu-shuf').onclick = () => { shuffle = !shuffle; LS.set('musicShuffle', shuffle); makeOrder(order[pos] ?? 0); musicView(); };
@@ -180,7 +220,11 @@ async function findStation() {
 function refresh() {
   if (location.hash.startsWith('#/music') && $('#mu-play')) {
     // Keep search results on screen; otherwise redraw the player.
-    if ($('#mu-res')) { const b = $('#mu-play'); b.textContent = audio.paused ? '▶' : '⏸'; b.disabled = false; $('.mu-title').textContent = current()?.name || 'Nothing playing'; } else musicView();
+    if ($('#mu-res')) {
+      const b = $('#mu-play'); b.textContent = audio.paused ? '▶' : '⏸'; b.disabled = false; $('.mu-title').textContent = current()?.name || 'Nothing playing';
+      let st = $('.mu-status'); if (!st && status) { st = document.createElement('div'); st.className = 'mu-status'; $('.mu-title').after(st); }
+      if (st) { st.textContent = status; st.hidden = !status; }
+    } else musicView();
   }
   let m = $('#mu-mini');
   const now = current();

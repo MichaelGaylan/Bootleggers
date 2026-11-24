@@ -4,10 +4,16 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.8.0';
-export const BUILD = '2026.11.24-13';
+export const VERSION = '0.8.1';
+export const BUILD = '2026.11.24-14';
 
 export const WHATS_NEW = [
+  {
+    version: '0.8.1', build: '2026.11.24-14', date: '2026-11-24',
+    lines: [
+      'Music: a Test sound button checks the speaker and volume, the player says when a station is connecting or why something isn\'t playing, and the built-in stations try backup servers on their own.',
+    ],
+  },
   {
     version: '0.8.0', build: '2026.11.24-13', date: '2026-11-24',
     lines: [

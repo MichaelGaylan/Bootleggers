@@ -860,3 +860,6 @@ label.btn { cursor: pointer; }
 
 /* Send turns a dull orange once everything on the check has gone to the kitchen (Gaylan, 2026-11-24). */
 .pos-actions .btn.pos-sent, .pos-actions .btn.pos-sent:disabled { background: #b8743a; color: #fff; opacity: 1; }
+
+/* Music: what the player is doing (connecting, or why it isn't playing). */
+.mu-status { margin: 2px 0 4px; font-size: 14px; font-weight: 600; color: var(--warn, #b8743a); }
