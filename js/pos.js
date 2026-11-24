@@ -14,8 +14,8 @@ import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session, LS } from
 import { canSee, canChange, isHost, myStaff } from './perms.js';
 import { BRAND } from './config.js';
 import { dishPhoto } from './menu.js';
-import { discounts, headline } from './coupons-core.js';
-import { couponSheet } from './coupons.js';
+import { discounts, headline, tagOf } from './coupons-core.js';
+import { couponSheet, discountsSheet } from './coupons.js';
 
 const money = (n) => (n < 0 ? '−' : '') + '$' + Math.abs(+n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const r2 = (n) => Math.round(n * 100) / 100;
@@ -337,7 +337,8 @@ export async function posCheckView(id) {
   if (!M.some((m) => m.section === section)) section = M[0]?.section;
   let seat = Math.min(posCheckView.seat || 1, c.guests);
   const t = totals(c, P.tax), unsent = c.items.filter((x) => !x.sent && !x.voided);
-  const dl = discounts(c).list, locked = (c.payments || []).length > 0; // RRA-122: no coupon changes once a payment is in
+  const dl = discounts(c).list, locked = (c.payments || []).length > 0;
+  const hasStanding = (await data.list('coupon')).some((cp) => tagOf(cp) && !cp.paused); // RRA-128 // RRA-122: no coupon changes once a payment is in
   const seats = [...new Set(c.items.map((x) => x.seat))].sort((a, b) => a - b);
   const items = M.find((m) => m.section === section)?.items || [];
   const nUnsent = unsent.reduce((n, x) => n + (x.qty || 1), 0);
@@ -359,8 +360,8 @@ export async function posCheckView(id) {
           <span class="pos-price">${money(lineTotal(x))}</span></div>`).join('')}</div>`).join('')
       : `<p class="muted center" style="margin:6px 0">No items yet. Tap a dish to add it.</p>${(c.payments || []).length ? '' : '<button class="btn plain block small" id="free" type="button">Seated by mistake? Free the table</button>'}`}
       <div class="pos-tot"><span>Subtotal</span><span>${money(t.sub)}</span></div>
-      ${dl.map((k, i) => `<div class="pos-tot pos-cpn"><button type="button" data-cpn="${i}" ${locked ? 'disabled' : ''}><span>🎟 ${esc(k.code)}</span><small>${esc(headline(k))}${k.note ? ` · <b style="color:var(--warn)">${esc(k.note)}</b>` : ''}</small></button><span>${k.amount ? '−' + money(k.amount) : money(0)}</span></div>`).join('')}
-      ${c.items.length && !locked && dl.every((k) => k.stack) ? `<button class="btn plain small pos-addcpn" id="cpn" type="button">🎟 ${dl.length ? 'Add another coupon' : 'Add a coupon'}</button>` : ''}
+      ${dl.map((k, i) => `<div class="pos-tot pos-cpn"><button type="button" data-cpn="${i}" ${locked ? 'disabled' : ''}><span>${tagOf(k) ? `${tagOf(k).icon} ${esc(tagOf(k).label)}` : `🎟 ${esc(k.code)}`}</span><small>${esc(tagOf(k) ? headline(k).split(': ')[1] : headline(k))}${k.note ? ` · <b style="color:var(--warn)">${esc(k.note)}</b>` : ''}</small></button><span>${k.amount ? '−' + money(k.amount) : money(0)}</span></div>`).join('')}
+      ${c.items.length && !locked && dl.every((k) => k.stack) ? `<div class="pos-addcpn"><button class="btn plain small" id="cpn" type="button">🎟 ${dl.length ? 'Add another coupon' : 'Add a coupon'}</button>${hasStanding ? '<button class="btn plain small" id="disc" type="button">🎖 Discounts</button>' : ''}</div>` : ''}
       <div class="pos-tot"><span>Tax ${((c.tax ?? P.tax) * 100).toFixed(1)}%</span><span>${money(t.tax)}</span></div>
       <div class="pos-tot big"><span>Total</span><span>${money(t.total)}</span></div>
       ${t.paid ? `<div class="pos-tot"><span>Paid</span><span>−${money(t.paid)}</span></div><div class="pos-tot big"><span>Due</span><span>${money(t.due)}</span></div>` : ''}
@@ -397,9 +398,10 @@ export async function posCheckView(id) {
   $$('.pos-ttabs a[role=tab]').forEach((a) => a.onclick = (e) => { e.preventDefault(); if (!a.classList.contains('on')) location.replace(a.getAttribute('href')); });
   // RRA-122: scan or type a coupon; tap a coupon line to take it off.
   $('#cpn')?.addEventListener('click', async () => { if (await couponSheet(c.id)) posCheckView(id); });
+  $('#disc')?.addEventListener('click', async () => { if (await discountsSheet(c.id)) posCheckView(id); });
   $$('[data-cpn]').forEach((b) => b.onclick = async () => {
     const k = dl[+b.dataset.cpn];
-    const ok = await sheet({ title: 'Take off coupon?', right: 'Take off', body: `<p><b>${esc(k.code)}</b> · ${esc(headline(k))}</p><p class="muted small">It can be scanned again afterwards.</p>` });
+    const ok = await sheet({ title: tagOf(k) ? 'Take off discount?' : 'Take off coupon?', right: 'Take off', body: `<p><b>${esc(tagOf(k) ? tagOf(k).label : k.code)}</b> · ${esc(headline(k))}</p><p class="muted small">It can be added again afterwards.</p>` });
     if (!ok) return;
     const cur = await data.get('check', c.id);
     await data.put('check', { ...cur, coupons: (cur.coupons || []).filter((x) => x.code !== k.code) });
@@ -718,7 +720,7 @@ export async function posSalesView() {
   const cps = {}; // RRA-122: coupons used today
   for (const c of closed) {
     const t = totals(c, P.tax); net += t.net; tax += t.tax; disc += t.disc;
-    for (const k of discounts(c).list) { const e = (cps[k.code.split('-')[0]] ||= { n: 0, amt: 0, label: headline(k) }); e.n++; e.amt += k.amount; }
+    for (const k of discounts(c).list) { const key = tagOf(k) ? `${tagOf(k).icon} ${tagOf(k).label} discounts` : k.code.split('-')[0]; const e = (cps[key] ||= { n: 0, amt: 0, label: tagOf(k) ? headline(k).split(': ')[1] : headline(k) }); e.n++; e.amt += k.amount; }
     const s = (by[c.serverName || 'Staff'] ||= { net: 0, card: 0, cash: 0, checks: 0 }); s.net += t.net; s.checks++;
     for (const p of c.payments || []) { if (p.method === 'cash') { cash += p.amount; cashTips += p.tip || 0; s.cash += p.tip || 0; } else { card += p.amount; cardTips += p.tip || 0; s.card += p.tip || 0; } }
     for (const x of c.items) if (!x.voided) items[x.name] = (items[x.name] || 0) + (x.qty || 1);
@@ -740,7 +742,7 @@ export async function posSalesView() {
     </div>
     <div class="section-label">By server</div>
     <div class="group">${Object.entries(by).map(([n, s]) => `<div class="row">${avatar(n)}<span class="grow"><span class="title">${esc(n)}</span><span class="sub">${s.checks} checks · card tips ${money(s.card)} · cash tips ${money(s.cash)}</span></span><span class="meta">${money(s.net)}</span></div>`).join('') || '<div class="row muted">No closed checks yet today.</div>'}</div>
-    ${Object.keys(cps).length ? `<div class="section-label">Coupons used</div><div class="group">${Object.entries(cps).map(([code, e]) => `<div class="row"><span class="grow"><span class="title">${esc(code)}</span><span class="sub">${esc(e.label)} · used ${e.n}×</span></span><span class="meta">−${money(e.amt)}</span></div>`).join('')}</div>` : ''}
+    ${Object.keys(cps).length ? `<div class="section-label">Coupons and discounts used</div><div class="group">${Object.entries(cps).map(([code, e]) => `<div class="row"><span class="grow"><span class="title">${esc(code)}</span><span class="sub">${esc(e.label)} · used ${e.n}×</span></span><span class="meta">−${money(e.amt)}</span></div>`).join('')}</div>` : ''}
     ${top.length ? `<div class="section-label">Top items</div><div class="group">${top.map(([n, q]) => `<div class="row"><span class="grow">${esc(n)}</span><span class="meta">${q}</span></div>`).join('')}</div>` : ''}
     <p class="muted small">Tips go into each night's tip pool and net sales into labor % in Payroll on their own.</p>`;
 }

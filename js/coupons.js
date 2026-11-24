@@ -16,7 +16,7 @@ import * as data from './data.js';
 import { $, $$, esc, view, sheet, toast, setTitle, setChrome } from './ui.js';
 import { canSee, canChange } from './perms.js';
 import { BRAND } from './config.js';
-import { TYPES, DAYS, cleanCode, newSuffix, payload, headline, finePrint, canApply, usesOf } from './coupons-core.js';
+import { TYPES, DAYS, TAGS, tagOf, cleanCode, newSuffix, payload, headline, finePrint, canApply, canApplyStanding, usesOf } from './coupons-core.js';
 
 const C = () => ({ title: BRAND.shortName, tagline: '', ...(BRAND.coupon || {}) });
 const lock = (m) => `<div class="empty">🔒 ${esc(m)}<br><span class="small">The Admin sets this in Settings → Roles and permissions.</span></div>`;
@@ -176,14 +176,18 @@ export async function couponsView() {
   list.sort((a, b) => (a.paused - b.paused) || String(a.code).localeCompare(b.code));
   view.innerHTML = `
     ${list.length ? `<div class="group">${list.map((cp) => { const [s, col] = status(cp, checks); const used = usesOf(cp, checks); return `
-      <a class="row nav" href="#/coupon/${cp.id}"><span class="grow"><span class="title">🎟 ${esc(cp.code)} <span class="chip c-${col}">${s}</span></span>
+      <a class="row nav" href="#/coupon/${cp.id}"><span class="grow"><span class="title">${tagOf(cp) ? tagOf(cp).icon : '🎟'} ${esc(cp.code)} <span class="chip c-${col}">${s}</span></span>
       <span class="sub">${esc(headline(cp))} · used ${used}${+cp.maxUses > 0 ? ` of ${cp.maxUses}` : ''}${cp.end ? ` · ends ${esc(cp.end)}` : ''}</span></span></a>`; }).join('')}</div>`
     : `<div class="empty">No coupons yet.${canChange('coupons') ? '<br><a class="btn" href="#/coupon/new" style="margin-top:10px">Make a coupon</a>' : ''}</div>`}
+    ${canChange('coupons') ? `<div class="section-label">Standing discounts</div><div class="group">${Object.entries(TAGS).map(([k, t]) => {
+      const have = list.find((cp) => cp.tag === k);
+      return have ? '' : `<a class="row nav" href="#/coupon/new-${k}"><span class="grow"><span class="title">${t.icon} Add a ${esc(t.label.toLowerCase())} discount</span><span class="sub">Every visit with ${esc(t.id)}, no coupon needed</span></span></a>`; }).join('') || '<div class="row muted small">All set up. Edit them above.</div>'}</div>` : ''}
     <div class="section-label">How coupons work</div>
     <div class="group"><div class="row"><span class="grow"><span class="sub" style="white-space:normal">
       Make a coupon here, then send it as a picture: a QR code or a barcode with the offer printed under it, ready to text, email, print or post.
       At the table, the server taps <b>Add a coupon</b> on the check and scans it with the phone camera, or types the code.
       The app checks the dates, days, hours, minimum and how many times it's been used, then takes the discount off before tax.
+      Standing discounts (military / veteran, first responder, senior) need no coupon: the server taps <b>Discounts</b> on the check and confirms they saw the guest's ID.
       The code only holds a number; the offer is looked up here, so a home-made code can't give itself a bigger discount, and another restaurant's app won't take ours.
     </span></span></div></div>`;
 }
@@ -198,11 +202,13 @@ export async function couponView(id) {
   setChrome({ tab: 'more', back: true });
   if (!canSee('coupons')) { setTitle('Coupon'); view.innerHTML = lock('Coupons are for managers and the Admin.'); return; }
   const edit = canChange('coupons');
-  const isNew = id === 'new';
+  const preTag = /^new-(\w+)$/.exec(id || '')?.[1];
+  const isNew = id === 'new' || !!TAGS[preTag];
   const saved = isNew ? null : await data.get('coupon', id);
   if (!isNew && !saved) { location.replace('#/coupons'); return; }
   if (isNew && !edit) { location.replace('#/coupons'); return; }
   const cp = { ...BLANK, ...(saved || {}) };
+  if (isNew && TAGS[preTag]) Object.assign(cp, { tag: preTag, code: TAGS[preTag].code, value: 10 });
   const [menu, checks, all] = await Promise.all([dishes(), data.list('check'), data.list('coupon')]);
   setTitle(isNew ? 'New coupon' : cp.code);
   let kind = couponView.kind || 'qr';
@@ -219,6 +225,7 @@ export async function couponView(id) {
       <p class="muted small" style="margin-bottom:0">Used ${used}${+cp.maxUses > 0 ? ` of ${cp.maxUses}` : ''} time${used === 1 ? '' : 's'}${cp.unique ? ` · ${(cp.codes || []).length} one-time code${(cp.codes || []).length === 1 ? '' : 's'} made, ${usedCodes.size} used` : ''}.</p></div>` : ''}
     <div class="section-label">The offer</div>
     <div class="group pad">
+      <label class="field"><span>Kind</span><select id="c-tag" ${dis}><option value="">Coupon (scan or type a code)</option>${Object.entries(TAGS).map(([k, t]) => `<option value="${k}" ${cp.tag === k ? 'selected' : ''}>${t.icon} ${esc(t.label)} discount (every visit, show ID)</option>`).join('')}</select></label>
       <label class="field"><span>Code (what's typed at the register)</span><input type="text" id="c-code" value="${esc(cp.code)}" placeholder="e.g. WINGS20" autocapitalize="characters" autocomplete="off" maxlength="16" ${dis}></label>
       <div class="segmented" id="c-type">${Object.entries(TYPES).map(([k, v]) => `<button type="button" data-t="${k}" class="${cp.type === k ? 'on' : ''}" ${dis}>${esc(v.replace('Buy one, get one free', 'BOGO'))}</button>`).join('')}</div>
       <label class="field" id="f-val"><span id="l-val">${cp.type === 'off' ? 'Dollars off' : 'Percent off'}</span><input type="number" inputmode="decimal" id="c-val" value="${esc(cp.value)}" min="0" step="0.01" ${dis}></label>
@@ -238,7 +245,7 @@ export async function couponView(id) {
     <div class="section-label">Limits</div>
     <div class="group pad">
       <label class="field"><span>Total uses allowed (blank = no limit)</span><input type="number" inputmode="numeric" id="c-max" value="${esc(cp.maxUses)}" min="0" step="1" placeholder="No limit" ${dis}></label>
-      <div class="row"><span class="grow"><span class="title">One-time codes</span><span class="sub" style="white-space:normal">Each guest gets their own code (${esc(cp.code || 'CODE')}-XXXXXX) that works once, so a screenshot can't be passed around</span></span><button class="toggle ${cp.unique ? 'on' : ''}" id="c-unique" type="button" aria-label="One-time codes" ${dis}></button></div>
+      <div class="row" id="f-unique"><span class="grow"><span class="title">One-time codes</span><span class="sub" style="white-space:normal">Each guest gets their own code (${esc(cp.code || 'CODE')}-XXXXXX) that works once, so a screenshot can't be passed around</span></span><button class="toggle ${cp.unique ? 'on' : ''}" id="c-unique" type="button" aria-label="One-time codes" ${dis}></button></div>
       <div class="row"><span class="grow"><span class="title">Can be combined</span><span class="sub">With another coupon that can also be combined</span></span><button class="toggle ${cp.stack ? 'on' : ''}" id="c-stack" type="button" aria-label="Can be combined" ${dis}></button></div>
       <label class="field"><span>Extra fine print (optional)</span><input type="text" id="c-fine" value="${esc(cp.fine)}" placeholder="e.g. Dine-in only" maxlength="60" ${dis}></label>
       ${saved ? `<div class="row"><span class="grow"><span class="title">Paused</span><span class="sub">Turn it off for now without deleting it</span></span><button class="toggle ${cp.paused ? 'on' : ''}" id="c-paused" type="button" aria-label="Paused" ${dis}></button></div>` : ''}
@@ -253,18 +260,25 @@ export async function couponView(id) {
     $('#l-val').textContent = t === 'off' ? 'Dollars off' : 'Percent off';
     $('#f-dish').hidden = !(t === 'free' || t === 'bogo');
     $('#f-food').hidden = !(t === 'pct' || t === 'off');
+    $('#f-unique').hidden = !!$('#c-tag').value; // a standing discount works every visit
   };
   show();
   $$('#c-type [data-t]').forEach((b) => b.onclick = () => { $$('#c-type button').forEach((x) => x.classList.toggle('on', x === b)); show(); });
   $$('#c-days [data-d]').forEach((b) => b.onclick = () => b.classList.toggle('on'));
   $$('.toggle').forEach((b) => b.onclick = () => b.classList.toggle('on'));
+  $('#c-tag').onchange = () => {
+    const t = TAGS[$('#c-tag').value];
+    if (t && !$('#c-code').value) $('#c-code').value = t.code;
+    if (t) $('#c-unique').classList.remove('on');
+    show();
+  };
   $('#c-code').oninput = (e) => { const v = cleanCode(e.target.value).replace(/-/g, ''); if (v !== e.target.value) e.target.value = v; };
 
   const read = () => {
     const t = $('#c-type .on').dataset.t;
     const dish = menu.find((d) => d.id === $('#c-dish').value);
     return {
-      ...cp, code: cleanCode($('#c-code').value).replace(/-/g, ''), type: t,
+      ...cp, code: cleanCode($('#c-code').value).replace(/-/g, ''), type: t, tag: $('#c-tag').value,
       value: t === 'pct' || t === 'off' ? +$('#c-val').value || 0 : 0,
       menuId: t === 'free' || t === 'bogo' ? dish?.id || '' : '', itemName: t === 'free' || t === 'bogo' ? dish?.name || '' : '',
       food: t === 'pct' || t === 'off' ? $('#c-food').classList.contains('on') : true,
@@ -273,7 +287,7 @@ export async function couponView(id) {
       days: $$('#c-days .on').map((b) => +b.dataset.d),
       from: $('#c-from').value, to: $('#c-to').value,
       maxUses: $('#c-max').value === '' ? '' : Math.max(0, Math.round(+$('#c-max').value)),
-      unique: $('#c-unique').classList.contains('on'), stack: $('#c-stack').classList.contains('on'),
+      unique: !$('#c-tag').value && $('#c-unique').classList.contains('on'), stack: $('#c-stack').classList.contains('on'),
       fine: $('#c-fine').value.trim(), paused: $('#c-paused')?.classList.contains('on') || false,
     };
   };
@@ -284,6 +298,7 @@ export async function couponView(id) {
     if (x.type === 'pct' && x.value > 100) return 'Percent off can be 100 at most.';
     if ((x.type === 'free' || x.type === 'bogo') && !x.menuId) return 'Pick the dish.';
     if (!x.days.length) return 'Pick at least one day.';
+    if (x.tag && all.some((o) => o.id !== x.id && o.tag === x.tag && !o.paused)) return `There's already a ${TAGS[x.tag].label.toLowerCase()} discount. Edit that one, or pause it first.`;
     if ((x.from && !x.to) || (!x.from && x.to)) return 'Set both From and Until, or neither.';
     if (x.start && x.end && x.end < x.start) return 'It expires before it starts.';
     return '';
@@ -362,8 +377,8 @@ export async function couponSheet(checkId) {
           setTimeout(() => { busy = false; }, scanned ? 1800 : 0); // don't re-read the same bad code at once
           return;
         }
-        await data.put('check', { ...check, coupons: [...(check.coupons || []), r.line] });
-        toast(`🎟 ${r.line.code}: ${headline(r.line)}`);
+        if (tagOf(r.line)) { api.close({ needId: r.line }); return; } // a veteran card etc.: confirm the ID first
+        await applyLine(checkId, r.line);
         api.close(true);
       };
       $('#capply', el).onclick = () => { const v = $('#ctyped', el).value.trim(); if (v) tryCode(v, false); else $('#ctyped', el).focus(); };
@@ -372,7 +387,36 @@ export async function couponSheet(checkId) {
     },
   });
   stop();
+  if (result?.needId) return (await sawId(result.needId)) && applyLine(checkId, result.needId);
   return !!result;
+}
+
+async function applyLine(checkId, line) {
+  const check = await data.get('check', checkId);
+  await data.put('check', { ...check, coupons: [...(check.coupons || []), line] });
+  toast(`${tagOf(line) ? tagOf(line).icon : '🎟'} ${headline(line)}`);
+  return true;
+}
+
+// The server confirms they saw the guest's ID (RRA-128).
+function sawId(line) {
+  const t = tagOf(line);
+  return sheet({ title: `${t.label} discount`, left: 'Cancel', right: 'Yes, add it', body: `<p style="font-size:1.1rem"><b>Did you see the guest's ${esc(t.id)}?</b></p><p class="muted">${esc(headline(line))}. The check will show it as a ${esc(t.label.toLowerCase())} discount.</p>` });
+}
+
+// Discounts on a check (RRA-128): the standing discounts, no code needed.
+export async function discountsSheet(checkId) {
+  const [coupons, checks, check] = await Promise.all([data.list('coupon'), data.list('check'), data.get('check', checkId)]);
+  const list = coupons.filter((cp) => tagOf(cp));
+  const rows = list.map((cp) => ({ cp, r: canApplyStanding({ coupon: cp, checks, check }) }));
+  const pick = await sheet({
+    title: 'Discounts', left: 'Cancel',
+    body: `${rows.map(({ cp, r }, i) => `<button type="button" class="row nav cpn-disc" data-i="${i}" ${r.ok ? '' : 'disabled'}><span class="grow"><span class="title">${tagOf(cp).icon} ${esc(tagOf(cp).label)}</span><span class="sub" style="white-space:normal">${esc(r.ok ? headline(cp).split(': ')[1] : r.error)}</span></span></button>`).join('') || '<p class="muted">No standing discounts yet. A manager adds them under More → Coupons.</p>'}`,
+    onMount(api) { $$('[data-i]', api.el).forEach((b) => b.onclick = () => api.close(rows[+b.dataset.i])); },
+  });
+  if (!pick?.r.ok) return false;
+  if (!(await sawId(pick.r.line))) return false;
+  return applyLine(checkId, pick.r.line);
 }
 
 // Reads one picture (a video frame or a canvas). The area inside the aiming

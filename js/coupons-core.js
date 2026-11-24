@@ -24,6 +24,17 @@ export const TYPES = {
 };
 export const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+// Standing discounts (RRA-128): a coupon with a tag is a discount a guest gets
+// every visit by showing ID, with no code to scan. The server picks it from
+// Discounts on the check and confirms they saw the ID. The tag is saved on the
+// check, so sales can show e.g. military/veteran discounts on their own line.
+export const TAGS = {
+  military: { label: 'Military / veteran', icon: '🎖', id: 'military or veteran ID', code: 'MILITARY' },
+  responder: { label: 'First responder', icon: '🚒', id: 'first responder ID', code: 'RESPONDER' },
+  senior: { label: 'Senior', icon: '🧓', id: 'ID showing their age', code: 'SENIOR' },
+};
+export const tagOf = (k) => TAGS[k?.tag] || null;
+
 export const tag = () => String((BRAND.coupon && BRAND.coupon.tag) || (BRAND.dataPrefix || 'CPN').replace(/\W+/g, '')).toUpperCase();
 
 // Codes: letters and numbers only, upper case. One-time codes add -XXXXXX.
@@ -69,6 +80,11 @@ const liveLines = (c) => (c.items || []).filter((x) => !x.voided);
 
 // The offer as a short line for the check and the coupon picture.
 export function headline(k) {
+  const t = tagOf(k);
+  if (t) return `${t.label}: ${offerText(k)}`;
+  return offerText(k);
+}
+function offerText(k) {
   const what = k.food ? 'food' : 'your check';
   if (k.type === 'pct') return `${+k.value || 0}% OFF ${k.food ? 'any food order' : 'your check'}`;
   if (k.type === 'off') return `$${(+k.value || 0).toFixed(2).replace(/\.00$/, '')} OFF ${what}`;
@@ -94,6 +110,7 @@ export function finePrint(k) {
   if (k.food && (k.type === 'pct' || k.type === 'off')) out.push('Food only · not valid on drinks');
   const when = [dayRange(k.days), k.from && k.to ? `${fmtHour(k.from)}–${fmtHour(k.to)}` : ''].filter(Boolean).join(' · ');
   if (when) out.push(`Valid ${when}`);
+  if (tagOf(k)) out.push(`Show ${tagOf(k).id} · every visit`);
   out.push(k.stack ? 'One per check' : 'One per check · not valid with other offers');
   if (k.start && k.start > new Date().toISOString().slice(0, 10)) out.push(`Starts ${fmtDay(k.start)}`);
   if (k.end) out.push(`Expires ${fmtDay(k.end)}`);
@@ -104,7 +121,7 @@ export function finePrint(k) {
 // The part of the coupon copied onto a check.
 export const snapshot = (cp, code) => ({
   couponId: cp.id, code, type: cp.type, value: +cp.value || 0, food: !!cp.food,
-  menuId: cp.menuId || '', itemName: cp.itemName || '', min: +cp.min || 0, stack: !!cp.stack,
+  menuId: cp.menuId || '', itemName: cp.itemName || '', min: +cp.min || 0, stack: !!cp.stack, tag: cp.tag || '',
 });
 
 // Discount for one coupon on a check right now (items can change after it's added).
@@ -145,7 +162,13 @@ export function canApply({ coupons, checks, check, text, now = new Date() }) {
   if (scan.error) return { error: scan.error };
   const hit = findCoupon(coupons, scan.code);
   if (!hit) return { error: `No coupon with the code ${scan.code}.` };
-  const { coupon: cp, code, suffix } = hit;
+  return rules({ ...hit, checks, check, now });
+}
+
+// A standing discount (RRA-128) picked from the list: same rules, no code read.
+export const canApplyStanding = ({ coupon, checks, check, now = new Date() }) => rules({ coupon, code: coupon.code, suffix: '', checks, check, now });
+
+function rules({ coupon: cp, code, suffix, checks, check, now }) {
   if (cp.paused) return { error: `${cp.code} is paused.` };
   if (cp.unique && !suffix) return { error: `${cp.code} only works with its one-time code (e.g. ${cp.code}-XXXXXX).` };
   if (suffix && !(cp.codes || []).includes(suffix)) return { error: `${code} isn't one of the one-time codes made for ${cp.code}.` };
@@ -155,8 +178,8 @@ export function canApply({ coupons, checks, check, text, now = new Date() }) {
   if (cp.days && cp.days.length && cp.days.length < 7 && !cp.days.includes(t.day)) return { error: `${cp.code} is only good ${dayRange(cp.days)}.` };
   if (cp.from && cp.to && (t.hm < cp.from || t.hm > cp.to)) return { error: `${cp.code} is only good ${fmtHour(cp.from)}–${fmtHour(cp.to)}.` };
   const on = check.coupons || [];
-  if (on.some((k) => k.couponId === cp.id)) return { error: `${cp.code} is already on this check (one per check).` };
-  if (on.length && (!cp.stack || on.some((k) => !k.stack))) return { error: 'This check already has a coupon, and these can\'t be combined.' };
+  if (on.some((k) => k.couponId === cp.id)) return { error: `${tagOf(cp) ? tagOf(cp).label + ' discount' : cp.code} is already on this check (one per check).` };
+  if (on.length && (!cp.stack || on.some((k) => !k.stack))) return { error: 'This check already has a coupon or discount, and these can\'t be combined.' };
   const used = (checks || []).filter((k) => k.id !== check.id).flatMap((k) => k.coupons || []);
   if (suffix && used.some((k) => k.code === code)) return { error: `${code} has already been used.` };
   const uses = used.filter((k) => k.couponId === cp.id).length;

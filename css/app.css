@@ -931,3 +931,7 @@ label.btn { cursor: pointer; }
   border: 1px solid var(--sep); border-radius: 10px; padding: 10px 12px; min-height: 44px; -webkit-appearance: none; appearance: none;
 }
 .android .group.pad input[type=number], .android .group.pad input[type=date], .android .group.pad input[type=time] { border-radius: 4px; border-color: var(--text-2); background: transparent; }
+.pos-addcpn { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.pos-addcpn .btn { padding-left: 0; padding-right: 0; }
+button.row.cpn-disc { width: 100%; text-align: left; background: var(--card-2); border: 0; border-radius: 12px; margin: 0 0 8px; padding: 12px 14px; font: inherit; color: var(--text); cursor: pointer; }
+button.row.cpn-disc:disabled { opacity: .55; cursor: default; }
