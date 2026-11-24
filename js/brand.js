@@ -125,7 +125,6 @@ self.BRAND = {
     "Fried Pickles": "fried-pickles.jpg",
     "Fries": "fries.jpg",
     "Ginger Ale": "ginger-ale.jpg",
-    "Grilled Cheese Club with Fries": "grilled-cheese-club-with-fries.jpg",
     "Grilled Cheese with Fries": "grilled-cheese-with-fries.jpg",
     "Honey Mustard Large": "honey-mustard-sauce-cup.jpg",
     "Honey Mustard Small": "honey-mustard-sauce-cup.jpg",

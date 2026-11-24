@@ -1,6 +1,6 @@
 // Bootleggers Kitchen service worker: works offline, updates on request.
 // Bump CACHE with every release (it follows the app version).
-const CACHE = 'blg-0.8.0-2026.11.24-8';
+const CACHE = 'blg-0.8.0-2026.11.24-9';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'js/brand.js', 'js/app.js', 'js/config.js', 'js/access.js', 'js/crypto.js', 'js/store.js', 'js/starter-stock.js', 'js/menu.js', 'js/pdf.js', 'js/lounge.js',
@@ -24,7 +24,6 @@ const SHELL = [
   'assets/menu/fried-mushrooms.jpg',
   'assets/menu/fried-pickles.jpg',
   'assets/menu/fries.jpg',
-  'assets/menu/grilled-cheese-club-with-fries.jpg',
   'assets/menu/grilled-cheese-with-fries.jpg',
   'assets/menu/hot-dog-basket-with-side.jpg',
   'assets/menu/mile-high-club-with-fries.jpg',
