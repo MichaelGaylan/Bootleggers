@@ -945,3 +945,13 @@ button.row.cpn-disc:disabled { opacity: .55; cursor: default; }
 .fl-t.dirty { background: color-mix(in srgb, var(--warn) 22%, var(--card-2)); box-shadow: inset 0 0 0 2px var(--warn); }
 .fl-t.dirty small { color: var(--warn); font-weight: 700; }
 .fl-dot.dirty { background: var(--warn); box-shadow: none; }
+
+/* RRA-135: drinks */
+.pos-hh { color: var(--ok); }
+.pos-cap small s { opacity: .6; font-weight: 500; }
+.pos-21 { display: inline-block; font-size: .66rem; font-weight: 800; padding: 0 4px; border-radius: 4px; background: var(--warn); color: #fff; vertical-align: 1px; }
+.pos-idok { font-weight: 700; color: var(--ok); text-transform: none; letter-spacing: 0; }
+.pos-hhbar { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--text); border-radius: 10px; padding: 7px 10px; margin-bottom: 8px; font-weight: 600; font-size: .88rem; }
+.pos-idcard { text-align: center; padding: 4px 0 10px; }
+.pos-idbig { font-size: 2.2rem; font-weight: 800; color: var(--warn); }
+.hh-days { margin-bottom: 10px; }
