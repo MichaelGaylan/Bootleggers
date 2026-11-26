@@ -4,14 +4,14 @@
 // js/brand.js, so a changeout never keeps another restaurant's files cached.
 importScripts('js/brand.js');
 const B = self.BRAND;
-const CACHE = B.dataPrefix.replace(/\W+$/, '') + '-0.11.0-2026.11.26-24';
+const CACHE = B.dataPrefix.replace(/\W+$/, '') + '-0.12.0-2026.11.26-25';
 const CODE = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'js/brand.js', 'js/app.js', 'js/config.js', 'js/access.js', 'js/crypto.js', 'js/store.js', 'js/starter-stock.js', 'js/menu.js', 'js/pdf.js', 'js/lounge.js',
   'js/ui.js', 'js/data.js', 'js/perms.js', 'js/recipes.js', 'js/stock.js', 'js/board.js', 'js/prep.js',
   'js/schedule.js', 'js/events.js', 'js/costs.js', 'js/settings.js', 'js/sync.js', 'js/audience.js', 'js/dedupe.js', 'js/reports.js',
   'js/payroll.js', 'js/paycalc.js', 'js/provider.js', 'js/pos.js', 'js/giftcards.js', 'js/music.js', 'js/cleardata.js',
-  'js/coupons.js', 'js/coupons-core.js', 'js/drinks.js', 'vendor/zxing/zxing.min.js', // RRA-122
+  'js/coupons.js', 'js/coupons-core.js', 'js/drinks.js', 'js/alerts.js', 'vendor/zxing/zxing.min.js', // RRA-122
 ];
 const PICTURES = [B.logo, B.icon180, B.icon192, B.icon512, B.iconMaskable, B.favicon]
   .concat(Object.values(B.menuPhotos || {}).map((f) => (B.menuPhotoDir || '') + f))
@@ -36,11 +36,12 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('message', (e) => { if (e.data === 'skipWaiting') self.skipWaiting(); });
 
-// A request waiting for approval (RRA-043): open the app on Team access.
+// Tapping a notification opens the app where it points: Team access for a
+// phone waiting for approval (RRA-043), or the screen an alert is about (RRA-137).
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-    const url = new URL('./#/team', self.registration.scope).href;
+    const url = new URL('./' + (e.notification.data?.url || '#/team'), self.registration.scope).href;
     for (const c of list) { if ('focus' in c) { c.navigate(url).catch(() => {}); return c.focus(); } }
     return self.clients.openWindow(url);
   }));

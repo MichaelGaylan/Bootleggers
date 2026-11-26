@@ -25,6 +25,7 @@ import { payrollView, payRunView, payRunDoneView, payHistoryView, myPayView, tip
 import { payrollSettings, hasPayroll } from './paycalc.js';
 import { posView, posCheckView, posPayView, ticketsView, posSalesView, posSettingsView, canOrder, canKitchen, canSales, posMenu, seatingView, startPickups, showPickups, tablesView, canSeat, canClear } from './pos.js';
 import { giftCardsView } from './giftcards.js';
+import { startAlerts, setLoungeExtra, alertsView, badge } from './alerts.js'; // RRA-137
 import { couponsView, couponView } from './coupons.js';
 import { musicView } from './music.js';
 import { clearDataView } from './cleardata.js';
@@ -197,11 +198,10 @@ async function openDoor() {
 
 async function updateBadge() {
   const n = unreadCount() + (profile ? await unreadPosts() : 0) + waiting.size;
-  $('#tab-badge').hidden = !n;
-  $('#tab-badge').textContent = n;
   $('#bell-dot').hidden = !n;
-  const sb = $('#side-badge');
-  if (sb) { sb.hidden = !n; sb.textContent = n; }
+  // RRA-137: the Lounge badges come from alerts.js (messages, report replies,
+  // swaps); notices and phones waiting for approval are added here.
+  setLoungeExtra(unreadCount() + waiting.size);
   // RRA-105: events coming up, on the sidebar and More.
   const ev = profile ? (await dueEvents().catch(() => [])).length : 0;
   for (const b of $$('#ev-badge, #more-ev-badge')) { b.hidden = !ev; b.textContent = ev; }
@@ -214,19 +214,19 @@ function renderSide() {
   const link = (r, label, extra = '') => `<a href="#/${r}" data-r="${r}"><span class="grow">${label}</span>${extra}</a>`;
   const items = [
     canSee('recipes') ? link('recipes', 'Recipes') : '',
-    jobAreas() && canClear() ? link('tables', 'Tables') : '',
+    jobAreas() && canClear() ? link('tables', 'Tables', badge('tables')) : '',
     canSee('prep') ? link('prep', 'Prep') : '',
     canSee('stock') ? link('stock', 'Stock count') : '',
-    canSee('stock') ? link('needed', 'Needed') : '',
+    canSee('stock') ? link('needed', 'Needed', badge('stock')) : '',
     canSee('orders') ? link('orders', 'Order guides') : '',
-    link('lounge', 'Employee lounge', '<i id="side-badge" class="sbadge" hidden></i>'),
+    link('lounge', 'Employee lounge', badge('lounge')),
     canSee('board') ? link('board', '<span class="sub-l">Bulletin board</span>') : '',
     canSee('schedule') ? link('schedule', '<span class="sub-l">Schedule</span>') : '',
     canTime() ? link('timesheets', '<span class="sub-l">Time sheets</span>') : link('timesheet', '<span class="sub-l">My time sheet</span>'),
     myStaff() ? link('mypay', '<span class="sub-l">My pay &amp; tips</span>') : '',
     renderSide.pay ? link('payroll', 'Payroll') : '',
-    canOrder() ? link('pos', 'Orders (POS)', '<i class="sbadge pos-badge" hidden></i>').replace('<a ', '<a data-pospop ') : '',
-    canKitchen() ? link('tickets', '<span class="sub-l">Kitchen and bar screen</span>') : '',
+    canOrder() ? link('pos', 'Orders (POS)', badge('pos')).replace('<a ', '<a data-pospop ') : '',
+    canKitchen() ? link('tickets', '<span class="sub-l">Kitchen and bar screen</span>', badge('tickets')) : '',
     canSee('coupons') ? link('coupons', 'Coupons') : '',
     BRAND.giftCards?.url ? link('giftcards', 'Gift cards') : '',
     jobAllows('music') ? link('music', 'Music') : '',
@@ -258,12 +258,12 @@ function moreView() {
       <p class="muted small">${profile.role === 'owner' ? 'Admin phone. Access does not expire.' : `Access stays on while you use it. It ends after ${daysLeft} days without opening the app.`}</p>
     </div>
     <div class="group">
-      ${canOrder() ? '<a class="row" href="#/pos" data-pospop><span class="grow">Orders (POS)</span><i class="sbadge pos-badge" hidden></i></a>' : ''}
-      ${canKitchen() ? '<a class="row" href="#/tickets"><span class="grow">Kitchen and bar screen</span></a>' : ''}
+      ${canOrder() ? '<a class="row" href="#/pos" data-pospop><span class="grow">Orders (POS)</span>' + badge('pos') + '</a>' : ''}
+      ${canKitchen() ? '<a class="row" href="#/tickets"><span class="grow">Kitchen and bar screen</span>' + badge('tickets') + '</a>' : ''}
       ${canSales() ? '<a class="row" href="#/possales"><span class="grow">Today\'s sales</span></a>' : ''}
       ${canSee('coupons') ? '<a class="row" href="#/coupons"><span class="grow">Coupons</span></a>' : ''}
       ${BRAND.giftCards?.url ? '<a class="row" href="#/giftcards"><span class="grow">Gift cards</span></a>' : ''}
-      ${canClear() ? '<a class="row" href="#/tables"><span class="grow">Tables to clear</span></a>' : ''}
+      ${canClear() ? '<a class="row" href="#/tables"><span class="grow">Tables to clear</span>' + badge('tables') + '</a>' : ''}
       ${jobAllows('music') ? '<a class="row" href="#/music"><span class="grow">Music</span></a>' : ''}
       ${moreView.pay ? '<a class="row" href="#/payroll"><span class="grow">Payroll</span></a>' : ''}
       ${myStaff() ? '<a class="row" href="#/mypay"><span class="grow">My pay &amp; tips</span></a>' : ''}
@@ -272,6 +272,7 @@ function moreView() {
       ${canSee('costs') ? '<a class="row" href="#/costs"><span class="grow">Costs and waste</span></a>' : ''}
     </div>
     <div class="group">
+      <a class="row" href="#/alerts"><span class="grow">Alerts</span><span class="meta">Badges, chime, notifications</span></a>
       <a class="row" href="#/settings"><span class="grow">Settings</span><span class="meta">${esc(THEMES[getTheme()])}</span></a>
       ${access.can(profile, 'invite') ? `<a class="row" href="#/team"><span class="grow">Invite and approve phones</span>${waiting.size ? `<span class="chip warn">${waiting.size} waiting</span>` : ''}</a>` : ''}
       ${isHost() ? `<a class="row" href="#/backup"><span class="grow">Admin backup</span>${LS.get('backupAt', 0) ? '' : '<span class="chip warn">Not made yet</span>'}</a>` : ''}
@@ -286,6 +287,7 @@ function moreView() {
       <button class="row" id="leave" type="button" style="color:var(--danger)"><span class="grow">Remove access from this phone</span></button>
     </div>
     <p class="muted small center">${esc(APP_NAME)} ${VERSION} · build ${BUILD}</p>`;
+  updateBadge();
   $('#show-notice').onclick = () => sheet({ title: 'Notices of use', left: null, right: 'Done', body: NOTICE_HTML });
   $('#leave').onclick = async () => {
     const ok = await sheet({ title: 'Remove access?', right: 'Remove', body: `<p>This deletes the app's data from this phone, including recipes saved here. You'll need a new invite to use it again.</p>${profile.role === 'owner' ? '<p class="hint">This is the Admin phone. Removing access deletes the Admin key. You can get back in only with an Admin backup, or by adding a new key to the app.</p>' : ''}` });
@@ -829,6 +831,7 @@ const routes = {
   'schedule-print': (arg) => schedulePrintView(arg),
   staff: () => staffView(),
   tables: () => tablesView(), // RRA-132
+  alerts: () => alertsView(), // RRA-137
   jobtitles: () => jobTitlesView(), // RRA-131
   shifts: () => shiftTimesView(),
   events: () => eventsView(),
@@ -1003,6 +1006,7 @@ async function boot() {
     data.onChange((coll, remote) => { if (remote) debounceRoute(); });
     data.onChange(() => updateBadge());
     startPickups(); // RRA-124: order-up alerts
+    startAlerts(); // RRA-137: badges for new work
   }
   // RRA-087: add starter data only after the shared data has arrived, so a
   // second Admin device (an iPad) never adds it all a second time.

@@ -4,8 +4,8 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.11.0';
-export const BUILD = '2026.11.26-24';
+export const VERSION = '0.12.0';
+export const BUILD = '2026.11.26-25';
 
 // Text that names the restaurant uses tokens, so it reads right after a
 // changeout (RRA-123): {name} = short name, {restaurant} = full name,
@@ -14,6 +14,14 @@ export const brandText = (s) => String(s ?? '')
   .replace(/\{name\}/g, BRAND.shortName).replace(/\{restaurant\}/g, BRAND.restaurant).replace(/\{app\}/g, BRAND.appName);
 
 const WHATS_NEW_RAW = [
+  {
+    version: '0.12.0', build: '2026.11.26-25', date: '2026-11-26',
+    lines: [
+      'Alert badges: a red number on the tab, the left menu, More and the app icon when something new needs you, with a chime and buzz, and a phone notification when the app is in the background. Each person gets only the alerts for their job: new kitchen tickets (cooks and chefs), new bar tickets (bartenders and barbacks), tables to clear (bussers, servers, hosts), order up, new guests seated in your section, a check or ticket waiting too long, new messages and problem-report replies, swap requests and answers, and 86 or low stock.',
+      'Settings for alerts are in More → Alerts: turn each kind, the chime, and phone notifications on or off for this phone. Managers and the Admin can also ask for alerts other jobs get. The Admin sets how long a check can stay open in Settings → Point of sale.',
+      'Fixed: "Picked up" on the order-up banner did nothing while a pop-up was open (like Staff member in Team access). The banner now shows on top of the pop-up and the tap works.',
+    ],
+  },
   {
     version: '0.11.0', build: '2026.11.26-24', date: '2026-11-26',
     lines: [
