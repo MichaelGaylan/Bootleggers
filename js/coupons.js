@@ -16,7 +16,7 @@ import * as data from './data.js';
 import { $, $$, esc, view, sheet, toast, setTitle, setChrome } from './ui.js';
 import { canSee, canChange } from './perms.js';
 import { BRAND } from './config.js';
-import { TYPES, DAYS, TAGS, tagOf, cleanCode, newSuffix, payload, headline, finePrint, canApply, canApplyStanding, usesOf } from './coupons-core.js';
+import { TYPES, DAYS, TAGS, tagOf, cleanCode, newSuffix, barPayload, qrLink, headline, finePrint, canApply, canApplyStanding, usesOf } from './coupons-core.js';
 
 const C = () => ({ title: BRAND.shortName, tagline: '', ...(BRAND.coupon || {}) });
 const lock = (m) => `<div class="empty">🔒 ${esc(m)}<br><span class="small">The Admin sets this in Settings → Roles and permissions.</span></div>`;
@@ -96,7 +96,9 @@ export async function drawCoupon(cp, code, kind = 'qr') {
   for (const line of finePrint(cp)) fine.push(...wrap(ctx, line, inner));
   const codeBox = kind === 'bar' ? 170 : 380;
   const H = 30 + 74 + codeBox + 26 + 48 + fine.length * 32 + 44 + 26 + (brand.tagline ? 74 : 10) + 30;
-  cv.width = W; cv.height = H;
+  // Drawn at twice the size so bars and squares stay sharp on paper (RRA-150).
+  const S = 2;
+  cv.width = W * S; cv.height = H * S; ctx.scale(S, S);
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
   ctx.strokeStyle = '#000'; ctx.fillStyle = '#000';
   ctx.lineWidth = 8; ctx.strokeRect(8, 8, W - 16, H - 16);
@@ -110,15 +112,20 @@ export async function drawCoupon(cp, code, kind = 'qr') {
   spaced(ctx, title, W / 2, y, ts * 0.32);
   y += 12;
   // The code, with its white margin kept inside the border.
-  const text = payload(code);
   if (kind === 'bar') {
-    const bars = await code128Bars(text);
+    // RRA-150: just the code, and a wide white gap (at least 12 bar widths)
+    // between the bars and the frame lines, so the reader doesn't take the
+    // frame for bars.
+    const bars = await code128Bars(barPayload(code));
     const modules = bars.reduce((t, b) => t + +b, 0);
-    const mw = Math.max(1, Math.floor(inner / modules));
+    const mw = Math.max(1, Math.floor(((W - 44) * S) / (modules + 28))) / S;
     let x = (W - modules * mw) / 2;
+    // No frame lines beside the bars: a dark line on the same line as the
+    // bars stops the iPhone reader (see readFrame).
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, y + 4, 30, codeBox - 8); ctx.fillRect(W - 30, y + 4, 30, codeBox - 8); ctx.fillStyle = '#000';
     bars.forEach((b, i) => { if (i % 2 === 0) ctx.fillRect(x, y + 20, +b * mw, codeBox - 40); x += +b * mw; });
   } else {
-    const q = await qrModules(text);
+    const q = await qrModules(qrLink(code, cp, new URL('coupon.html', location.href.split('#')[0]).href));
     const size = codeBox - 30, cell = Math.floor(size / q.n), x0 = (W - cell * q.n) / 2, y0 = y + (codeBox - cell * q.n) / 2;
     for (let yy = 0; yy < q.n; yy++) for (let xx = 0; xx < q.n; xx++) if (q.get(xx, yy)) ctx.fillRect(x0 + xx * cell, y0 + yy * cell, cell, cell);
   }
@@ -420,25 +427,64 @@ export async function discountsSheet(checkId) {
 }
 
 // Reads one picture (a video frame or a canvas). The area inside the aiming
-// box is tried first: it holds just the code, so the coupon's frame lines
-// can't confuse the barcode reader, and it's quicker. Then the whole picture.
+// box is tried first: it holds just the code, and it's quicker. Then thin
+// bands across the middle, then the whole picture.
+//
+// RRA-150: the iPhone reader (ZXing) can't find a barcode when anything dark
+// sits to the left of the bars on the same line (the coupon's frame lines, the
+// table edge, a thumb): tested 2026-11-26, it fails even with 80 bar widths of
+// white in between. So each band is also read starting inside every wide white
+// gap on the line, which puts the start of the read in the white space just
+// before the bars.
 export async function readFrame(src, w, h) {
   const Z = await loadZXing();
   const reader = readFrame.r ||= new Z.MultiFormatReader();
   readFrame.hints ||= new Map([[Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.QR_CODE, Z.BarcodeFormat.CODE_128]]]);
+  readFrame.bar ||= new Map([[Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.CODE_128]]]);
   const cv = readFrame.cv ||= document.createElement('canvas');
-  const scale = Math.min(1, 900 / w);
-  const tries = [[0.2, 0.15, 0.6, 0.7], [0, 0, 1, 1]]; // x, y, width, height as parts of the picture
-  for (const [x, y, ww, hh] of tries) {
-    cv.width = Math.round(w * ww * scale); cv.height = Math.round(h * hh * scale);
+  const sub = readFrame.sub ||= document.createElement('canvas');
+  const read = (c, hints) => {
+    try { return reader.decode(new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(c))), hints).getText(); } catch { return null; }
+  };
+  // The aiming box and the bands are read at full camera size (thin bars
+  // blur away when shrunk); only the whole picture is shrunk.
+  const scaleOf = (ww) => (ww === 1 ? Math.min(1, 900 / w) : Math.min(1, 1600 / (w * ww)));
+  // x, y, width, height as parts of the picture; band = a thin line across.
+  const tries = [[0.2, 0.15, 0.6, 0.7], [0.04, 0.47, 0.92, 0.04, 1], [0.04, 0.4, 0.92, 0.04, 1], [0.04, 0.54, 0.92, 0.04, 1], [0.04, 0.33, 0.92, 0.04, 1], [0, 0, 1, 1]];
+  for (const [x, y, ww, hh, band] of tries) {
+    const scale = scaleOf(ww);
+    cv.width = Math.round(w * ww * scale); cv.height = Math.max(8, Math.round(h * hh * scale));
     const ctx = cv.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(src, w * x, h * y, w * ww, h * hh, 0, 0, cv.width, cv.height);
-    try {
-      const bmp = new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(cv)));
-      return reader.decode(bmp, readFrame.hints).getText();
-    } catch {}
+    const hit = read(cv, readFrame.hints);
+    if (hit) return hit;
+    if (!band) continue;
+    for (const at of whiteGaps(ctx, cv.width, cv.height)) {
+      sub.width = cv.width - at; sub.height = cv.height;
+      sub.getContext('2d', { willReadFrequently: true }).drawImage(cv, at, 0, sub.width, sub.height, 0, 0, sub.width, sub.height);
+      const t = read(sub, readFrame.bar);
+      if (t) return t;
+    }
   }
   return null;
+}
+
+// Where a read could start: the middle of each wide light gap on the middle
+// line of a band (at most 6, left to right).
+function whiteGaps(ctx, w, h) {
+  const px = ctx.getImageData(0, h >> 1, w, 1).data;
+  const lum = new Float32Array(w);
+  let lo = 255, hi = 0;
+  for (let i = 0; i < w; i++) { const v = (px[i * 4] * 0.3 + px[i * 4 + 1] * 0.59 + px[i * 4 + 2] * 0.11); lum[i] = v; if (v < lo) lo = v; if (v > hi) hi = v; }
+  if (hi - lo < 40) return [];
+  const cut = (lo + hi) / 2, min = Math.max(16, Math.round(w * 0.025)), out = [];
+  let run = 0;
+  for (let i = 0; i <= w; i++) {
+    if (i < w && lum[i] > cut) { run++; continue; }
+    if (run >= min && i - run > 0 && i < w) out.push(i - Math.round(run / 2));
+    run = 0;
+  }
+  return out.slice(0, 6);
 }
 
 // Camera → onCode(text). Returns a stop function.
@@ -447,7 +493,7 @@ async function startScanner(video, onCode, msg) {
   const stop = () => { stopped = true; clearInterval(timer); stream?.getTracks().forEach((t) => t.stop()); };
   if (!navigator.mediaDevices?.getUserMedia) { msg('No camera here. Type the code below.'); return stop; }
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false });
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 } }, audio: false });
     if (stopped) { stop(); return stop; }
     video.srcObject = stream;
     await video.play().catch(() => {});

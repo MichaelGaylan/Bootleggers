@@ -282,6 +282,22 @@ self.BRAND = {
     burger: { title: 'Temperature', options: ['Medium rare', 'Medium', 'Medium well', 'Well done'] },
     salad: { title: 'Dressing', options: ['Ranch', 'Blue Cheese', 'Honey Mustard', 'Italian', 'None'] },
   },
+  // Dish changes (RRA-149): condiments and toppings a server can mark NO, ADD
+  // or EXTRA on a dish, with the price an ADD or EXTRA costs (0 = free). Each
+  // NO swaps one add-on for free. Starter prices only: the Admin changes the
+  // list and prices in Settings → Point of sale → Toppings.
+  posToppings: [
+    ['Cheese', 1.00], ['Bacon', 2.00], ['Mushrooms', 1.00], ['Jalapeños', 0.75], ['Onions', 0.50],
+    ['Grilled onions', 0.75], ['Tomato', 0.50], ['Lettuce', 0], ['Pickles', 0], ['Sour cream', 0.75],
+    ['Salsa', 0.50], ['Guacamole', 1.50], ['Mayo', 0], ['Mustard', 0], ['Ketchup', 0],
+  ],
+  // Toppings already on a dish, listed first with "on the dish" (dish name →
+  // toppings). A dish's Recipes ingredients count too. Starter guesses: edit freely.
+  posToppingsOn: {
+    'Nachos (Half)': ['Cheese', 'Jalapeños', 'Sour cream', 'Salsa'],
+    'Nachos (Full)': ['Cheese', 'Jalapeños', 'Sour cream', 'Salsa'],
+    'Classic Burger with Fries': ['Lettuce', 'Tomato', 'Onions', 'Pickles'],
+  },
   // Words left off the POS tiles and tickets to keep them short.
   posTrim: [' with Fries', ' with Side'],
 

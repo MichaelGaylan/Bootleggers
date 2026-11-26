@@ -1,0 +1,92 @@
+// Dish changes at the point of sale (RRA-149): NO, ADD and EXTRA on
+// condiments and toppings (Gaylan, 2026-11-26: "burger with no mushrooms, add
+// tomatoes, onions, extra cheese or no cheese; Nachos with no jalapeños").
+//
+// Only condiments and toppings from the list below change; menu items, sides
+// and drinks are never swapped here. ADD and EXTRA cost the topping's price
+// (the Admin sets them in Settings → Point of sale → Toppings; the starter list
+// lives in js/brand.js posToppings). Each NO on a line trades for one ADD or
+// EXTRA at no charge, e.g. NO cheese + EXTRA onions = free ("swap"). When there
+// are more adds than NOs, the swaps go to the priciest adds.
+//
+// A change is { k: 'no' | 'add' | 'extra', n: 'Cheese', p: 1 } on the line's
+// changes list. The line keeps its menu price in base, and price = base + charge.
+
+import { esc, $$ } from './ui.js';
+import { BRAND } from './config.js';
+
+const r2 = (n) => Math.round(n * 100) / 100;
+export const WORD = { no: 'NO', add: 'ADD', extra: 'EXTRA' };
+
+// The topping list: the Admin's (Settings → Point of sale) or js/brand.js.
+export function toppingList(P) {
+  const own = Array.isArray(P?.toppings) ? P.toppings : null;
+  const list = own || (BRAND.posToppings || []).map(([n, p]) => ({ n, p }));
+  return list.filter((t) => t && String(t.n || '').trim()).map((t) => ({ n: String(t.n).trim(), p: Math.max(0, +t.p || 0) }));
+}
+
+// Is this topping already on the dish? Looks in the recipe's ingredients and
+// description, and in js/brand.js posToppingsOn (dish name → toppings).
+const stem = (s) => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/(es|s)$/, '').trim();
+export function onDish(top, recipe) {
+  const on = (BRAND.posToppingsOn || {})[recipe?.name] || [];
+  if (on.some((n) => stem(n) === stem(top))) return true;
+  const words = [...(recipe?.ingredients || []).map((i) => i.item), recipe?.desc || ''].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  return !!stem(top) && words.includes(stem(top));
+}
+
+// Drinks and bar items don't get toppings.
+export const canChangeLine = (x) => !!x && !x.kind && x.station !== 'Bar';
+
+// What the changes cost: every ADD and EXTRA at its price, less one free swap per NO.
+export function charge(changes) {
+  const list = changes || [];
+  const nNo = list.filter((c) => c.k === 'no').length;
+  const paid = list.filter((c) => c.k !== 'no').map((c) => +c.p || 0).sort((a, b) => b - a);
+  const swaps = Math.min(nNo, paid.length);
+  return { amount: r2(paid.slice(swaps).reduce((t, p) => t + p, 0)), swaps, waived: r2(paid.slice(0, swaps).reduce((t, p) => t + p, 0)) };
+}
+
+// A line with new changes: price = base + charge.
+export function withChanges(x, changes) {
+  const base = x.base ?? x.price;
+  const c = charge(changes);
+  return { ...x, base, changes, price: r2(base + c.amount) };
+}
+
+// Words for the check and the ticket, NO first: "NO Mushrooms", "ADD Tomato".
+const ORDER = { no: 0, add: 1, extra: 2 };
+export const sorted = (changes) => [...(changes || [])].sort((a, b) => ORDER[a.k] - ORDER[b.k]);
+export const changeWords = (changes) => sorted(changes).map((c) => `${WORD[c.k]} ${c.n}`);
+// HTML with NO in red and ADD / EXTRA in bold (class pos-chg).
+export const changesHtml = (changes) => sorted(changes).map((c) => `<span class="pos-chg chg-${c.k}"><b>${WORD[c.k]}</b> ${esc(c.n)}</span>`).join(' ');
+// Same order on a check? Compare choices, note and changes.
+export const modKey = (x) => JSON.stringify([x.mods || [], x.note || '', sorted(x.changes).map((c) => c.k + c.n)]);
+
+// The picker: one row per topping with No / Add / Extra. Toppings already on
+// the dish come first. state is a Map name → 'no' | 'add' | 'extra'.
+export function toppingsHtml(list, recipe, state) {
+  const money = (p) => (p > 0 ? `+$${p.toFixed(2)}` : 'free');
+  const rows = list.map((t) => ({ ...t, on: onDish(t.n, recipe) })).sort((a, b) => b.on - a.on);
+  return `<div class="tp-list">${rows.map((t) => `<div class="tp-row" data-tp="${esc(t.n)}"><span class="tp-n">${esc(t.n)}${t.on ? ' <small class="tp-on">on the dish</small>' : ''}<small class="tp-p">${money(t.p)}</small></span>
+    <span class="tp-btns">${['no', 'add', 'extra'].map((k) => `<button type="button" data-k="${k}" class="${state.get(t.n) === k ? 'on k-' + k : ''}">${k === 'no' ? 'No' : k === 'add' ? 'Add' : 'Extra'}</button>`).join('')}</span></div>`).join('')}</div>
+    <p class="tp-sum muted small" id="tp-sum"></p>`;
+}
+// Wire the picker inside el. onChange(changes) runs after every tap.
+export function wireToppings(el, list, state, onChange) {
+  const price = Object.fromEntries(list.map((t) => [t.n, t.p]));
+  const changes = () => [...state].map(([n, k]) => ({ k, n, p: price[n] || 0 }));
+  const sum = () => {
+    const box = el.querySelector('#tp-sum'); if (!box) return;
+    const ch = changes(), c = charge(ch);
+    box.textContent = ch.length ? `${changeWords(ch).join(' · ')}${c.amount ? ` · +$${c.amount.toFixed(2)}` : ''}${c.swaps ? ` · ${c.swaps} free swap${c.swaps > 1 ? 's' : ''}` : ''}` : 'Tap No, Add or Extra. Each NO swaps one add-on for free.';
+  };
+  $$('.tp-row', el).forEach((row) => $$('button', row).forEach((b) => b.onclick = () => {
+    const n = row.dataset.tp, k = b.dataset.k;
+    if (state.get(n) === k) state.delete(n); else state.set(n, k);
+    $$('button', row).forEach((y) => y.className = state.get(n) === y.dataset.k ? 'on k-' + y.dataset.k : '');
+    sum(); onChange?.(changes());
+  }));
+  sum();
+  return changes;
+}
