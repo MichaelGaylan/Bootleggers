@@ -27,16 +27,20 @@ const key = (s) => String(s || '').trim().toLowerCase();
 // Runs once per menu version, on the Admin phone (or on a phone-only setup).
 export async function applyMenu({ shared = false, host = false } = {}) {
   if (shared && !host) return;
-  if ((await store.get('menu'))?.version === MENU_VERSION) return;
+  // RRA-142: what the team's data actually got is kept in the shared settings
+  // (menuApplied), not only on this device, so an update that never reached
+  // the shared data runs again instead of being counted as done.
+  const settings = await data.settings();
+  if (settings.menuApplied?.version === MENU_VERSION) return;
 
   // RRA-136: what the last menu update gave each dish, so a price or section
   // the Admin changed in Recipes is kept. Only a dish still exactly as the
   // last update left it follows the new menu. Dishes are never removed.
-  const last = await store.get('menu');
-  const prev = last?.items || null;          // { name: [price, section] }
-  const prevSecs = last?.sections || null;
+  const applied = settings.menuApplied || null;
+  const last = applied || (await store.get('menu'));
+  const prev = applied?.items || null;          // { name: [price, section] }
+  const prevSecs = applied?.sections || null;
   const recipes = await data.list('recipe');
-  const settings = await data.settings();
 
   // Menu sections: keep the team's list as it is (order, removed and custom
   // sections) and only add sections this menu update brings in.
@@ -50,7 +54,9 @@ export async function applyMenu({ shared = false, host = false } = {}) {
     const before = MENU_SECTIONS.slice(0, i).reverse().find((x) => sections.includes(x));
     sections.splice(before ? sections.indexOf(before) + 1 : sections.length, 0, s);
   });
-  await data.saveSettings({ ...settings, sections });
+  const newSections = sections.filter((x) => !(settings.sections || []).includes(x)).length;
+  await data.saveSettings({ ...(await data.settings()), sections });
+  let newDishes = 0;
 
   // Dishes: add what's missing; a dish still as the last menu left it gets the
   // new price and section; one the Admin changed keeps its own.
@@ -66,7 +72,8 @@ export async function applyMenu({ shared = false, host = false } = {}) {
       // A starter dish the Admin took out after the last update stays out.
       if (!r && prev?.[key(name)]) continue;
       if (!r) {
-        await data.put('recipe', { kind: 'dish', name, section: m.section, price, menuOrder: order, ...(extra.drink ? { drink: extra.drink } : {}), ingredients: ings, steps: [], uses: [], comments: [] });
+        await data.put('recipe', { kind: 'dish', name, section: m.section, price, menuOrder: order, ...(extra.drink ? { drink: extra.drink } : {}), ...(extra.desc ? { desc: extra.desc } : {}), ingredients: ings, steps: extra.steps || [], uses: [], comments: [] });
+        newDishes += 1;
         continue;
       }
       const p = prev?.[key(name)];
@@ -89,7 +96,9 @@ export async function applyMenu({ shared = false, host = false } = {}) {
       if (!have.has(key(name))) await data.put('stock', { name, unit: unit || 'each', group: g.group, par: 0, onHand: 0, vendor: '', price: '' });
     }
   }
-  await store.put('menu', { version: MENU_VERSION, at: Date.now(), items, sections: MENU_SECTIONS });
+  await store.put('menu', { version: MENU_VERSION, at: Date.now() });
+  await data.saveSettings({ ...(await data.settings()), menuApplied: { version: MENU_VERSION, at: Date.now(), items, sections: MENU_SECTIONS } });
+  return { dishes: newDishes, sections: newSections };
 }
 
 // Preset vendors (RRA-044): common food-service suppliers for what the
