@@ -392,7 +392,8 @@ function aboutView() {
     <div class="card center">
       <img src="${esc(BRAND.icon192)}" alt="" width="84" height="84" style="border-radius:20px">
       <h2 style="margin:10px 0 0">${esc(APP_NAME)}</h2>
-      <p class="muted">Version ${VERSION} · build ${BUILD}</p>
+      <p class="muted">Version ${VERSION} · build ${BUILD}${updateReady() ? ' · <b>Update ready</b>' : ''}</p>
+      ${updateReady() ? '<button class="btn small" id="upd-now" type="button">Update now</button>' : ''}
       <p class="small muted">${esc(BRAND.restaurant)} · ${esc(BRAND.location)}</p>${BRAND.credit ? `<p class="small muted">${esc(BRAND.credit)}</p>` : ''}
     </div>
     <div class="section-label">How to use it</div>
@@ -412,6 +413,7 @@ function aboutView() {
       <a class="row" href="#/whatsnew"><span class="grow">What's new</span></a>
       <a class="row" href="#/report"><span class="grow">Report a problem</span></a>
     </div>`;
+  $('#upd-now')?.addEventListener('click', (e) => { e.target.disabled = true; e.target.textContent = 'Updating…'; applyUpdate(); });
 }
 
 function whatsNewView() {
@@ -1036,25 +1038,62 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && profile) { access.touch(); loadNotices(); }
 });
 
-// Offline support and update prompt.
+// Offline support and safe updates (RRA-146). A new version downloads quietly
+// and waits; it never reloads the app on its own while someone is working.
+// It takes over by itself only when the app has just been opened fresh
+// (nothing tapped yet); otherwise a bar offers "Update now".
+const OPENED = Date.now();
+let touched = false;
+['pointerdown', 'keydown'].forEach((ev) => addEventListener(ev, () => { touched = true; }, { capture: true, passive: true }));
+const freshOpen = () => !touched && Date.now() - OPENED < 15000;
+let swReg = null, applying = false, activated = false;
+// activated: another window of the app already switched to the new version,
+// so Update now only needs to reload this one.
+const updateReady = () => activated || !!(swReg?.waiting && navigator.serviceWorker.controller);
+function applyUpdate() {
+  applying = true;
+  LS.set('updSince', 0);
+  document.activeElement?.blur?.(); // a field being typed in saves first
+  if (activated || !swReg?.waiting) { setTimeout(() => location.reload(), 250); return; }
+  setTimeout(() => swReg.waiting?.postMessage('skipWaiting'), 250);
+  setTimeout(() => location.reload(), 4000); // safety net if the handover is slow
+}
+function updateBar() {
+  let bar = document.getElementById('upd-bar');
+  if (!updateReady()) { bar?.remove(); document.body.classList.remove('has-upd'); return; }
+  let since = LS.get('updSince', 0);
+  if (!since) { since = Date.now(); LS.set('updSince', since); }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'upd-bar'; bar.className = 'upd-bar'; bar.setAttribute('role', 'status');
+    bar.innerHTML = '<span class="grow"><b>Update ready</b><small>Finish what you\'re doing, then tap Update now.</small></span><button class="btn small" type="button">Update now</button>';
+    bar.querySelector('button').onclick = (e) => { e.target.disabled = true; e.target.textContent = 'Updating…'; applyUpdate(); };
+    document.body.appendChild(bar);
+  }
+  bar.classList.toggle('old', Date.now() - since > 864e5); // waiting over a day: orange
+  document.body.classList.add('has-upd');
+}
+const onWaiting = () => (freshOpen() ? applyUpdate() : updateBar());
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').then((reg) => {
-    // An update left waiting by an older version: let it take over now.
-    if (reg.waiting && navigator.serviceWorker.controller) reg.waiting.postMessage('skipWaiting');
+    swReg = reg;
+    if (reg.waiting && navigator.serviceWorker.controller) onWaiting();
     reg.addEventListener('updatefound', () => {
       const nw = reg.installing;
       nw?.addEventListener('statechange', () => {
-        if (nw.state === 'installed' && navigator.serviceWorker.controller) nw.postMessage('skipWaiting');
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) onWaiting();
       });
     });
     // Look for a new version whenever the app comes back to the front.
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { reg.update().catch(() => {}); updateBar(); } });
   }).catch(() => {});
-  // Reload only when an update takes over, not on the very first install.
+  // Reload only for an update this screen asked for (or right after opening).
   const hadController = !!navigator.serviceWorker.controller;
   let reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (hadController && !reloading) { reloading = true; location.reload(); }
+    if (!hadController || reloading) return;
+    if (applying || freshOpen()) { reloading = true; LS.set('updSince', 0); location.reload(); return; }
+    activated = true; updateBar();
   });
 }
 

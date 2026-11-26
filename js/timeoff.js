@@ -3,6 +3,9 @@
 // schedule) approve or decline; an approved request puts Time off on those days
 // of the schedule. The person who asked gets an alert badge and a pop-up with
 // the answer, like swap answers (RRA-079, RRA-137).
+// RRA-148: an approver can Ask a question before deciding. The person gets a
+// badge and a pop-up to reply; every approver sees the reply on the request.
+// It can go back and forth (r.qa) until someone taps OK or No.
 
 import * as data from './data.js';
 import { $, $$, esc, sheet, toast, LS, session } from './ui.js';
@@ -22,6 +25,13 @@ const canApprove = () => canChange('schedule');
 const seenSet = () => new Set(LS.get('toSeen', []));
 const markSeen = (k) => { const s = seenSet(); s.add(k); LS.set('toSeen', [...s].slice(-300)); };
 const ansKey = (r) => `${r.id}:${r.status}`;
+const qaOf = (r) => r.qa || [];
+const lastQ = (r) => { const q = qaOf(r); return q.length && q[q.length - 1].kind === 'q' ? q[q.length - 1] : null; };
+const qKey = (r) => `${r.id}:q${qaOf(r).length}`;
+// Waiting on the person who asked: the latest entry is an unanswered question.
+const needsReply = (r) => r.status === 'asked' && !!lastQ(r);
+const ago = (t) => new Date(t).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+const qaHtml = (r, me) => qaOf(r).slice(-2).map((x) => `<br><span class="${x.kind === 'q' ? '' : 'to-ans'}">${x.kind === 'q' ? '❓' : '💬'} <b>${me && x.byId === me.id ? 'You' : esc(x.by.split(' ')[0])}:</b> ${esc(x.text)}</span>`).join('');
 
 // Requests to show: waiting ones for approvers, and my own from today on.
 export async function timeOffList() {
@@ -37,6 +47,7 @@ export async function timeOffBadge() {
   const all = await data.list('timeoff');
   let n = canApprove() ? all.filter((r) => r.status === 'asked').length : 0;
   if (me) n += all.filter((r) => r.staffId === me.id && (r.status === 'approved' || r.status === 'declined') && !seen.has(ansKey(r))).length;
+  if (me) n += all.filter((r) => r.staffId === me.id && needsReply(r)).length; // RRA-148: a question waits for my reply
   return n;
 }
 
@@ -112,6 +123,46 @@ async function decline(r) {
   toast('Time off declined');
   return true;
 }
+// RRA-148: an approver asks; the person who asked replies.
+async function ask(r) {
+  const cur = await data.get('timeoff', r.id);
+  if (!cur || cur.status !== 'asked') { toast('Already answered'); return false; }
+  const res = await sheet({
+    title: 'Ask about this request', right: 'Send',
+    body: `<p style="margin-top:0"><b>${esc(cur.name)}</b> · ${esc(rangeText(cur))}</p>${cur.note ? `<div class="msg" style="margin:0 0 8px">${esc(cur.note)}</div>` : ''}
+      ${qaOf(cur).length ? `<div class="small" style="margin-bottom:8px">${qaHtml({ qa: qaOf(cur).slice(-4) }, myStaff()).replace(/^<br>/, '')}</div>` : ''}
+      <label class="field"><span>Your question (${esc(cur.name.split(' ')[0])} sees it)</span><textarea id="to-q" rows="3" placeholder="Like: Can you work the 12th if Ben covers the 13th?"></textarea></label>`,
+    onMount: (api) => { api.onRight = () => { const t = $('#to-q', api.el).value.trim(); if (!t) { toast('Type a question'); return; } api.close({ t }); }; },
+  });
+  if (!res) return false;
+  const now = await data.get('timeoff', r.id);
+  if (!now || now.status !== 'asked') { toast('Already answered'); return false; }
+  const me = myStaff();
+  await data.put('timeoff', { ...now, qa: [...qaOf(now), { kind: 'q', by: session.profile?.name || '', byId: me?.id || '', at: Date.now(), text: res.t }] });
+  toast(`Question sent to ${now.name.split(' ')[0]}`);
+  return true;
+}
+async function reply(r) {
+  const cur = await data.get('timeoff', r.id);
+  const q = cur && lastQ(cur);
+  if (!q || cur.status !== 'asked') { toast(cur?.status === 'asked' ? 'Nothing to answer' : 'Already answered'); return false; }
+  const res = await sheet({
+    title: 'Question about your time off', left: 'Later', right: 'Reply',
+    body: `<p style="margin-top:0">${esc(rangeText(cur))}</p>
+      <div class="msg" style="margin:0 0 8px">❓ <b>${esc(q.by)}</b> · ${esc(ago(q.at))}<br>${esc(q.text)}</div>
+      <label class="field"><span>Your reply (managers see it)</span><textarea id="to-r" rows="3"></textarea></label>`,
+    onMount: (api) => { api.onRight = () => { const t = $('#to-r', api.el).value.trim(); if (!t) { toast('Type a reply'); return; } api.close({ t }); }; },
+  });
+  markSeen(qKey(cur));
+  if (!res) return false;
+  const now = await data.get('timeoff', r.id);
+  if (!now || now.status !== 'asked') { toast('Already answered'); return false; }
+  const me = myStaff();
+  await data.put('timeoff', { ...now, qa: [...qaOf(now), { kind: 'a', by: me?.name || session.profile?.name || '', byId: me?.id || '', at: Date.now(), text: res.t }] });
+  toast('Reply sent');
+  return true;
+}
+
 async function withdraw(r) {
   const ok = await sheet({ title: 'Remove request?', right: 'Remove', body: `<p>Take back your time-off request for <b>${esc(rangeText(r))}</b>?</p>` });
   if (!ok) return false;
@@ -128,10 +179,11 @@ export async function timeOffSection(done) {
   if (!list.length) return { html: '', wire: () => {} };
   const ST = { approved: '<span class="chip ok">Approved</span>', declined: '<span class="chip danger">Declined</span>' };
   const html = `<div class="section-label">Time-off requests</div><div class="group">${list.map((r) => `
-    <div class="row" data-toff="${r.id}"><span class="grow"><span class="title">${me && r.staffId === me.id ? 'You' : esc(r.name)} · ${esc(rangeText(r))}</span>
-      <span class="sub" style="white-space:normal">${r.note ? esc(r.note) : 'No note'}${r.status === 'declined' && r.reason ? ` · ${esc(r.reason)}` : ''}${r.decidedBy ? ` · ${esc(r.decidedBy)}` : ''}</span></span>
+    <div class="row toff-row" data-toff="${r.id}"><span class="grow"><span class="title">${me && r.staffId === me.id ? 'You' : esc(r.name)} · ${esc(rangeText(r))}</span>
+      <span class="sub" style="white-space:normal">${r.note ? esc(r.note) : 'No note'}${r.status === 'declined' && r.reason ? ` · ${esc(r.reason)}` : ''}${r.decidedBy ? ` · ${esc(r.decidedBy)}` : ''}${qaHtml(r, me)}</span></span>
       <span class="swap-acts">${r.status !== 'asked' ? ST[r.status] || ''
-        : canApprove() ? '<button class="btn small" data-tok type="button">OK</button><button class="btn danger small" data-tno type="button">No</button>'
+        : canApprove() && !(me && r.staffId === me.id && needsReply(r)) ? `${needsReply(r) ? '<span class="chip warn">Waiting on reply</span>' : qaOf(r).length ? '<span class="chip flag">💬 Reply</span>' : ''}<button class="btn small" data-tok type="button">OK</button><button class="btn tonal small" data-task type="button">Ask</button><button class="btn danger small" data-tno type="button">No</button>`
+        : needsReply(r) && me && r.staffId === me.id ? '<button class="btn small" data-trep type="button">Reply</button><button class="btn plain small" data-trm type="button">Remove</button>'
         : '<span class="chip warn">Waiting</span><button class="btn plain small" data-trm type="button">Remove</button>'}</span></div>`).join('')}</div>`;
   const wire = (root) => {
     $$('[data-toff]', root).forEach((row) => {
@@ -139,6 +191,8 @@ export async function timeOffSection(done) {
       if (me && r.staffId === me.id && r.status !== 'asked') markSeen(ansKey(r)); // seen the answer here
       $('[data-tok]', row)?.addEventListener('click', async () => { if (await approve(r)) done(); });
       $('[data-tno]', row)?.addEventListener('click', async () => { if (await decline(r)) done(); });
+      $('[data-task]', row)?.addEventListener('click', async () => { if (await ask(r)) done(); });
+      $('[data-trep]', row)?.addEventListener('click', async () => { if (await reply(r)) done(); });
       $('[data-trm]', row)?.addEventListener('click', async () => { if (await withdraw(r)) done(); });
     });
   };
@@ -150,6 +204,12 @@ export async function timeOffPopups() {
   const me = myStaff();
   if (!me) return false;
   const seen = seenSet();
+  // RRA-148: a manager's question pops up once; the badge stays until I reply.
+  for (const r of (await data.list('timeoff')).filter((x) => x.staffId === me.id && needsReply(x))) {
+    if (seen.has(qKey(r))) continue;
+    await reply(r);
+    return true;
+  }
   for (const r of (await data.list('timeoff')).filter((x) => x.staffId === me.id && (x.status === 'approved' || x.status === 'declined'))) {
     if (seen.has(ansKey(r))) continue;
     const ok = r.status === 'approved';

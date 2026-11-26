@@ -4,7 +4,7 @@
 // js/brand.js, so a changeout never keeps another restaurant's files cached.
 importScripts('js/brand.js');
 const B = self.BRAND;
-const CACHE = B.dataPrefix.replace(/\W+$/, '') + '-0.14.1-2026.11.26-28';
+const CACHE = B.dataPrefix.replace(/\W+$/, '') + '-0.15.0-2026.11.26-29';
 const CODE = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'js/brand.js', 'js/app.js', 'js/config.js', 'js/access.js', 'js/crypto.js', 'js/store.js', 'js/starter-stock.js', 'js/menu.js', 'js/pdf.js', 'js/lounge.js',
@@ -18,16 +18,15 @@ const PICTURES = [B.logo, B.icon180, B.icon192, B.icon512, B.iconMaskable, B.fav
   .filter(Boolean);
 const SHELL = [...new Set(CODE.concat(PICTURES))];
 
-// A new version takes over as soon as it has downloaded; the page reloads
-// itself when that happens. (Waiting for every window to close never
-// happens reliably for home-screen apps on iPhone.)
+// RRA-146: a new version downloads and then waits. It takes over only when
+// the app asks (Update now, or right after the app is opened fresh), so the
+// app never reloads in the middle of an order.
 self.addEventListener('install', (e) => {
   // cache: 'reload' skips the browser's own short-term cache, which could
   // otherwise hand back the previous version's files (GitHub Pages lets
   // browsers keep files for 10 minutes).
   e.waitUntil(caches.open(CACHE)
-    .then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' }))))
-    .then(() => self.skipWaiting()));
+    .then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))));
 });
 
 self.addEventListener('activate', (e) => {
