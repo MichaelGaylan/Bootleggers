@@ -88,6 +88,54 @@ export async function clearRequest(iid) {
 }
 const docPath = (c, i) => `${c}~${i}`;
 
+// ----- Getting back in (RRA-134) -----
+// Every manager and Admin phone leaves its public sealing key in a "door"
+// record, which holds nothing secret. A locked-out phone seals its "let me
+// back in" request to all of them, so any one of them can let the person
+// back in, not only the manager who first invited them. The approval comes
+// back the same way, sealed to the asking phone only.
+let inboxGoneFn = null;
+export const onInboxGone = (fn) => { inboxGoneFn = fn; };
+const doorRef = (iid) => fs.doc(db, 'teams', TEAM, 'docs', docPath('door', iid));
+export async function publishDoor(iid, ek) {
+  if (!FIREBASE || !iid || !ek) return false;
+  await connect();
+  await fs.setDoc(doorRef(iid), { c: 'door', i: iid, u: Date.now(), d: false, iv: '', ct: JSON.stringify({ ek }) });
+  return true;
+}
+export async function dropDoor(iid) {
+  if (!FIREBASE || !iid) return;
+  await connect().catch(() => {});
+  if (!db) return;
+  await fs.setDoc(doorRef(iid), { c: 'door', i: iid, u: Date.now(), d: true, iv: '', ct: '' }).catch(() => {});
+}
+// The sealing keys of every manager and Admin phone.
+export async function doorKeys() {
+  if (!FIREBASE) return [];
+  await connect();
+  const snap = await fs.getDocs(fs.query(fs.collection(db, 'teams', TEAM, 'docs'), fs.where('c', '==', 'door')));
+  const keys = [];
+  for (const d of snap.docs) { const r = d.data(); if (r.d) continue; try { const { ek } = JSON.parse(r.ct); if (ek && !keys.includes(ek)) keys.push(ek); } catch { /* bad record */ } }
+  return keys;
+}
+const replyRef = (iid) => fs.doc(db, 'teams', TEAM, 'docs', docPath('reply', iid));
+// Approver: send the activation back, sealed to the asking phone.
+export async function postReply(iid, box) {
+  if (!FIREBASE || !db) return false;
+  await fs.setDoc(replyRef(iid), { c: 'reply', i: iid, u: Date.now(), d: false, iv: '', ct: JSON.stringify(box) });
+  return true;
+}
+// Asking phone: wait for the activation. Returns a stop function.
+export async function watchReply(iid, fn) {
+  if (!FIREBASE) return () => {};
+  await connect();
+  return fs.onSnapshot(replyRef(iid), (d) => { const r = d.data(); if (r && !r.d && r.ct) { try { fn(JSON.parse(r.ct)); } catch { /* bad record */ } } }, () => {});
+}
+export async function clearReply(iid) {
+  if (!FIREBASE || !db) return;
+  await fs.setDoc(replyRef(iid), { c: 'reply', i: iid, u: Date.now(), d: true, iv: '', ct: '' }).catch(() => {});
+}
+
 async function seal(obj) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, te.encode(JSON.stringify(obj)));
@@ -214,7 +262,11 @@ export async function start(profile, onStatus = () => {}) {
       for (const ch of snap.docChanges()) {
         const r = ch.doc.data();
         seen.add(docPath(r.c, r.i));
-        if (r.c === 'inbox') { if (!r.d && inboxFn) { try { await inboxFn(r.i, JSON.parse(r.ct)); } catch { /* not for this phone */ } } continue; }
+        if (r.c === 'inbox') {
+          if (r.d) { if (inboxGoneFn) inboxGoneFn(r.i); } // RRA-134: someone else handled it
+          else if (inboxFn) { try { await inboxFn(r.i, JSON.parse(r.ct)); } catch { /* not for this phone */ } }
+          continue;
+        }
         if (!COLLS.includes(r.c)) continue;
         const mine = await localDoc(r.c, r.i);
         if (mine && (mine.updated || 0) >= r.u) continue; // ours is as new or newer

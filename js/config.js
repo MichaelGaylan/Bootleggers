@@ -4,8 +4,8 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.9.0';
-export const BUILD = '2026.11.26-22';
+export const VERSION = '0.10.0';
+export const BUILD = '2026.11.26-23';
 
 // Text that names the restaurant uses tokens, so it reads right after a
 // changeout (RRA-123): {name} = short name, {restaurant} = full name,
@@ -14,6 +14,14 @@ export const brandText = (s) => String(s ?? '')
   .replace(/\{name\}/g, BRAND.shortName).replace(/\{restaurant\}/g, BRAND.restaurant).replace(/\{app\}/g, BRAND.appName);
 
 const WHATS_NEW_RAW = [
+  {
+    version: '0.10.0', build: '2026.11.26-23', date: '2026-11-26',
+    lines: [
+      'Invites ask for the person\'s job (Server, Bartender, Host, Line cook…), so they get the right screens from the start. Approving an older invite or letting someone back in asks too.',
+      'Anyone who joined without a job title shows "Pick a job" on the Staff list, so nobody is left on the Line cook screens by mistake.',
+      '"Ask to get back in" now goes to every manager and the Admin in the app, not only the person who first invited them. Any one of them can let the person back in, and the app opens on that phone by itself once approved.',
+    ],
+  },
   {
     version: '0.9.0', build: '2026.11.26-22', date: '2026-11-26',
     lines: [
