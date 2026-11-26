@@ -622,10 +622,10 @@ async function pourStock(lines, sign) {
   }
 }
 
-// RRA-149: what the changes add on the check line ("+$1.00 · 1 swap").
+// RRA-149: what the changes do to the dish's price on the check ("+$0.50", "−$1.00").
 function lineExtra(x) {
-  const k = charge(x.changes);
-  return [k.amount ? ` <b>+${money(k.amount)}</b>` : '', k.swaps ? ` <span class="pos-swap">${k.swaps} swap${k.swaps > 1 ? 's' : ''}</span>` : ''].join('');
+  const k = charge(x.changes).amount;
+  return k ? ` <b class="pos-chgamt">${k > 0 ? '+' : '−'}${money(Math.abs(k))}</b>` : '';
 }
 
 // RRA-149: NO / ADD / EXTRA on a dish not sent yet, plus the kitchen note.
@@ -980,7 +980,7 @@ export async function posSettingsView() {
       <div class="row"><span class="grow"><span class="title">Order-up alert</span><span class="sub" style="white-space:normal">When a ticket is bumped, its server gets "Pick up". If nobody picks it up in this time, every server on the clock gets it in red.</span></span><span class="meta">${P.pickupDelay || 2} min</span><button class="btn plain small" id="pkd" type="button">Change</button></div>
       <div class="row"><span class="grow"><span class="title">Check open too long</span><span class="sub" style="white-space:normal">Its server and the managers get an alert when a check is still open after this long (RRA-137).</span></span><span class="meta">${P.checkLate || 90} min</span><button class="btn plain small" id="ckl" type="button">Change</button></div>
       <div class="row"><span class="grow"><span class="title">Happy hour</span><span class="sub" style="white-space:normal">${esc(hhLabel({ ...HH_DEFAULT, ...(P.happyHour || {}) }))}${P.happyHour?.on && +P.happyHour.off ? ` · $${(+P.happyHour.off).toFixed(2)} off alcoholic drinks` : ''}. Drinks with their own happy hour price in Recipes use that price.</span></span><button class="btn plain small" id="hh" type="button">Change</button></div>
-      <div class="row"><span class="grow"><span class="title">Toppings</span><span class="sub" style="white-space:normal">${esc(toppingList(P).map((t) => t.n).join(', ') || 'None yet')}. Servers mark these NO, ADD or EXTRA on a dish; ADD and EXTRA cost the price set here, and each NO swaps one for free.</span></span><button class="btn plain small" id="tops" type="button">Change</button></div>
+      <div class="row"><span class="grow"><span class="title">Toppings</span><span class="sub" style="white-space:normal">${esc(toppingList(P).map((t) => t.n).join(', ') || 'None yet')}. Servers mark these NO, ADD or EXTRA on a dish; ADD and EXTRA add the price set here to the dish, and NO takes it off.</span></span><button class="btn plain small" id="tops" type="button">Change</button></div>
       <div class="row"><span class="grow"><span class="title">Sales tax</span><span class="sub">Check the rate for your address</span></span><span class="meta">${(P.tax * 100).toFixed(2)}%</span><button class="btn plain small" id="tax" type="button">Change</button></div>
     </div>
     <p class="muted small">Nothing is connected yet, so card payments are practice runs. Going live needs the restaurant's server for the payment keys and a developer account with ${esc(svc.id === 'practice' ? 'the payment company' : svc.name)}.</p>`;
@@ -1012,7 +1012,7 @@ async function toppingsSheet(P) {
   const row = (t = { n: '', p: 0 }) => `<div class="tp-edit"><input type="text" class="tp-en" value="${esc(t.n)}" placeholder="Topping, e.g. Bacon" aria-label="Topping"><input type="text" class="tp-ep" inputmode="decimal" value="${t.p ? t.p.toFixed(2) : ''}" placeholder="free" aria-label="Price"><button type="button" class="btn plain small tp-x" aria-label="Remove">✕</button></div>`;
   const v = await sheet({
     title: 'Toppings', right: 'Save',
-    body: `<p class="muted small" style="margin-top:0">Condiments and toppings only. Price is what an ADD or EXTRA costs; leave it blank for free. Each NO on a dish swaps one ADD or EXTRA for free.</p>
+    body: `<p class="muted small" style="margin-top:0">Condiments and toppings only. ADD and EXTRA add this price to the dish; NO takes it off. Leave it blank for free.</p>
       <div id="tp-rows">${rows.map(row).join('')}</div>
       <button class="btn plain block" id="tp-add" type="button">+ Add a topping</button>`,
     onMount(api) {

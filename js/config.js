@@ -18,7 +18,7 @@ const WHATS_NEW_RAW = [
     version: '0.16.0', build: '2026.11.26-30', date: '2026-11-26',
     lines: [
       'Change a dish when ordering: tap a dish on the check, then Change: No / Add / Extra. Mark toppings like NO mushrooms, ADD tomato or EXTRA cheese. Burgers, wings and salads show the same list under their choice. The changes show on the kitchen ticket with NO in red.',
-      'Add-ons and extras cost the price the Admin sets in Settings → Point of sale → Toppings. Each NO swaps one add-on for free, so NO cheese with EXTRA onions costs nothing.',
+      'Each topping has its own price, set by the Admin in Settings → Point of sale → Toppings. ADD and EXTRA add it to the dish, NO takes it off, and the dish on the check shows the difference (NO cheese with EXTRA onions = −$0.50 at the starter prices).',
       'Coupons: the barcode now holds just the code and has more white space around it, so the scanner reads it from farther away. The QR code now opens a Bootleggers offer page on any phone camera, showing the offer and the code to show the server. Older coupons still scan.',
     ],
   },

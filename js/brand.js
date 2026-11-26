@@ -283,8 +283,8 @@ self.BRAND = {
     salad: { title: 'Dressing', options: ['Ranch', 'Blue Cheese', 'Honey Mustard', 'Italian', 'None'] },
   },
   // Dish changes (RRA-149): condiments and toppings a server can mark NO, ADD
-  // or EXTRA on a dish, with the price an ADD or EXTRA costs (0 = free). Each
-  // NO swaps one add-on for free. Starter prices only: the Admin changes the
+  // or EXTRA on a dish, with each one's price (0 = free): ADD and EXTRA add it
+  // to the dish, NO takes it off. Starter prices only: the Admin changes the
   // list and prices in Settings → Point of sale → Toppings.
   posToppings: [
     ['Cheese', 1.00], ['Bacon', 2.00], ['Mushrooms', 1.00], ['Jalapeños', 0.75], ['Onions', 0.50],

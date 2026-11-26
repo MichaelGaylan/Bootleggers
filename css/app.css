@@ -992,6 +992,6 @@ button.row.cpn-disc:disabled { opacity: .55; cursor: default; }
 .pos-chg { white-space: nowrap; }
 .pos-chg.chg-no, .pos-chg.chg-no b { color: var(--danger); }
 .pos-chg.chg-add b, .pos-chg.chg-extra b { color: var(--text); }
-.pos-swap { font-size: .74rem; padding: 0 5px; border-radius: 6px; background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--text); }
+.pos-chgamt { color: var(--text); white-space: nowrap; }
 .pos-ti em.pos-chgs { color: var(--text); font-size: .9rem; }
 .pos-ti em.pos-chgs .pos-chg.chg-no b { text-decoration: underline; }
