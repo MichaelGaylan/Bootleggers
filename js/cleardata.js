@@ -20,7 +20,7 @@ export const CLEAR_GROUPS = [
   { k: 'e86', label: 'Empty the 86 list', sub: 'Turns every dish back on so it can be ordered. No dish, menu item or stock is deleted.', setting: true },
   { k: 'prep', label: 'Daily prep check-offs', sub: 'Which prep was marked done each day. The prep list itself stays.', colls: ['prepday'] },
   { k: 'posts', label: 'Messages and problem reports', colls: ['post'] },
-  { k: 'swaps', label: 'Swap requests', colls: ['swap'] },
+  { k: 'swaps', label: 'Swap and time-off requests', sub: 'Approved time off stays on the schedule.', colls: ['swap', 'timeoff'] },
   { k: 'events', label: 'Events (BEOs)', colls: ['event'] },
   { k: 'waste', label: 'Waste log', colls: ['waste'] },
   { k: 'weeks', label: 'Past schedules', sub: 'Weeks before this one. This week and later stay.', colls: ['week'], keep: (id) => id >= thisWeek() },
