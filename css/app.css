@@ -955,3 +955,7 @@ button.row.cpn-disc:disabled { opacity: .55; cursor: default; }
 .pos-idcard { text-align: center; padding: 4px 0 10px; }
 .pos-idbig { font-size: 2.2rem; font-weight: 800; color: var(--warn); }
 .hh-days { margin-bottom: 10px; }
+
+/* RRA-141: dishes with no price yet */
+.pos-tile.noprice { opacity: .55; }
+.pos-tile.noprice .pos-cap small { color: var(--text-2); font-style: italic; }

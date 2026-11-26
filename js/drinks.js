@@ -119,7 +119,8 @@ export function pours(dish, stock) {
   const out = [];
   for (const { s, a } of lines) {
     const size = unitSize(s.unit);
-    const used = a.oz != null ? (size.oz ? a.oz / size.oz : null) : (size.count ? a.count / size.count : null);
+    // A count ("1 bottle") on a stock item sold by volume counts whole units.
+    const used = a.oz != null ? (size.oz ? a.oz / size.oz : null) : a.count / (size.count || 1);
     if (used) out.push({ id: s.id, name: s.name, used });
   }
   return out;

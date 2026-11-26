@@ -78,11 +78,13 @@ async function menu() {
   const s = await data.settings();
   const hh = { ...HH_DEFAULT, ...(s.pos?.happyHour || {}) };
   const order = s.sections || [];
-  const dishes = (await data.list('recipe')).filter((r) => r.kind === 'dish' && r.section && +r.price > 0);
-  const secs = [...new Set(dishes.map((d) => d.section))].sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+  // RRA-141: every menu section is a tab, and dishes with no price yet show
+  // grayed out ("No price yet"), so new sections like Cocktails are easy to find.
+  const dishes = (await data.list('recipe')).filter((r) => r.kind === 'dish' && r.section);
+  const secs = [...new Set([...order.filter((x) => x !== 'Other'), ...dishes.map((d) => d.section)])].sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
   return secs.map((section) => ({ section, items: dishes.filter((d) => d.section === section).sort((a, b) => (a.menuOrder ?? 999) - (b.menuOrder ?? 999) || a.name.localeCompare(b.name)).map((d) => {
     const now = priceNow(d, hh);
-    return { id: d.id, name: d.name, price: now.price, base: +d.price, hh: now.hh, kind: drinkKind(d), section, station: stationOf(d, s), photo: photoOf(d) };
+    return { id: d.id, name: d.name, price: now.price, base: +d.price, hh: now.hh, noPrice: !(+d.price > 0), kind: drinkKind(d), section, station: stationOf(d, s), photo: photoOf(d) };
   }) }));
 }
 
@@ -469,14 +471,18 @@ export async function posCheckView(id, opt = {}) {
     <div class="pos-right">
     ${happyNow({ ...HH_DEFAULT, ...(P.happyHour || {}) }) ? `<div class="pos-hhbar">🍻 Happy hour prices are on · ${esc(hhLabel({ ...HH_DEFAULT, ...P.happyHour }))}</div>` : ''}
     <div class="pos-secs pos-tabs">${M.map((m) => `<button type="button" data-sec="${esc(m.section)}" class="${m.section === section ? 'on' : ''}">${esc(m.section)}</button>`).join('')}</div>
-    <div class="pos-grid">${items.map((x) => { const out = P.eightySix[x.id]; return `<button type="button" class="pos-tile${out ? ' out' : ''}${x.photo ? '' : ' nopic'}" data-item="${x.id}" ${out ? 'disabled' : ''} style="--tile:${tint(x.section + x.name)}">
+    <div class="pos-grid">${items.map((x) => { const out = P.eightySix[x.id]; const np = x.noPrice; return `<button type="button" class="pos-tile${out ? ' out' : ''}${np ? ' noprice' : ''}${x.photo ? '' : ' nopic'}" data-item="${x.id}" ${out || (np && !boss()) ? 'disabled' : ''} style="--tile:${tint(x.section + x.name)}">
       <span class="pos-pic">${x.photo ? `<img src="${esc(x.photo)}" alt="" loading="lazy">` : `<span>${esc(short(x.name))}</span>`}</span>
-      <span class="pos-cap"><span class="pos-tn">${esc(short(x.name))}</span><small>${out ? '86’d' : x.hh ? `<s>${money(x.base)}</s> <b class="pos-hh">${money(x.price)}</b>` : money(x.price)}${isAlcohol(x.kind) ? ' <span class="pos-21">21+</span>' : ''}</small></span></button>`; }).join('') || '<p class="muted small">No dishes with a price in this section. Add prices in Recipes.</p>'}</div>
+      <span class="pos-cap"><span class="pos-tn">${esc(short(x.name))}</span><small>${out ? '86’d' : np ? (boss() ? 'No price yet · tap to set' : 'No price yet') : x.hh ? `<s>${money(x.base)}</s> <b class="pos-hh">${money(x.price)}</b>` : money(x.price)}${isAlcohol(x.kind) ? ' <span class="pos-21">21+</span>' : ''}</small></span></button>`; }).join('') || `<p class="muted small">Nothing in ${esc(section || 'this section')} yet. Add ${/beer|wine|liquor|cocktail|drink|beverage/i.test(section || '') ? 'drinks' : 'dishes'} in Recipes.</p>`}</div>
     </div></div>`;
   posCheckView.shown = c.id; posRestore(place, opt.pin);
   $$('[data-sec]').forEach((b) => b.onclick = () => { LS.set('posSec', b.dataset.sec); posCheckView(id, { pin: true }); });
   $$('[data-seat]').forEach((b) => b.onclick = () => { posCheckView.seat = +b.dataset.seat; posCheckView(id, { pin: true }); });
-  $$('[data-item]').forEach((b) => b.onclick = () => addItem(c, items.find((x) => x.id === b.dataset.item), seat));
+  $$('[data-item]').forEach((b) => b.onclick = async () => {
+    const x = items.find((y) => y.id === b.dataset.item);
+    if (x.noPrice) { if (await setPriceSheet(x)) posCheckView(id, { pin: true }); return; }
+    addItem(c, x, seat);
+  });
   $$('[data-line]').forEach((b) => b.onclick = () => lineSheet(c, c.items.find((x) => x.id === b.dataset.line)));
   $$('[data-plus]').forEach((b) => b.onclick = () => bump(c, b.dataset.plus, +1));
   $$('[data-minus]').forEach((b) => b.onclick = () => bump(c, b.dataset.minus, -1));
@@ -550,6 +556,25 @@ async function addItem(c, x, seat) {
   const same = !line.mods.length && !line.note && cur.items.find((y) => !y.sent && !y.voided && y.menuId === x.id && y.seat === seat && !(y.mods || []).length && !y.note);
   await data.put('check', { ...cur, items: same ? cur.items.map((y) => (y === same ? { ...y, qty: (y.qty || 1) + 1 } : y)) : [...cur.items, line] });
   posCheckView(c.id, { pin: true });
+}
+
+// RRA-141: a manager or the Admin types a missing price right from Orders.
+async function setPriceSheet(x) {
+  const v = await sheet({
+    title: short(x.name), right: 'Save',
+    body: `<p class="muted small" style="margin-top:0">This ${x.kind ? 'drink' : 'dish'} has no price yet, so it can't be ordered. Set its menu price (it's saved in Recipes too).</p>
+      <label class="field"><span>Menu price</span><input type="text" inputmode="decimal" id="np" placeholder="e.g. 8.00"></label><p id="np-err" class="small" style="color:var(--danger)"></p>`,
+    onMount(api) {
+      setTimeout(() => $('#np', api.el)?.focus(), 50);
+      api.onRight = () => { const n = parseFloat($('#np', api.el).value.replace('$', '')); if (!(n > 0)) { $('#np-err', api.el).textContent = 'Type a price above $0.'; return; } api.close(n.toFixed(2)); };
+    },
+  });
+  if (!v) return false;
+  const r = await data.get('recipe', x.id);
+  if (!r) return false;
+  await data.put('recipe', { ...r, price: v });
+  toast(`${short(x.name)}: ${money(+v)}`);
+  return true;
 }
 
 // RRA-135: 21+ ID check, once per seat. Saved on the check with who checked.
