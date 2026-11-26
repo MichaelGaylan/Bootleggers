@@ -557,10 +557,12 @@ export async function staffView() {
   // RRA-092: a removed person's hours that match someone on the list by name.
   const orphans = change ? await orphanHistory() : [];
   const matches = orphans.map((g) => ({ g, to: staff.find((s) => sameName(s.name, g.name)) })).filter((x) => x.to);
+  const noJob = staff.filter((s) => s.noJob);
   view.innerHTML = `
+    ${noJob.length && change ? `<div class="hint small"><b>${esc(noJob.map((s) => s.name).join(', '))}</b> joined without a job title, so for now they get the Line cook screens. Tap ${noJob.length === 1 ? 'their name' : 'each name'} and pick a Position.</div>` : ''}
     ${matches.map((x, i) => `<div class="hint small"><b>${esc(x.to.name)}</b> may have hours from an earlier record (${x.g.n} punch${x.g.n === 1 ? '' : 'es'}, ${hoursText(x.g.hours)}). <button class="btn tonal small" type="button" data-merge="${i}">Same person? Move them</button></div>`).join('')}
     <div class="group">${staff.map((s) => `<div class="row">${change ? `<button class="rm" type="button" data-rm="${s.id}" aria-label="Remove ${esc(s.name)}">−</button>` : ''}
-      <span class="grow"${change ? ` data-edit="${s.id}" style="cursor:pointer"` : ''}><span class="title">${esc(s.name)}</span><span class="sub">${esc(s.position || '')} · ${esc(ROLES[s.role] || 'Staff')}${s.dev ? '' : ` ${chipHtml('Not linked', 'warn')}`}</span></span></div>`).join('') || '<div class="row muted">No staff yet.</div>'}</div>
+      <span class="grow"${change ? ` data-edit="${s.id}" style="cursor:pointer"` : ''}><span class="title">${esc(s.name)}</span><span class="sub">${esc(s.position || '')} · ${esc(ROLES[s.role] || 'Staff')}${s.dev ? '' : ` ${chipHtml('Not linked', 'warn')}`}${s.noJob ? ` ${chipHtml('Pick a job', 'warn')}` : ''}</span></span></div>`).join('') || '<div class="row muted">No staff yet.</div>'}</div>
     ${change ? '<button class="btn tonal block" id="add" type="button">+ Add staff</button>' : ''}
     <div class="group" style="margin-top:14px"><a class="row nav" href="#/jobtitles"><span class="grow"><span class="title">Job titles</span><span class="sub">${esc((await positionList()).join(', '))}</span></span></a></div>
     <p class="muted small">Not linked: this person hasn't opened the app on their phone yet, so Change role isn't available for them.</p>
@@ -576,6 +578,7 @@ export async function staffView() {
       if (!ok) return;
       // RRA-090: the team settings list removed phones; that phone locks itself.
       if (s.iid) { const set = await data.settings(); await data.saveSettings({ ...set, removed: { ...(set.removed || {}), [s.iid]: { name: s.name, at: Date.now(), by: session.profile?.name } } }); }
+      if (s.iid && s.role === 'manager') import('./sync.js').then((m) => m.dropDoor(s.iid)).catch(() => {}); // RRA-134
       await data.remove('staff', s.id); toast(s.iid ? 'Removed, and their app access ended' : 'Removed'); staffView();
     };
   });
@@ -606,7 +609,7 @@ async function staffDialog(existing) {
         const n = $('#st-n', api.el).value.trim(); if (!n) return;
         let p = $('#st-p', api.el).value;
         if (p === '__new') { newTitle = $('#st-pnew', api.el).value.trim().replace(/\s+/g, ' '); if (!newTitle) { toast('Type the new job title'); return; } p = newTitle; }
-        Object.assign(s, { name: n, position: p });
+        Object.assign(s, { name: n, position: p, noJob: false }); // RRA-133: a job was picked
         if ($('#st-rate', api.el)) rate = $('#st-rate', api.el).value.trim().replace('$', '');
         api.close(true);
       };
@@ -630,8 +633,13 @@ export async function ensureStaffFor(profile) {
   const ek = await myEcdhPublic(); // so a manager's fix to my hours reaches this phone
   const dev = await myPublicKey(); // so the Admin can change my role (RRA-066)
   const mine = staff.find((s) => (s.iid && s.iid === profile.iid)) || staff.find((s) => s.name === profile.name);
-  if (mine) { if (mine.ek !== ek || mine.dev !== dev || mine.iid !== profile.iid) await data.put('staff', { ...mine, ek, dev, iid: profile.iid }); return; }
-  await data.put('staff', { name: profile.name, position: profile.role === 'manager' ? 'Manager' : profile.role === 'chef' ? 'Chef' : 'Line cook', role: profile.role, iid: profile.iid, ek, dev });
+  // RRA-133: the job title picked on the invite (or when letting them back in)
+  // is used once for this phone; a later change on the Staff list sticks.
+  const job = profile.pos && (!mine || mine.posFrom !== profile.iid) ? { position: profile.pos, posFrom: profile.iid, noJob: false } : null;
+  if (mine) { if (job || mine.ek !== ek || mine.dev !== dev || mine.iid !== profile.iid) await data.put('staff', { ...mine, ...(job || {}), ek, dev, iid: profile.iid }); return; }
+  const auto = profile.role === 'manager' ? 'Manager' : profile.role === 'chef' ? 'Chef' : '';
+  // No job title yet: Line cook for now, flagged on the Staff list so it isn't left that way.
+  await data.put('staff', { name: profile.name, position: job?.position || auto || 'Line cook', ...(job ? { posFrom: profile.iid } : !auto ? { noJob: true } : {}), role: profile.role, iid: profile.iid, ek, dev });
 }
 
 // ------------------------------------------------- print several weeks (RRA-042)

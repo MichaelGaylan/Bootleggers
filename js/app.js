@@ -15,7 +15,7 @@ import { recipesView, recipeView, printView } from './recipes.js';
 import { stockView, neededView, ordersView, vendorsView } from './stock.js';
 import { boardView, unreadPosts } from './board.js';
 import { prepView } from './prep.js';
-import { scheduleView, staffView, ensureStaffFor, staffList, schedulePrintView, swapPopups, shiftTimesView, jobTitlesView } from './schedule.js';
+import { scheduleView, staffView, ensureStaffFor, staffList, schedulePrintView, swapPopups, shiftTimesView, jobTitlesView, positionList } from './schedule.js';
 import { eventsView, eventView, dueEvents, eventPopups } from './events.js';
 import { costsView } from './costs.js';
 import { loungeView, timesheetView, timesheetsView, canTime } from './lounge.js';
@@ -167,15 +167,32 @@ async function onRequest(iid, box) {
   if (waiting.has(iid)) return;
   const text = await access.openRequest(box);
   const req = await access.readRequest(text); // throws if used, expired or not ours
-  waiting.set(iid, { iid, text, name: req.invite.name, at: Date.now() });
+  waiting.set(iid, { iid, text, name: req.invite.name, at: Date.now(), restore: !!req.restore });
   updateBadge();
   if (location.hash.startsWith('#/team') && !dlg.open) teamView();
-  else toast(`${req.invite.name}'s phone is waiting for your approval`);
+  else toast(req.restore ? `${req.invite.name} is asking to get back in. See More → Invite and approve phones.` : `${req.invite.name}'s phone is waiting for your approval`);
   if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
     navigator.serviceWorker?.ready.then((r) => r.showNotification(APP_NAME, {
       body: `${req.invite.name}'s phone is waiting for your approval.`, tag: `req-${iid}`, icon: BRAND.icon192,
     })).catch(() => {});
   }
+}
+
+// RRA-134: a request someone else already handled leaves this list too.
+function requestGone(iid) {
+  if (!waiting.delete(iid)) return;
+  updateBadge();
+  if (location.hash.startsWith('#/team') && !dlg.open) teamView();
+}
+// RRA-134: manager and Admin phones leave their public sealing key where a
+// locked-out phone can find it, so "Ask to get back in" reaches all of them.
+const doorId = (ek) => profile?.iid || `a-${ek.slice(-20)}`;
+async function openDoor() {
+  if (!sync.enabled() || !profile) return;
+  const ek = await access.myEcdhPublic();
+  const flag = BRAND.dataPrefix + 'door';
+  if (access.can(profile, 'invite')) { if (await sync.publishDoor(doorId(ek), ek).catch(() => false)) localStorage.setItem(flag, '1'); }
+  else if (localStorage.getItem(flag)) { await sync.dropDoor(doorId(ek)); localStorage.removeItem(flag); }
 }
 
 async function updateBadge() {
@@ -469,21 +486,28 @@ function reportView() {
 
 // ------------------------------------------------ Team (RRA-018)
 
+// RRA-133: the job they do, asked whenever someone is let in, so nobody ends
+// up on the Line cook screens by mistake.
+const jobOptions = (list, pick = '') => `<option value="">Choose their job…</option>${list.map((p) => `<option${p === pick ? ' selected' : ''}>${esc(p)}</option>`).join('')}`;
+const autoJob = (role) => (role === 'manager' ? 'Manager' : role === 'chef' ? 'Chef' : '');
+
 async function teamView(incoming) {
   if (!access.can(profile, 'invite')) { location.hash = '#/more'; return; }
   setChrome({ tab: 'more', back: true });
   setTitle('Team access');
   const invites = (await access.issuedInvites()).sort((a, b) => b.iat - a.iat);
+  const jobs = await positionList();
   view.innerHTML = `
     <div class="section-label">1. Send an invite</div>
     <div class="card">
-      <label class="field" style="margin-top:0"><span>Their name</span><input type="text" id="i-name" placeholder="e.g. Sam (line cook)" autocomplete="off"></label>
+      <label class="field" style="margin-top:0"><span>Their name</span><input type="text" id="i-name" placeholder="e.g. Sam" autocomplete="off"></label>
       <label class="field"><span>Role</span><select id="i-role"><option value="staff">Staff</option><option value="chef">Chef</option>${access.can(profile, 'invite.manager') ? '<option value="manager">Manager (can invite and approve phones)</option>' : ''}</select></label>
+      <label class="field" id="i-job-f"><span>Job</span><select id="i-job">${jobOptions(jobs)}</select></label>
       <button class="btn block" id="i-make" type="button">Create invite</button>
       <p class="muted small">Each invite works once, on one phone, within ${INVITE_HOURS} hours.</p>
     </div>
     ${waiting.size ? `<div class="section-label">Waiting for you</div>
-    <div class="group">${[...waiting.values()].map((w) => `<button class="row nav" type="button" data-wait="${esc(w.iid)}"><span class="grow"><span class="title">${esc(w.name)}</span><span class="sub">Their phone sent a request</span></span><span class="chip warn">Check</span></button>`).join('')}</div>` : ''}
+    <div class="group">${[...waiting.values()].map((w) => `<button class="row nav" type="button" data-wait="${esc(w.iid)}"><span class="grow"><span class="title">${esc(w.name)}</span><span class="sub">${w.restore ? 'Asking to get back in' : 'Their phone sent a request'}</span></span><span class="chip warn">Check</span></button>`).join('')}</div>` : ''}
     <div class="section-label">2. Approve their phone</div>
     <div class="card">
       <p class="small muted" style="margin-top:0">When they open the invite, their request shows up above by itself${sync.enabled() ? '' : ' (with shared data on)'}. If it doesn't, they can send it by text: paste it here.</p>
@@ -496,18 +520,23 @@ async function teamView(incoming) {
     <div class="section-label">Invites from this phone</div>
     <div class="group">${invites.length ? invites.map((i) => `
       <div class="row"><span class="grow"><span class="title">${esc(i.name)} <span class="chip">${esc(access.ROLES[i.role])}</span></span>
-      <span class="sub">Sent ${fmtDate(i.iat)} · id ${esc(i.iid)}</span></span>
+      <span class="sub">${i.pos ? `${esc(i.pos)} · ` : ''}Sent ${fmtDate(i.iat)} · id ${esc(i.iid)}</span></span>
       ${i.status === 'approved' ? '<span class="chip ok">Approved</span>' : Date.now() > i.exp ? '<span class="chip">Expired</span>' : '<span class="chip warn">Waiting</span>'}</div>`).join('')
       : '<div class="row muted">None yet.</div>'}</div>
     <p class="muted small">To take access away right now, send the invite id to the app's developer so it can be added to the revoked list. Otherwise access ends by itself after ${INACTIVITY_DAYS} days without use.</p>`;
 
+  // Chefs and managers get their job title from their role.
+  const jobShown = () => { $('#i-job-f').hidden = ($('#i-role')?.value || 'staff') !== 'staff'; };
+  $('#i-role').onchange = jobShown; jobShown();
   $('#i-make').onclick = async () => {
     const name = $('#i-name').value.trim();
     if (!name) { $('#i-name').focus(); return; }
     const role = $('#i-role')?.value || 'staff';
+    const pos = autoJob(role) || $('#i-job').value;
+    if (!pos) { toast('Choose their job'); $('#i-job').focus(); return; }
     if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
     let code;
-    try { code = await access.createInvite(profile, name, role); }
+    try { code = await access.createInvite(profile, name, role, pos); }
     catch (e) { toast(e.message); return; }
     const link = `${location.origin}${location.pathname}#t=${code}`;
     const text = `${APP_NAME} invite for ${name}. Open this on your own phone (works once, for ${INVITE_HOURS} hours):\n${link}`;
@@ -535,27 +564,47 @@ async function teamView(incoming) {
     const known = req.restore ? (await staffList()).find((x) => x.name.trim().toLowerCase() === req.invite.name.trim().toLowerCase()) : null;
     const roles = ['staff', 'chef', ...(access.can(profile, 'invite.manager') ? ['manager'] : [])];
     const def = roles.includes(known?.role) ? known.role : 'staff';
+    const jobs = await positionList(known?.position);
+    // Older invites carry no job title: ask for it now (RRA-133).
+    const askJob = req.restore || (!req.invite.pos && (req.invite.role || 'staff') === 'staff');
     const ok = await sheet({
       title: req.restore ? 'Let them back in' : 'Approve phone', right: 'Approve',
       body: `${req.restore
         ? `<p><b>${esc(req.invite.name)}</b> lost access on their phone and is asking to get back in.</p>
           <label class="field"><span>Role</span><select id="r-role">${roles.map((r) => `<option value="${r}"${r === def ? ' selected' : ''}>${esc(access.ROLES[r])}</option>`).join('')}</select></label>
           ${known ? '' : '<p class="hint small">No one with this name is on the staff list. Make sure you know who this is.</p>'}`
-        : `<p><b>${esc(req.invite.name)}</b> · ${esc(access.ROLES[req.invite.role])}</p>`}
+        : `<p><b>${esc(req.invite.name)}</b> · ${esc(access.ROLES[req.invite.role])}${req.invite.pos ? ` · ${esc(req.invite.pos)}` : ''}</p>`}
+        ${askJob ? `<label class="field" id="r-job-f"><span>Job</span><select id="r-job">${jobOptions(jobs, known && !known.noJob ? known.position : '')}</select></label>` : ''}
         <p>Ask them to read the code on their phone. It must match:</p>
         <div class="code-big">${esc(req.deviceCode)}</div>
         <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="match" style="width:22px;height:22px"> The code on their phone matches</label>`,
-      onMount: (api) => { api.onRight = () => { if ($('#match', api.el).checked) api.close($('#r-role', api.el)?.value || true); else toast('Check the code with them first'); }; },
+      onMount: (api) => {
+        const jobShown = () => { const f = $('#r-job-f', api.el); if (f) f.hidden = !!autoJob($('#r-role', api.el)?.value || req.invite.role); };
+        $('#r-role', api.el)?.addEventListener('change', jobShown); jobShown();
+        api.onRight = () => {
+          if (!$('#match', api.el).checked) { toast('Check the code with them first'); return; }
+          const role = $('#r-role', api.el)?.value || req.invite.role;
+          const pos = askJob ? (autoJob(role) || $('#r-job', api.el)?.value || '') : '';
+          if (askJob && !pos) { toast('Choose their job'); return; }
+          api.close({ role, pos });
+        };
+      },
     });
     if (!ok) return;
     let code;
-    try { code = await access.approve(profile, req, typeof ok === 'string' ? ok : undefined); }
+    try { code = await access.approve(profile, req, req.restore ? ok.role : undefined, ok.pos); }
     catch (e) { toast(e.message); return; }
-    if (waiting.has(req.invite.iid)) { waiting.delete(req.invite.iid); sync.clearRequest(req.invite.iid); updateBadge(); }
+    // RRA-134: the activation goes straight back to their phone, and the
+    // request leaves every other manager's list.
+    let sentBack = false;
+    if (sync.enabled()) {
+      try { const box = await access.sealReply(req, code); if (box) sentBack = await sync.postReply(req.invite.iid, box); } catch { /* they can paste it */ }
+    }
+    waiting.delete(req.invite.iid); sync.clearRequest(req.invite.iid); updateBadge();
     const text = `${APP_NAME} activation for ${req.invite.name}. Copy this whole message, then open the app and tap Paste:\n${code}`;
     await sheet({
       title: 'Approved', left: null, right: 'Done',
-      body: `<p>Send this activation back to <b>${esc(req.invite.name)}</b>. It only works on their phone.</p>
+      body: `${sentBack ? `<p><b>Sent to ${esc(req.invite.name)}'s phone.</b> It opens by itself in a moment. If it doesn't, send this activation by text.</p>` : `<p>Send this activation back to <b>${esc(req.invite.name)}</b>. It only works on their phone.</p>`}
         <button class="btn block" id="s" type="button">Send activation</button>
         <button class="btn plain block" id="c" type="button" style="margin-top:6px">Copy whole message</button>
         ${codeBox(code, 'Activation')}`,
@@ -621,7 +670,7 @@ async function lockedView(incoming) {
     view.innerHTML = `
       <h2>Almost there, ${esc(pending.name)}</h2>
       ${pending.posted
-        ? `<p><b>Step 1.</b> Done: your request went to the manager who invited you. They get a note in the app. If they don't see it, send it by text too.</p>
+        ? `<p><b>Step 1.</b> Done: your request went to ${pending.restore ? 'every manager and the Admin. Any one of them can let you back in' : 'the manager who invited you'}. They get a note in the app. If they don't see it, send it by text too.</p>
           <button class="btn tonal block" id="send" type="button">Send request by text</button>`
         : `<p><b>Step 1.</b> Send your request to ${pending.restore ? 'a manager or the Admin' : 'the manager who invited you'}.</p>
           <p id="auto" class="small muted"></p>
@@ -629,7 +678,7 @@ async function lockedView(incoming) {
       <details class="code-more"><summary>Request code only</summary>${codeBox(pending.request, 'Request')}</details>
       <p style="margin-top:18px"><b>Step 2.</b> Your manager will ask for this code. Read it to them:</p>
       <div class="code-big">${esc(pending.deviceCode)}</div>
-      <p style="margin-top:18px"><b>Step 3.</b> Paste the activation your manager sends back.</p>
+      <p style="margin-top:18px"><b>Step 3.</b> ${pending.posted ? 'Keep this screen open: the app opens by itself once they approve. Or paste' : 'Paste'} the activation your manager sends back.</p>
       <textarea id="code" placeholder="Paste the activation" style="min-height:70px">${esc(incoming || '')}</textarea>
       <div class="btn-row" style="margin-top:10px">
         <button class="btn tonal" id="paste" type="button">Paste</button>
@@ -640,16 +689,33 @@ async function lockedView(incoming) {
     const req = `${APP_NAME} request from ${pending.name}. Paste this in the app under More → Invite and approve staff:\n${pending.request}`;
     $('#send').onclick = () => share(`${APP_NAME} request`, req);
     wireCodeBox(view, pending.request, 'Request');
-    if (pending.rk && !pending.posted && sync.enabled()) {
-      $('#auto').textContent = 'Sending your request to your manager’s phone…';
-      access.sealRequest(pending)
-        .then((box) => sync.postRequest(pending.iid, box))
+    // RRA-134: "let me back in" goes to every manager and Admin phone.
+    const sealed = pending.restore
+      ? () => sync.doorKeys().then((keys) => access.sealToAll(pending, keys))
+      : () => access.sealRequest(pending);
+    if ((pending.rk || pending.restore) && !pending.posted && sync.enabled()) {
+      $('#auto').textContent = pending.restore ? 'Sending your request to the managers and the Admin…' : 'Sending your request to your manager’s phone…';
+      sealed()
+        .then((box) => (box ? sync.postRequest(pending.iid, box) : false))
         .then(async (sent) => {
-          if (!sent) return;
+          if (!sent) { const a = $('#auto'); if (a && pending.restore) a.textContent = 'No manager phone could get it yet. Send it by text instead.'; return; }
           await store.put('pending', { ...pending, posted: Date.now() });
           if (!dlg.open && !$('#code').value) lockedView();
         })
         .catch(() => { const a = $('#auto'); if (a) a.textContent = 'Couldn’t send it automatically (no signal?). Send it by text instead.'; });
+    }
+    // RRA-134: the approval comes straight back; open the app when it does.
+    if (pending.posted && sync.enabled() && lockedView.watching !== pending.iid) {
+      lockedView.watching = pending.iid;
+      sync.watchReply(pending.iid, async (box) => {
+        try {
+          const code = await access.openReply(box);
+          profile = await access.activate(code);
+          sync.clearReply(pending.iid);
+          localStorage.removeItem(BRAND.dataPrefix + 'expiredNotice');
+          toast(`Welcome${pending.restore ? ' back' : ''}, ${profile.name}`); boot();
+        } catch { /* an old or wrong reply: they can still paste */ }
+      }).catch(() => { lockedView.watching = null; });
     }
     $('#paste').onclick = () => pasteInto($('#code'));
     $('#go').onclick = async () => {
@@ -662,7 +728,7 @@ async function lockedView(incoming) {
   }
 
   view.innerHTML = `
-    ${expired ? `<div class="hint"><b>Your access ended</b> after ${INACTIVITY_DAYS} days without use, or a manager removed it. Ask a manager for a new invite.</div>` : ''}
+    ${expired ? `<div class="hint"><b>Your access ended</b> after ${INACTIVITY_DAYS} days without use, or a manager removed it. Tap <b>Ask to get back in</b> below: any manager or the Admin can let you back in.</div>` : ''}
     <h2>Invite only</h2>
     <p>${esc(APP_NAME)} is for the ${esc(BRAND.shortName)} team. A manager sends you an invite, and it opens on your phone only.</p>
     ${installHint(incoming)}
@@ -804,6 +870,7 @@ async function checkRoleGrant() {
   profile = next; session.profile = next;
   await data.put('staff', { ...me, grantSeen: Date.now(), role: next.role });
   if (access.can(profile, 'invite')) sync.onInbox(onRequest); else if (from === 'manager') sync.onInbox(null);
+  if (from !== next.role) openDoor(); // RRA-134
   if (next.role === 'manager') await sync.reopenPrivate();
   if (from === 'manager' && next.role !== 'manager') {
     // Others' hours and every pay rate leave this phone (only here, not for the team).
@@ -930,6 +997,8 @@ async function boot() {
   if (!boot.wired) {
     boot.wired = true;
     if (access.can(profile, 'invite')) sync.onInbox(onRequest);
+    sync.onInboxGone(requestGone);
+    openDoor();
     sync.start(profile, () => { if (location.hash.startsWith('#/settings')) route(); });
     data.onChange((coll, remote) => { if (remote) debounceRoute(); });
     data.onChange(() => updateBadge());
