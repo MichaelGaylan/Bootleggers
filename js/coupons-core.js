@@ -3,8 +3,9 @@
 //
 // A coupon is a shared record ('coupon'): a typed code (WINGS20), an offer
 // (percent off, dollar off, a free dish, or buy one get one), and its rules.
-// The QR code or barcode on a printed or texted coupon holds only
-// "<tag>:<code>", e.g. BLG:WINGS20 or BLG:WINGS20-7F3K9Q for a one-time code.
+// The barcode on a printed or texted coupon holds only the code (WINGS20 or
+// WINGS20-7F3K9Q for a one-time code); the QR holds a link to coupon.html with
+// "<tag>:<code>" in it (RRA-150/151). Older coupons hold just "BLG:<code>".
 // The offer itself is looked up here, so a home-made QR code can't name its
 // own discount, and another restaurant's app turns it away (different tag).
 //
@@ -48,10 +49,30 @@ export function newSuffix(n = 6) {
 
 // What goes inside the QR code or barcode.
 export const payload = (code) => `${tag()}:${cleanCode(code)}`;
+// RRA-150: the barcode holds just the code (WINGS20-7F3K9Q), so its bars are
+// fewer and wider and read from farther away.
+export const barPayload = (code) => cleanCode(code);
+// RRA-151: the QR holds a link to the offer page (coupon.html), so any phone
+// camera opens it. The offer words ride along in the link for the page to show;
+// the POS ignores them and looks the offer up from the code itself.
+export function qrLink(code, k, base) {
+  const q = new URLSearchParams({ c: payload(code), h: headline(k) });
+  const f = finePrint(k).join('|');
+  if (f) q.set('f', f.slice(0, 220));
+  return `${String(base).split('#')[0]}#${q.toString()}`;
+}
 
 // Whatever was scanned or typed → { code } or { error }.
 export function readScan(text) {
-  const t = String(text || '').trim();
+  let t = String(text || '').trim();
+  // RRA-151: a link from a coupon QR (…/coupon.html#c=BLG:WINGS20&h=…): only
+  // the code is read; the offer words in the link are never trusted.
+  const hash = t.match(/^https?:\/\/[^#\s]*#(.+)$/i);
+  if (hash) {
+    const c = new URLSearchParams(hash[1]).get('c') || (/^[A-Za-z0-9]+:[A-Za-z0-9-]+$/.test(hash[1]) ? hash[1] : '');
+    if (!c) return { error: "That isn't one of our coupon codes." };
+    t = c.trim();
+  }
   const m = t.match(/^([A-Za-z0-9]+):([A-Za-z0-9-]+)$/);
   if (m) {
     if (m[1].toUpperCase() !== tag()) return { error: 'This coupon is for a different restaurant.' };

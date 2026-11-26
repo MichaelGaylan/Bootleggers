@@ -402,7 +402,7 @@ function aboutView() {
       <p><b>Prep:</b> today's prep list by station. Tap an item when it's done.</p>
       <p><b>Stock:</b> count with + and −, then Save count. Needed shows what's below par, and Order guides splits it by vendor.</p>
       <p><b>Board:</b> messages for everyone, the kitchen or managers, plus notices from management. A red dot means something new.</p>
-      <p><b>Coupons:</b> managers make a coupon under More → Coupons and send it as a picture (QR code or barcode, with the offer printed under it) to text, email, print or post. At the table, tap <b>Add a coupon</b> on the check and scan it with the camera, or type the code. The discount comes off before tax. Military / veteran, first responder and senior discounts need no coupon: tap <b>Discounts</b> on the check and confirm you saw the guest's ID.</p>
+      <p><b>Coupons:</b> managers make a coupon under More → Coupons and send it as a picture (QR code or barcode, with the offer printed under it) to text, email, print or post. Scanned with any phone camera, the QR code opens a page with the offer and the code to show the server. At the table, tap <b>Add a coupon</b> on the check and scan it with the camera, or type the code. The discount comes off before tax. Military / veteran, first responder and senior discounts need no coupon: tap <b>Discounts</b> on the check and confirm you saw the guest's ID.</p>
       <p><b>More:</b> schedule, events, costs and waste, Settings, and this page.</p>
       <p><b>Access:</b> the app opens only on the phone a manager approved. It locks itself after ${INACTIVITY_DAYS} days without use.</p>
       <p><b>Install it:</b> on iPhone, tap Share, then Add to Home Screen. On Android, tap the menu, then Install app.</p>

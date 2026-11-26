@@ -282,6 +282,42 @@ self.BRAND = {
     burger: { title: 'Temperature', options: ['Medium rare', 'Medium', 'Medium well', 'Well done'] },
     salad: { title: 'Dressing', options: ['Ranch', 'Blue Cheese', 'Honey Mustard', 'Italian', 'None'] },
   },
+  // Dish changes (RRA-149): condiments and toppings a server can mark NO, ADD
+  // or EXTRA on a dish, with each one's price (0 = free): ADD and EXTRA add it
+  // to the dish, NO takes it off. Starter prices only: the Admin changes the
+  // list and prices in Settings → Point of sale → Toppings.
+  posToppings: [
+    ['Cheese', 1.00], ['Bacon', 2.00], ['Mushrooms', 1.00], ['Jalapeños', 0.75], ['Onions', 0.50],
+    ['Grilled onions', 0.75], ['Tomato', 0.50], ['Lettuce', 0], ['Pickles', 0], ['Sour cream', 0.75],
+    ['Salsa', 0.50], ['Guacamole', 1.50], ['Mayo', 0], ['Mustard', 0], ['Ketchup', 0],
+  ],
+  // What comes on each dish: only these can be marked NO (or EXTRA); anything
+  // else can only be ADDed (Gaylan, 2026-11-26). Dish name → toppings; a dish
+  // not listed uses its menu section below. Toppings named in a dish's
+  // ingredients in Recipes count too. Starter guesses: edit freely.
+  posToppingsOn: {
+    'Black & Blue with Fries': ['Cheese', 'Lettuce', 'Tomato', 'Onions'],
+    'Veggie Burger with Fries': ['Cheese', 'Lettuce', 'Tomato', 'Onions', 'Pickles'],
+    'Hot Dog Basket with Side': [],
+    'BLT with Fries': ['Bacon', 'Lettuce', 'Tomato', 'Mayo'],
+    'Grilled Cheese with Fries': ['Cheese'],
+    'Grilled Cheese Club with Fries': ['Cheese', 'Bacon', 'Lettuce', 'Tomato', 'Mayo'],
+    'The Grilled Cheese Incident with Fries': ['Cheese'],
+    'Philly Melt with Fries': ['Cheese', 'Grilled onions'],
+    'Bacon Ranch Chicken Sandwich with Fries': ['Bacon', 'Cheese', 'Lettuce', 'Tomato'],
+    'Quesadilla': ['Cheese', 'Sour cream', 'Salsa'],
+    'Single Taco (No Side)': ['Cheese', 'Lettuce', 'Tomato', 'Sour cream'],
+    'Taco Basket with Side': ['Cheese', 'Lettuce', 'Tomato', 'Sour cream'],
+    'Nachos (Half)': ['Cheese', 'Jalapeños', 'Sour cream', 'Salsa'],
+    'Nachos (Full)': ['Cheese', 'Jalapeños', 'Sour cream', 'Salsa'],
+    'Classic Burger with Fries': ['Cheese', 'Lettuce', 'Tomato', 'Onions', 'Pickles'],
+  },
+  // Menu section → what usually comes on its dishes, for dishes not listed above.
+  posToppingsBySection: {
+    Burgers: ['Cheese', 'Lettuce', 'Tomato', 'Onions', 'Pickles'],
+    Sandwiches: ['Lettuce', 'Tomato', 'Mayo'],
+    Salads: ['Cheese', 'Tomato', 'Onions'],
+  },
   // Words left off the POS tiles and tickets to keep them short.
   posTrim: [' with Fries', ' with Side'],
 

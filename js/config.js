@@ -4,8 +4,8 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.15.0';
-export const BUILD = '2026.11.26-29';
+export const VERSION = '0.16.0';
+export const BUILD = '2026.11.26-30';
 
 // Text that names the restaurant uses tokens, so it reads right after a
 // changeout (RRA-123): {name} = short name, {restaurant} = full name,
@@ -14,6 +14,14 @@ export const brandText = (s) => String(s ?? '')
   .replace(/\{name\}/g, BRAND.shortName).replace(/\{restaurant\}/g, BRAND.restaurant).replace(/\{app\}/g, BRAND.appName);
 
 const WHATS_NEW_RAW = [
+  {
+    version: '0.16.0', build: '2026.11.26-30', date: '2026-11-26',
+    lines: [
+      'Change a dish when ordering: tap a dish on the check, then Change: No / Add / Extra. Toppings that come on the dish can be marked NO or EXTRA (NO cheese, EXTRA pickles); anything else can be added (ADD tomato). Burgers, wings and salads show the same list under their choice. The changes show on the kitchen ticket with NO in red.',
+      'Each topping has its own price, set by the Admin in Settings → Point of sale → Toppings. ADD and EXTRA add it to the dish, NO takes it off, and the dish on the check shows the difference (NO cheese with EXTRA onions = −$0.50 at the starter prices).',
+      'Coupons: the barcode now holds just the code and has more white space around it, so the scanner reads it from farther away. The QR code now opens a Bootleggers offer page on any phone camera, showing the offer and the code to show the server. Older coupons still scan.',
+    ],
+  },
   {
     version: '0.15.0', build: '2026.11.26-29', date: '2026-11-26',
     lines: [

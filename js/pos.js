@@ -17,6 +17,7 @@ import { dishPhoto } from './menu.js';
 import { discounts, headline, tagOf } from './coupons-core.js';
 import { couponSheet, discountsSheet } from './coupons.js';
 import { ackSeated, ack86 } from './alerts.js';
+import { toppingList, toppingsHtml, wireToppings, withChanges, changesHtml, changeWords, charge, modKey, canChangeLine } from './mods.js';
 import { drinkKind, isAlcohol, stationOf, priceNow, happyNow, hhLabel, HH_DEFAULT, stockUse, legalAge } from './drinks.js';
 
 const money = (n) => (n < 0 ? '−' : '') + '$' + Math.abs(+n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -451,7 +452,7 @@ export async function posCheckView(id, opt = {}) {
       <div class="pos-head"><span>Item</span><span>Qty</span><span>Amount</span></div>
       ${c.items.length ? seats.map((s) => `<div class="pos-seat">${c.guests > 1 || (c.ids || {})[s] ? `<div class="pr-lab">${c.guests > 1 ? `Seat ${s}` : ''}${(c.ids || {})[s] ? ` <span class="pos-idok">🪪 21+ checked</span>` : ''}</div>` : ''}${c.items.filter((x) => x.seat === s).map((x) => `
         <div class="pos-line${x.voided ? ' void' : ''}">
-          <button class="pos-name" type="button" data-line="${x.id}"><span>${esc(short(x.name))}</span>${x.mods?.length ? `<span class="pos-mod">${esc(x.mods.join(', '))}</span>` : ''}${x.note ? `<span class="pos-mod">“${esc(x.note)}”</span>` : ''}<span class="pos-st">${x.voided ? 'void' : x.sent ? '✓ sent' : '<b style="color:var(--warn)">new</b>'}</span></button>
+          <button class="pos-name" type="button" data-line="${x.id}"><span>${esc(short(x.name))}</span>${x.mods?.length ? `<span class="pos-mod">${esc(x.mods.join(', '))}</span>` : ''}${x.changes?.length ? `<span class="pos-mod">${changesHtml(x.changes)}${lineExtra(x)}</span>` : ''}${x.note ? `<span class="pos-mod">“${esc(x.note)}”</span>` : ''}<span class="pos-st">${x.voided ? 'void' : x.sent ? '✓ sent' : '<b style="color:var(--warn)">new</b>'}</span></button>
           <span class="pos-qty">${x.voided ? `<b>${x.qty || 1}</b>` : `<button type="button" data-minus="${x.id}" aria-label="One less">−</button><b>${x.qty || 1}</b><button type="button" data-plus="${x.id}" aria-label="One more">+</button>`}</span>
           <span class="pos-price">${money(lineTotal(x))}</span></div>`).join('')}</div>`).join('')
       : `<p class="muted center" style="margin:6px 0">No items yet. Tap a dish to add it.</p>${(c.payments || []).length ? '' : '<button class="btn plain block small" id="free" type="button">Seated by mistake? Free the table</button>'}`}
@@ -524,7 +525,7 @@ async function bump(c, lineId, d) {
     const q = (x.qty || 1) + d;
     items = q > 0 ? items.map((y) => (y.id === x.id ? { ...y, qty: q } : y)) : items.filter((y) => y.id !== x.id);
   } else if (d > 0) {
-    const same = items.find((y) => !y.sent && !y.voided && y.menuId === x.menuId && y.seat === x.seat && (y.mods || []).join() === (x.mods || []).join() && (y.note || '') === (x.note || ''));
+    const same = items.find((y) => !y.sent && !y.voided && y.menuId === x.menuId && y.seat === x.seat && modKey(y) === modKey(x));
     items = same ? items.map((y) => (y === same ? { ...y, qty: (y.qty || 1) + 1 } : y)) : [...items, { ...x, id: lid(), qty: 1, sent: false, voided: false }];
   } else { lineSheet(c, x); return; }
   await data.put('check', { ...cur, items });
@@ -538,14 +539,24 @@ async function addItem(c, x, seat) {
   const m = modsFor(x.name, x.section, x.kind);
   let line = { id: lid(), menuId: x.id, name: x.name, price: x.price, station: x.station, mods: [], note: '', seat, qty: 1, sent: false, ...(x.kind ? { kind: x.kind } : {}), ...(x.hh ? { hh: true } : {}) };
   if (m) {
+    // RRA-149: dishes (not drinks) can also get NO / ADD / EXTRA here.
+    const tops = canChangeLine(line) ? toppingList(await posSettings()) : [];
+    const recipe = tops.length ? await data.get('recipe', x.id) : null;
+    const state = new Map();
+    let getChanges = () => [];
     const pick = await sheet({
       title: short(x.name), left: 'Cancel',
       body: `<div class="pr-lab">${esc(m.title)}</div><div class="pos-choices">${m.options.map((o) => `<button type="button" class="btn tonal" data-o="${esc(o)}">${esc(o)}</button>`).join('')}</div>
-        <label class="field"><span>Note for the ${x.station === 'Bar' ? 'bar' : 'kitchen'} (optional)</span><input type="text" id="nt" placeholder="e.g. no onions"></label>`,
-      onMount(api) { $$('[data-o]', api.el).forEach((b) => b.onclick = () => api.close({ mod: b.dataset.o, note: $('#nt', api.el).value.trim() })); },
+        ${tops.length ? `<details class="tp-more"><summary>No / Add / Extra toppings</summary>${toppingsHtml(tops, recipe, state)}<p class="muted small">Then tap the ${esc(m.title.toLowerCase())} above to add it.</p></details>` : ''}
+        <label class="field"><span>Note for the ${x.station === 'Bar' ? 'bar' : 'kitchen'} (optional)</span><input type="text" id="nt" placeholder="e.g. cut in half"></label>`,
+      onMount(api) {
+        if (tops.length) getChanges = wireToppings(api.el, tops, state);
+        $$('[data-o]', api.el).forEach((b) => b.onclick = () => api.close({ mod: b.dataset.o, note: $('#nt', api.el).value.trim(), changes: getChanges() }));
+      },
     });
     if (!pick) return;
     line = { ...line, mods: [pick.mod], note: pick.note };
+    if (pick.changes?.length) line = withChanges(line, pick.changes);
     // A double pours twice and costs more (js/brand.js drinks.choices).
     const o = (m.drink || []).find((d) => d[0] === pick.mod);
     if (o?.[1]) line.pourX = o[1];
@@ -611,12 +622,43 @@ async function pourStock(lines, sign) {
   }
 }
 
+// RRA-149: what the changes do to the dish's price on the check ("+$0.50", "−$1.00").
+function lineExtra(x) {
+  const k = charge(x.changes).amount;
+  return k ? ` <b class="pos-chgamt">${k > 0 ? '+' : '−'}${money(Math.abs(k))}</b>` : '';
+}
+
+// RRA-149: NO / ADD / EXTRA on a dish not sent yet, plus the kitchen note.
+async function changeSheet(c, x) {
+  const tops = toppingList(await posSettings());
+  const recipe = await data.get('recipe', x.menuId);
+  const state = new Map((x.changes || []).map((k) => [k.n, k.k]));
+  // A topping no longer on the list still shows, so it can be taken off.
+  for (const k of x.changes || []) if (!tops.some((t) => t.n === k.n)) tops.push({ n: k.n, p: +k.p || 0 });
+  let getChanges = () => [];
+  const v = await sheet({
+    title: short(x.name), left: 'Cancel', right: 'Done',
+    body: `${(x.qty || 1) > 1 ? `<p class="muted small" style="margin-top:0">This changes all ${x.qty}. To change just one, take the quantity down by one, then add the other again.</p>` : ''}
+      ${tops.length ? toppingsHtml(tops, recipe, state) : '<p class="muted">No toppings set up yet. The Admin adds them in Settings → Point of sale → Toppings.</p>'}
+      <label class="field"><span>Note for the kitchen (optional)</span><input type="text" id="nt" value="${esc(x.note || '')}" placeholder="e.g. cut in half"></label>`,
+    onMount(api) {
+      getChanges = wireToppings(api.el, tops, state);
+      api.onRight = () => api.close({ changes: getChanges(), note: $('#nt', api.el).value.trim() });
+    },
+  });
+  if (!v) return false;
+  const cur = await data.get('check', c.id);
+  await data.put('check', { ...cur, items: cur.items.map((y) => (y.id === x.id && !y.sent ? { ...withChanges(y, v.changes), note: v.note } : y)) });
+  return true;
+}
+
 async function lineSheet(c, x) {
   const act = await sheet({
     title: x.name, left: 'Close',
-    body: `<p class="muted small">${(x.qty || 1) > 1 ? `${x.qty} × ` : ''}${money(x.price)} · seat ${x.seat}${x.mods?.length ? ' · ' + esc(x.mods.join(', ')) : ''} · ${x.sent ? 'sent to the ' + x.station.toLowerCase() : 'not sent yet'}</p>
+    body: `<p class="muted small">${(x.qty || 1) > 1 ? `${x.qty} × ` : ''}${money(x.price)} · seat ${x.seat}${x.mods?.length ? ' · ' + esc(x.mods.join(', ')) : ''}${x.changes?.length ? ' · ' + esc(changeWords(x.changes).join(', ')) : ''} · ${x.sent ? 'sent to the ' + x.station.toLowerCase() : 'not sent yet'}</p>
       <div class="stack">
         ${c.guests > 1 ? `<div class="pr-lab">Move to seat</div><div class="segmented">${Array.from({ length: c.guests }, (_, i) => `<button type="button" data-mv="${i + 1}" class="${x.seat === i + 1 ? 'on' : ''}">${i + 1}</button>`).join('')}</div>` : ''}
+        ${!x.sent && !x.voided && canChangeLine(x) ? '<button class="btn block" type="button" data-a="change">Change: No / Add / Extra</button>' : ''}
         ${!x.sent ? '<button class="btn block tonal" type="button" data-a="remove" style="color:var(--danger)">Remove (not sent yet)</button>' : ''}
         ${x.sent && !x.voided ? (boss() ? '<button class="btn block tonal" type="button" data-a="void" style="color:var(--danger)">Void (manager)</button>' : '<p class="muted small">Sent items can only be voided by a manager.</p>') : ''}
       </div>`,
@@ -626,6 +668,7 @@ async function lineSheet(c, x) {
     },
   });
   if (!act) return;
+  if (act.a === 'change') { if (await changeSheet(c, x)) posCheckView(c.id); return; }
   const cur = await data.get('check', c.id);
   let items = cur.items.map((y) => (y.id !== x.id ? y : act.move ? { ...y, seat: act.move } : act.a === 'void' ? { ...y, voided: true, voidBy: meName() } : y));
   if (act.a === 'remove') items = items.filter((y) => y.id !== x.id);
@@ -640,7 +683,7 @@ async function send(c) {
   const unsent = cur.items.filter((x) => !x.sent && !x.voided);
   for (const st of ['Kitchen', 'Bar']) {
     const its = unsent.filter((x) => x.station === st);
-    if (its.length) await data.put('ticket', { checkId: cur.id, checkName: cur.name, server: cur.serverName || '', serverId: cur.server || '', station: st, at: Date.now(), items: its.map((x) => ({ name: x.name, qty: x.qty || 1, mods: x.mods || [], note: x.note || '', seat: x.seat, done: false })) });
+    if (its.length) await data.put('ticket', { checkId: cur.id, checkName: cur.name, server: cur.serverName || '', serverId: cur.server || '', station: st, at: Date.now(), items: its.map((x) => ({ name: x.name, qty: x.qty || 1, mods: x.mods || [], ...(x.changes?.length ? { changes: x.changes } : {}), note: x.note || '', seat: x.seat, done: false })) });
   }
   await data.put('check', { ...cur, items: cur.items.map((x) => (unsent.includes(x) ? { ...x, sent: true, ...(x.kind && x.kind !== 'na' ? { poured: true } : {}) } : x)) });
   await pourStock(unsent, 1);
@@ -851,7 +894,7 @@ export async function ticketsView() {
       <div class="card pos-ticket ${m >= 15 ? 'late' : m >= 8 ? 'warm' : ''}">
         <div class="pos-th"><b>${esc(t.checkName)}</b><span>${m} min</span></div>
         <div class="pr-lab">${esc((t.server || '').split(' ')[0])} · ${tm(t.at)}</div>
-        ${t.items.map((it, i) => `<button type="button" class="pos-ti${it.done ? ' done' : ''}" data-t="${t.id}" data-i="${i}"><span>${(it.qty || 1) > 1 ? `<b class="pos-x">${it.qty}×</b> ` : ''}${esc(short(it.name))}${it.mods?.length ? `<em>${esc(it.mods.join(', '))}</em>` : ''}${it.note ? `<em>“${esc(it.note)}”</em>` : ''}</span><small>S${it.seat}</small></button>`).join('')}
+        ${t.items.map((it, i) => `<button type="button" class="pos-ti${it.done ? ' done' : ''}" data-t="${t.id}" data-i="${i}"><span>${(it.qty || 1) > 1 ? `<b class="pos-x">${it.qty}×</b> ` : ''}${esc(short(it.name))}${it.mods?.length ? `<em>${esc(it.mods.join(', '))}</em>` : ''}${it.changes?.length ? `<em class="pos-chgs">${changesHtml(it.changes)}</em>` : ''}${it.note ? `<em>“${esc(it.note)}”</em>` : ''}</span><small>S${it.seat}</small></button>`).join('')}
         <button class="btn block small" type="button" data-bump="${t.id}">Bump</button>
       </div>`; }).join('') || `<div class="empty">No ${station.toLowerCase()} tickets right now.</div>`}</div>
     <p class="muted small center">Tap an item when it's up. Bump clears the ticket. Tickets turn orange at 8 minutes and red at 15.</p>`;
@@ -937,6 +980,7 @@ export async function posSettingsView() {
       <div class="row"><span class="grow"><span class="title">Order-up alert</span><span class="sub" style="white-space:normal">When a ticket is bumped, its server gets "Pick up". If nobody picks it up in this time, every server on the clock gets it in red.</span></span><span class="meta">${P.pickupDelay || 2} min</span><button class="btn plain small" id="pkd" type="button">Change</button></div>
       <div class="row"><span class="grow"><span class="title">Check open too long</span><span class="sub" style="white-space:normal">Its server and the managers get an alert when a check is still open after this long (RRA-137).</span></span><span class="meta">${P.checkLate || 90} min</span><button class="btn plain small" id="ckl" type="button">Change</button></div>
       <div class="row"><span class="grow"><span class="title">Happy hour</span><span class="sub" style="white-space:normal">${esc(hhLabel({ ...HH_DEFAULT, ...(P.happyHour || {}) }))}${P.happyHour?.on && +P.happyHour.off ? ` · $${(+P.happyHour.off).toFixed(2)} off alcoholic drinks` : ''}. Drinks with their own happy hour price in Recipes use that price.</span></span><button class="btn plain small" id="hh" type="button">Change</button></div>
+      <div class="row"><span class="grow"><span class="title">Toppings</span><span class="sub" style="white-space:normal">${esc(toppingList(P).map((t) => t.n).join(', ') || 'None yet')}. Servers mark these NO, ADD or EXTRA on a dish; ADD and EXTRA add the price set here to the dish, and NO takes it off.</span></span><button class="btn plain small" id="tops" type="button">Change</button></div>
       <div class="row"><span class="grow"><span class="title">Sales tax</span><span class="sub">Check the rate for your address</span></span><span class="meta">${(P.tax * 100).toFixed(2)}%</span><button class="btn plain small" id="tax" type="button">Change</button></div>
     </div>
     <p class="muted small">Nothing is connected yet, so card payments are practice runs. Going live needs the restaurant's server for the payment keys and a developer account with ${esc(svc.id === 'practice' ? 'the payment company' : svc.name)}.</p>`;
@@ -957,9 +1001,32 @@ export async function posSettingsView() {
     if (v) { await savePos({ checkLate: v }); toast(`Check alert: ${v} min`); posSettingsView(); }
   };
   $('#hh').onclick = async () => { if (await happyHourSheet(P)) posSettingsView(); };
+  $('#tops').onclick = async () => { if (await toppingsSheet(P)) posSettingsView(); };
   $('#tax').onclick = async () => { const v = await sheet({ title: 'Sales tax', right: 'Save', body: `<label class="field"><span>Percent</span><input type="text" inputmode="decimal" id="tx" value="${(P.tax * 100).toFixed(2)}"></label><p class="muted small">New checks use the new rate; open checks keep theirs.</p>`, onMount: (api) => { api.onRight = () => api.close(parseFloat($('#tx', api.el).value)); } }); if (v >= 0 && v < 20) { await savePos({ tax: v / 100 }); posSettingsView(); } };
 }
 
+
+// RRA-149: the toppings list and what an ADD or EXTRA costs (blank = free).
+async function toppingsSheet(P) {
+  const rows = toppingList(P);
+  const row = (t = { n: '', p: 0 }) => `<div class="tp-edit"><input type="text" class="tp-en" value="${esc(t.n)}" placeholder="Topping, e.g. Bacon" aria-label="Topping"><input type="text" class="tp-ep" inputmode="decimal" value="${t.p ? t.p.toFixed(2) : ''}" placeholder="free" aria-label="Price"><button type="button" class="btn plain small tp-x" aria-label="Remove">✕</button></div>`;
+  const v = await sheet({
+    title: 'Toppings', right: 'Save',
+    body: `<p class="muted small" style="margin-top:0">Condiments and toppings only. ADD and EXTRA add this price to the dish; NO takes it off. Leave it blank for free.</p>
+      <div id="tp-rows">${rows.map(row).join('')}</div>
+      <button class="btn plain block" id="tp-add" type="button">+ Add a topping</button>`,
+    onMount(api) {
+      const wire = () => $$('.tp-x', api.el).forEach((b) => b.onclick = () => b.closest('.tp-edit').remove());
+      $('#tp-add', api.el).onclick = () => { $('#tp-rows', api.el).insertAdjacentHTML('beforeend', row()); wire(); $$('.tp-en', api.el).at(-1).focus(); };
+      wire();
+      api.onRight = () => api.close($$('.tp-edit', api.el).map((r) => ({ n: $('.tp-en', r).value.trim(), p: Math.max(0, r2(parseFloat($('.tp-ep', r).value.replace('$', '')) || 0)) })).filter((t) => t.n));
+    },
+  });
+  if (!v) return false;
+  await savePos({ toppings: v });
+  toast(`Toppings saved (${v.length})`);
+  return true;
+}
 
 // RRA-135: happy hour days, times and the amount off every alcoholic drink.
 async function happyHourSheet(P) {
