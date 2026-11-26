@@ -4,8 +4,8 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.13.0';
-export const BUILD = '2026.11.26-26';
+export const VERSION = '0.14.0';
+export const BUILD = '2026.11.26-27';
 
 // Text that names the restaurant uses tokens, so it reads right after a
 // changeout (RRA-123): {name} = short name, {restaurant} = full name,
@@ -14,6 +14,16 @@ export const brandText = (s) => String(s ?? '')
   .replace(/\{name\}/g, BRAND.shortName).replace(/\{restaurant\}/g, BRAND.restaurant).replace(/\{app\}/g, BRAND.appName);
 
 const WHATS_NEW_RAW = [
+  {
+    version: '0.14.0', build: '2026.11.26-27', date: '2026-11-26',
+    lines: [
+      'The bar menu now arrives: the Draft Beer, Bottles & Cans, Wine, Liquor and Cocktails sections are added as soon as the team\'s data has loaded, even on a slow connection. The Admin sees a short "Menu update" note when new items are added.',
+      'Ten beers in Bottles & Cans and ten wines in Wine (by the glass and by the bottle), with prices. Each one counts down its own case or bottle in Stock.',
+      'Six classic cocktails with recipes and steps: Old Fashioned, Moscow Mule, Mojito, Whiskey Sour, Cosmopolitan and Paloma. Every cocktail has a drawn picture until you add a photo of your own.',
+      'Orders shows every menu section as a tab. Anything without a price yet shows grayed out; a manager or the Admin can tap it and type the price right there.',
+      'Dishes and drinks can have a short description in Recipes.',
+    ],
+  },
   {
     version: '0.13.0', build: '2026.11.26-26', date: '2026-11-26',
     lines: [

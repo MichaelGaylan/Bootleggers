@@ -4,7 +4,7 @@
 // js/brand.js, so a changeout never keeps another restaurant's files cached.
 importScripts('js/brand.js');
 const B = self.BRAND;
-const CACHE = B.dataPrefix.replace(/\W+$/, '') + '-0.13.0-2026.11.26-26';
+const CACHE = B.dataPrefix.replace(/\W+$/, '') + '-0.14.0-2026.11.26-27';
 const CODE = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'js/brand.js', 'js/app.js', 'js/config.js', 'js/access.js', 'js/crypto.js', 'js/store.js', 'js/starter-stock.js', 'js/menu.js', 'js/pdf.js', 'js/lounge.js',

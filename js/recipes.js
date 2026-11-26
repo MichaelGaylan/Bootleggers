@@ -113,6 +113,7 @@ export async function recipeView(id) {
     <div class="recipe">
       ${dishPhoto(r) ? `<img src="${esc(dishPhoto(r))}" alt="" style="width:100%;max-height:260px;object-fit:cover;border-radius:var(--radius);margin-bottom:8px">` : ''}
       <p><span class="chip">${r.kind === 'house' ? esc(r.category || 'House recipe') : esc(r.section || 'Dish')}</span>${r.kind === 'house' ? ` ${chip('Sub recipe', 'purple')}` : ''}</p>
+      ${r.kind === 'dish' && r.desc ? `<p class="muted">${esc(r.desc)}</p>` : ''}
       ${r.kind === 'house' && (r.yield || r.storage) ? `<div class="facts">
         <div><b>Yield</b>${esc(r.yield || '—')}</div><div><b>Storage</b>${esc(r.storage || '—')}</div></div>` : ''}
       ${uses.length ? `<h2>Uses house recipes</h2><div class="group">${uses.map((u) => `<a class="row" href="#/recipe/${u.id}"><span class="grow">${esc(u.name)}</span>${chip('Sub recipe', 'purple')}</a>`).join('')}</div>` : ''}
@@ -251,6 +252,7 @@ export async function recipeDialog(existing, kind = 'house', section = null) {
         <label class="field"><span>Menu section</span><select id="r-sec">${[...(settings.sections || []), 'Other'].map((c) => `<option ${c === r.section ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>
         <label class="field"><span>${dishPhoto(r) ? 'Replace photo' : 'Photo'}</span><input type="file" id="r-photo" accept="image/*"></label>
         ${dishPhoto(r) ? `<div id="r-photo-prev"><img src="${esc(dishPhoto(r))}" alt="" style="width:120px;border-radius:8px">${r.photo ? ' <button type="button" class="btn plain small" id="r-photo-del">Remove photo</button>' : ' <span class="muted small">Standard picture</span>'}</div>` : ''}
+        <label class="field"><span>Description (optional)</span><input type="text" id="r-desc" value="${esc(r.desc || '')}" placeholder="e.g. Low-carb light lager"></label>
         <label class="field"><span>Drink</span><select id="r-drink">
           <option value="">${esc(sectionKind(r.section) ? `Same as the section (${KINDS()[sectionKind(r.section)]})` : 'Same as the section (food)')}</option>
           <option value="food" ${r.drink === 'food' ? 'selected' : ''}>Not a drink (food)</option>
@@ -318,6 +320,7 @@ export async function recipeDialog(existing, kind = 'house', section = null) {
           price: !house && $('#r-price', el) ? $('#r-price', el).value.trim().replace('$', '') : r.price,
           hhPrice: !house && $('#r-hh', el) ? $('#r-hh', el).value.trim().replace('$', '') || undefined : r.hhPrice,
           drink: house ? undefined : $('#r-drink', el).value || undefined,
+          desc: house ? undefined : $('#r-desc', el).value.trim() || undefined,
           photo: house ? '' : r.photo || '',
           uses: house ? [] : $$('#dish-only input:checked', el).map((c) => c.value),
           comments: comment ? [...(r.comments || []), { by: session.profile.name, at: Date.now(), text: comment }] : r.comments || [],

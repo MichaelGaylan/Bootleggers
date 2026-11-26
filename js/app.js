@@ -1011,13 +1011,20 @@ async function boot() {
   }
   // RRA-087: add starter data only after the shared data has arrived, so a
   // second Admin device (an iPad) never adds it all a second time.
-  if (!sync.enabled() || await sync.whenSynced()) {
-    await data.seed({ shared: sync.enabled(), host: profile.role === 'owner' });
-    await applyMenu({ shared: sync.enabled(), host: profile.role === 'owner' });
-    await applyVendors({ shared: sync.enabled(), host: profile.role === 'owner' });
-    await applySupplies({ shared: sync.enabled(), host: profile.role === 'owner' });
+  // RRA-142: if the shared data takes longer than 8 seconds to load (a big
+  // team, a slow connection), the starter data and menu updates still run as
+  // soon as it has loaded, instead of waiting for the next full restart.
+  const starters = async () => {
+    const opt = { shared: sync.enabled(), host: profile.role === 'owner' };
+    await data.seed(opt);
+    const added = await applyMenu(opt);
+    await applyVendors(opt);
+    await applySupplies(opt);
+    if (added?.dishes || added?.sections) toast(`Menu update: ${[added.sections ? `${added.sections} new section${added.sections > 1 ? 's' : ''}` : '', added.dishes ? `${added.dishes} new item${added.dishes > 1 ? 's' : ''}` : ''].filter(Boolean).join(' and ')} added to Recipes`);
     if (canChange('settings')) setTimeout(() => offerDedupe(), 1500);
-  }
+  };
+  if (!sync.enabled() || await sync.whenSynced()) await starters();
+  else sync.whenSynced(36e5).then((ok) => { if (ok) starters().then(() => { if (/^#\/(recipes?|pos|poscheck|list)/.test(location.hash)) route(); }); });
   await noticeGate();
   await homeTip();
   if (incoming && access.parse(incoming)?.kind === 'req') { location.hash = '#/team'; return teamView(incoming); }
