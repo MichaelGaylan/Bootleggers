@@ -969,3 +969,5 @@ button.row.cpn-disc:disabled { opacity: .55; cursor: default; }
 .upd-bar.old { border-color: #ff9500; background: color-mix(in srgb, #ff9500 14%, var(--card)); }
 .upd-bar .btn { flex: none; }
 .has-upd .pickups { top: calc(var(--safe-t) + 94px); }
+.to-ans { color: var(--text); } /* RRA-148: the reply on a time-off request */
+@media (max-width: 600px) { .toff-row { flex-wrap: wrap; } .toff-row > .grow { flex: 1 1 100%; } .toff-row > .swap-acts { margin-left: auto; } }

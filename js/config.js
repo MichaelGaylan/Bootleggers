@@ -19,6 +19,7 @@ const WHATS_NEW_RAW = [
     lines: [
       'Updates wait for you: a new version downloads quietly and an "Update ready · Update now" bar shows at the top. The app no longer reloads by itself in the middle of an order. It updates on its own only when you open it fresh. The bar turns orange if an update has waited more than a day.',
       'Review hours: the "without a clock-out" note now names who is missing one and counts only the tab you are on, with "+N in other tabs" when the cause is elsewhere. Someone clocked in right now shows On shift instead of Fix. A forgotten clock-out by someone no longer on the Staff list now shows up as its own row so it can be fixed.',
+      'Time-off requests: managers can tap Ask to send a question before saying OK or No. The person gets a badge and a pop-up to reply, every manager sees the reply on the request, and it can go back and forth.',
     ],
   },
   {
