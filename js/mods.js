@@ -26,13 +26,20 @@ export function toppingList(P) {
   return list.filter((t) => t && String(t.n || '').trim()).map((t) => ({ n: String(t.n).trim(), p: Math.max(0, +t.p || 0) }));
 }
 
-// Is this topping already on the dish? Looks in the recipe's ingredients and
-// description, and in js/brand.js posToppingsOn (dish name → toppings).
-const stem = (s) => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/(es|s)$/, '').trim();
+// Is this topping already on the dish? (Gaylan, 2026-11-26: NO is only offered
+// for toppings that come on the dish; a hot dog basket can't get NO pickles.)
+// Comes from, in order: js/brand.js posToppingsOn for the dish's name; if the
+// dish isn't listed there, posToppingsBySection for its menu section; plus any
+// topping named in the dish's ingredients in Recipes. A dish with none of these
+// offers only ADD.
+const stem = (s) => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/(es|s)$/, '').trim();
+export function onList(recipe) {
+  const by = BRAND.posToppingsOn || {}, sec = BRAND.posToppingsBySection || {};
+  return by[recipe?.name] || sec[recipe?.section] || [];
+}
 export function onDish(top, recipe) {
-  const on = (BRAND.posToppingsOn || {})[recipe?.name] || [];
-  if (on.some((n) => stem(n) === stem(top))) return true;
-  const words = [...(recipe?.ingredients || []).map((i) => i.item), recipe?.desc || ''].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  if (onList(recipe).some((n) => stem(n) === stem(top))) return true;
+  const words = (recipe?.ingredients || []).map((i) => i.item).join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   return !!stem(top) && words.includes(stem(top));
 }
 
@@ -62,13 +69,13 @@ export const changesHtml = (changes) => sorted(changes).map((c) => `<span class=
 // Same order on a check? Compare choices, note and changes.
 export const modKey = (x) => JSON.stringify([x.mods || [], x.note || '', sorted(x.changes).map((c) => c.k + c.n)]);
 
-// The picker: one row per topping with No / Add / Extra. Toppings already on
-// the dish come first. state is a Map name → 'no' | 'add' | 'extra'.
+// The picker: one row per topping. Toppings on the dish come first with No and
+// Extra; the rest offer Add. state is a Map name → 'no' | 'add' | 'extra'.
 export function toppingsHtml(list, recipe, state) {
   const money = (p) => (p > 0 ? `+$${p.toFixed(2)}` : 'free');
   const rows = list.map((t) => ({ ...t, on: onDish(t.n, recipe) })).sort((a, b) => b.on - a.on);
   return `<div class="tp-list">${rows.map((t) => `<div class="tp-row" data-tp="${esc(t.n)}"><span class="tp-n">${esc(t.n)}${t.on ? ' <small class="tp-on">on the dish</small>' : ''}<small class="tp-p">${money(t.p)}</small></span>
-    <span class="tp-btns">${['no', 'add', 'extra'].map((k) => `<button type="button" data-k="${k}" class="${state.get(t.n) === k ? 'on k-' + k : ''}">${k === 'no' ? 'No' : k === 'add' ? 'Add' : 'Extra'}</button>`).join('')}</span></div>`).join('')}</div>
+    <span class="tp-btns">${(t.on ? ['no', 'extra'] : ['add']).concat(state.get(t.n) && !(t.on ? ['no', 'extra'] : ['add']).includes(state.get(t.n)) ? [state.get(t.n)] : []).map((k) => `<button type="button" data-k="${k}" class="${state.get(t.n) === k ? 'on k-' + k : ''}">${k === 'no' ? 'No' : k === 'add' ? 'Add' : 'Extra'}</button>`).join('')}</span></div>`).join('')}</div>
     <p class="tp-sum muted small" id="tp-sum"></p>`;
 }
 // Wire the picker inside el. onChange(changes) runs after every tap.
@@ -78,7 +85,7 @@ export function wireToppings(el, list, state, onChange) {
   const sum = () => {
     const box = el.querySelector('#tp-sum'); if (!box) return;
     const ch = changes(), c = charge(ch);
-    box.textContent = ch.length ? `${changeWords(ch).join(' · ')} · ${c.amount < 0 ? '−' : '+'}$${Math.abs(c.amount).toFixed(2)} on the dish` : 'Tap No, Add or Extra. Add and Extra cost the price shown; No takes it off.';
+    box.textContent = ch.length ? `${changeWords(ch).join(' · ')} · ${c.amount < 0 ? '−' : '+'}$${Math.abs(c.amount).toFixed(2)} on the dish` : 'No and Extra are for what comes on the dish; Add is for anything else. Add and Extra cost the price shown; No takes it off.';
   };
   $$('.tp-row', el).forEach((row) => $$('button', row).forEach((b) => b.onclick = () => {
     const n = row.dataset.tp, k = b.dataset.k;

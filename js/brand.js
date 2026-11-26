@@ -291,12 +291,32 @@ self.BRAND = {
     ['Grilled onions', 0.75], ['Tomato', 0.50], ['Lettuce', 0], ['Pickles', 0], ['Sour cream', 0.75],
     ['Salsa', 0.50], ['Guacamole', 1.50], ['Mayo', 0], ['Mustard', 0], ['Ketchup', 0],
   ],
-  // Toppings already on a dish, listed first with "on the dish" (dish name →
-  // toppings). A dish's Recipes ingredients count too. Starter guesses: edit freely.
+  // What comes on each dish: only these can be marked NO (or EXTRA); anything
+  // else can only be ADDed (Gaylan, 2026-11-26). Dish name → toppings; a dish
+  // not listed uses its menu section below. Toppings named in a dish's
+  // ingredients in Recipes count too. Starter guesses: edit freely.
   posToppingsOn: {
+    'Black & Blue with Fries': ['Cheese', 'Lettuce', 'Tomato', 'Onions'],
+    'Veggie Burger with Fries': ['Cheese', 'Lettuce', 'Tomato', 'Onions', 'Pickles'],
+    'Hot Dog Basket with Side': [],
+    'BLT with Fries': ['Bacon', 'Lettuce', 'Tomato', 'Mayo'],
+    'Grilled Cheese with Fries': ['Cheese'],
+    'Grilled Cheese Club with Fries': ['Cheese', 'Bacon', 'Lettuce', 'Tomato', 'Mayo'],
+    'The Grilled Cheese Incident with Fries': ['Cheese'],
+    'Philly Melt with Fries': ['Cheese', 'Grilled onions'],
+    'Bacon Ranch Chicken Sandwich with Fries': ['Bacon', 'Cheese', 'Lettuce', 'Tomato'],
+    'Quesadilla': ['Cheese', 'Sour cream', 'Salsa'],
+    'Single Taco (No Side)': ['Cheese', 'Lettuce', 'Tomato', 'Sour cream'],
+    'Taco Basket with Side': ['Cheese', 'Lettuce', 'Tomato', 'Sour cream'],
     'Nachos (Half)': ['Cheese', 'Jalapeños', 'Sour cream', 'Salsa'],
     'Nachos (Full)': ['Cheese', 'Jalapeños', 'Sour cream', 'Salsa'],
-    'Classic Burger with Fries': ['Lettuce', 'Tomato', 'Onions', 'Pickles'],
+    'Classic Burger with Fries': ['Cheese', 'Lettuce', 'Tomato', 'Onions', 'Pickles'],
+  },
+  // Menu section → what usually comes on its dishes, for dishes not listed above.
+  posToppingsBySection: {
+    Burgers: ['Cheese', 'Lettuce', 'Tomato', 'Onions', 'Pickles'],
+    Sandwiches: ['Lettuce', 'Tomato', 'Mayo'],
+    Salads: ['Cheese', 'Tomato', 'Onions'],
   },
   // Words left off the POS tiles and tickets to keep them short.
   posTrim: [' with Fries', ' with Side'],
