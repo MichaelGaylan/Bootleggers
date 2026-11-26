@@ -186,7 +186,7 @@ async function seatTable(t) {
   });
   if (!ok) return;
   const P = await posSettings();
-  const no = (P.seq || 100) + 1;
+  const no = (P.seq ?? 100) + 1; // seq is 0 after Clear test data (RRA-130), so the next check is #1
   await savePos({ seq: no });
   const c = await data.put('check', { no, name: tableName(t), tableId: t.id, kind: t.kind === 'bar' ? 'tab' : 'table', guests, server: meId(), serverName: meName(), opened: Date.now(), items: [], payments: [], tax: P.tax });
   posCheckView.seat = 1;
