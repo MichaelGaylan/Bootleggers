@@ -4,8 +4,8 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.8.5';
-export const BUILD = '2026.11.26-20';
+export const VERSION = '0.8.6';
+export const BUILD = '2026.11.26-21';
 
 // Text that names the restaurant uses tokens, so it reads right after a
 // changeout (RRA-123): {name} = short name, {restaurant} = full name,
@@ -14,6 +14,13 @@ export const brandText = (s) => String(s ?? '')
   .replace(/\{name\}/g, BRAND.shortName).replace(/\{restaurant\}/g, BRAND.restaurant).replace(/\{app\}/g, BRAND.appName);
 
 const WHATS_NEW_RAW = [
+  {
+    version: '0.8.6', build: '2026.11.26-21', date: '2026-11-26',
+    lines: [
+      'You can add your own job titles. When adding or editing staff, pick "+ Add a job title…" in Position, or manage the list in Settings → People → Job titles. Busser is now on the list next to Bartender.',
+      'Tip pool points for "Host" now also count for "Host stand".',
+    ],
+  },
   {
     version: '0.8.5', build: '2026.11.26-20', date: '2026-11-26',
     lines: [

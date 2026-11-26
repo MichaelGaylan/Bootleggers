@@ -15,7 +15,7 @@ import { recipesView, recipeView, printView } from './recipes.js';
 import { stockView, neededView, ordersView, vendorsView } from './stock.js';
 import { boardView, unreadPosts } from './board.js';
 import { prepView } from './prep.js';
-import { scheduleView, staffView, ensureStaffFor, staffList, schedulePrintView, swapPopups, shiftTimesView } from './schedule.js';
+import { scheduleView, staffView, ensureStaffFor, staffList, schedulePrintView, swapPopups, shiftTimesView, jobTitlesView } from './schedule.js';
 import { eventsView, eventView, dueEvents, eventPopups } from './events.js';
 import { costsView } from './costs.js';
 import { loungeView, timesheetView, timesheetsView, canTime } from './lounge.js';
@@ -760,6 +760,7 @@ const routes = {
   schedule: (arg) => scheduleView(arg),
   'schedule-print': (arg) => schedulePrintView(arg),
   staff: () => staffView(),
+  jobtitles: () => jobTitlesView(), // RRA-131
   shifts: () => shiftTimesView(),
   events: () => eventsView(),
   event: (id) => eventView(id),

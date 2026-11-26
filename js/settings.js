@@ -39,6 +39,7 @@ export async function settingsView() {
     ${full ? `<button class="acc-head${so === 'people' ? ' open' : ''}" type="button" data-g="people"><span class="grow">People</span><span class="meta">${counts.staff} staff</span></button>
     <div class="group acc-body"${so === 'people' ? '' : ' hidden'}>
       <a class="row" href="#/staff"><span class="grow">Staff</span><span class="meta">${counts.staff}</span></a>
+      <a class="row" href="#/jobtitles"><span class="grow">Job titles</span><span class="meta">Bartender, Busser…</span></a>
       <a class="row" href="#/roles"><span class="grow">Roles and permissions</span></a>
       ${canChange('schedule') ? '<a class="row" href="#/shifts"><span class="grow">Shift times</span><span class="meta">Schedule buttons</span></a>' : ''}
       ${canAccess(session.profile, 'invite') ? '<a class="row" href="#/team"><span class="grow">Invite and approve phones</span></a>' : ''}
