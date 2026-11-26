@@ -11,7 +11,7 @@
 
 import * as data from './data.js';
 import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session, LS } from './ui.js';
-import { canSee, canChange, isHost, myStaff } from './perms.js';
+import { canSee, canChange, isHost, myStaff, jobAllows, jobAreas } from './perms.js';
 import { BRAND } from './config.js';
 import { dishPhoto } from './menu.js';
 import { discounts, headline, tagOf } from './coupons-core.js';
@@ -38,11 +38,18 @@ const payService = (P) => PAYMENT_SERVICES.find((p) => p.id === P.payment) || PA
 
 // ---------- who can do what (roles from perms.js, job from the Staff position) ----------
 const role = () => session.profile?.role;
-const job = () => { const p = myStaff()?.position || ''; return /bar/i.test(p) ? 'bar' : /server|host|bus|wait|front|cashier/i.test(p) ? 'front' : 'kitchen'; };
 const boss = () => isHost() || role() === 'manager';
-export const canOrder = () => boss() || (canChange('pos') && role() === 'staff' && job() !== 'kitchen');
-export const canKitchen = () => boss() || (canSee('pos') && (role() === 'chef' || job() !== 'front'));
-const can86 = () => boss() || (canChange('pos') && (role() === 'chef' || job() === 'kitchen'));
+// Job views (RRA-132): what a staff person can do comes from their job title
+// (Settings → People → Job titles). Chefs, managers and the Admin as before.
+const staffCan = (k, lv = 'change') => role() === 'staff' && (lv === 'see' ? canSee('pos') : canChange('pos')) && jobAllows(k);
+export const canSeat = () => boss() || staffCan('seating');           // see the seating layout, seat guests
+export const canTake = () => boss() || staffCan('orders');            // take orders and payments
+export const canClear = () => boss() || role() === 'chef' || staffCan('tables'); // clear tables
+export const canOrder = () => canSeat() || canTake();                 // the Orders menu entry
+export const canTables = () => canClear();
+const kitchenSt = () => (boss() || role() === 'chef' ? ['Kitchen', 'Bar'] : ['Kitchen', 'Bar'].filter((s) => staffCan(s.toLowerCase(), 'see')));
+export const canKitchen = () => kitchenSt().length > 0;
+const can86 = () => boss() || (canChange('pos') && (role() === 'chef' || jobAllows('kitchen')));
 export const canSales = () => boss();
 const meId = () => myStaff()?.id || (isHost() ? 'admin' : session.profile?.iid || 'me');
 const meName = () => session.profile?.name || 'Me';
@@ -124,17 +131,19 @@ const curArea = (areas) => { const a = LS.get('posArea', areas[0].id); return ar
 const numPick = (name, n, on, taken = []) => `<div class="num-pick" data-pick="${name}">${Array.from({ length: n }, (_, i) => i + 1).map((v) => `<button type="button" data-v="${v}" class="${v === on ? 'on' : ''}" ${taken.includes(v) && v !== on ? 'disabled' : ''}>${v}</button>`).join('')}</div>`;
 const wirePick = (el, name, set) => $$(`[data-pick="${name}"] button`, el).forEach((b) => b.onclick = () => { $$(`[data-pick="${name}"] button`, el).forEach((x) => x.classList.toggle('on', x === b)); set(+b.dataset.v); });
 
-function floorHtml(tables, checks, P, edit, size = FLOOR) {
+function floorHtml(tables, checks, P, edit, size = FLOOR, dirty = {}) {
   const cell = (x, y) => tables.find((t) => t.x === x && t.y === y);
+  const showMoney = canTake();
   let h = '';
   for (let y = 0; y < size.rows; y++) for (let x = 0; x < size.cols; x++) {
     const t = cell(x, y);
     if (!t) { h += edit ? `<button type="button" class="fl-cell fl-empty" data-cell="${x},${y}" style="grid-column:${x + 1};grid-row:${y + 1}" aria-label="Add a table here">+</button>` : ''; continue; }
     const c = checks.find((k) => k.tableId === t.id || (!k.tableId && k.name === tableName(t)));
     const tot = c ? totals(c, P.tax).total : 0;
-    h += `<button type="button" class="fl-t k-${t.kind}${c ? ' busy' : ''}" data-t="${t.id}" style="grid-column:${x + 1};grid-row:${y + 1}">
+    const d = !c && !edit && dirty[t.id];
+    h += `<button type="button" class="fl-t k-${t.kind}${c ? ' busy' : ''}${d ? ' dirty' : ''}" data-t="${t.id}" style="grid-column:${x + 1};grid-row:${y + 1}">
       <b>${esc((SHORT[t.kind] || '') + t.no)}</b>
-      <small>${c ? `${c.guests} · ${mins(c.opened)}m` : `${t.seats} seat${t.seats > 1 ? 's' : ''}`}</small>${c ? `<small class="fl-amt">${money(tot)}</small>` : ''}</button>`;
+      <small>${c ? `${c.guests} · ${mins(c.opened)}m` : d ? `Clear · ${mins(d.at)}m` : `${t.seats} seat${t.seats > 1 ? 's' : ''}`}</small>${c && showMoney ? `<small class="fl-amt">${money(tot)}</small>` : ''}</button>`;
   }
   // Small areas stay small: each square is at most about 96px wide.
   return `<div class="floor${edit ? ' edit' : ''}" style="--cols:${size.cols};--rows:${size.rows};max-width:${size.cols * 104 + 24}px">${h}</div>`;
@@ -142,35 +151,38 @@ function floorHtml(tables, checks, P, edit, size = FLOOR) {
 
 // Orders (POS): the seating layout.
 export async function posView() {
-  setChrome({ tab: 'more', back: true });
+  setChrome({ tab: jobAreas() ? 'pos' : 'more', back: !jobAreas() });
   setTitle('Seating');
-  if (!canOrder()) { view.innerHTML = lock('Orders are for servers, bartenders, managers and the Admin.'); return; }
+  if (!canSeat()) { view.innerHTML = lock('Seating is for hosts, servers, bartenders, managers and the Admin.'); return; }
   const P = await posSettings(), staff = await data.list('staff');
   const all = tablesOf(P), areas = areasOf(P), area = curArea(areas);
   const tables = all.filter((t) => t.area === area);
   const open = await openChecks();
+  const dirty = await dirtyTables();
   const mine = open.filter((c) => boss() || c.server === meId());
-  setTitle('Seating', `<button class="btn small" id="pos-cur" type="button">Current orders${mine.length ? ` (${mine.length})` : ''}</button>`);
+  setTitle('Seating', canTake() ? `<button class="btn small" id="pos-cur" type="button">Current orders${mine.length ? ` (${mine.length})` : ''}</button>` : '');
   const today = new Date().toDateString();
   const closedToday = (await data.list('check')).filter((c) => c.closed && new Date(c.closed).toDateString() === today).length;
   view.innerHTML = `
     ${areaTabs(areas, area, all, open)}
-    ${floorHtml(tables, open, P, false, sizeOf(areas.find((a) => a.id === area)))}
-    <p class="muted small center" style="margin:0 0 6px">Tap a free table to seat guests. Tap a seated table to bring up its order.</p>
-    <div class="fl-key small muted"><span><i class="fl-dot"></i> Free</span><span><i class="fl-dot busy"></i> Seated</span></div>
+    ${floorHtml(tables, open, P, false, sizeOf(areas.find((a) => a.id === area)), dirty)}
+    <p class="muted small center" style="margin:0 0 6px">Tap a free table to seat guests.${canTake() ? ' Tap a seated table to bring up its order.' : ''}${canClear() ? ' Tap a table marked Clear once it\'s bussed.' : ''}</p>
+    <div class="fl-key small muted"><span><i class="fl-dot"></i> Free</span><span><i class="fl-dot busy"></i> Seated</span><span><i class="fl-dot dirty"></i> Needs clearing</span></div>
     <div class="group">
+      ${canClear() ? `<a class="row nav" href="#/tables"><span class="grow">Tables to clear</span>${Object.keys(dirty).length ? `<span class="chip warn">${Object.keys(dirty).length}</span>` : ''}</a>` : ''}
       ${boss() ? '<a class="row nav" href="#/seating"><span class="grow"><span class="title">Change the seating layout</span><span class="sub">Areas (dining room, bar, outside) and their tables, booths and seats</span></span></a>' : ''}
       ${canKitchen() ? '<a class="row nav" href="#/tickets"><span class="grow">Kitchen and bar screen</span></a>' : ''}
       ${canSales() ? '<a class="row nav" href="#/possales"><span class="grow">Today\'s sales</span></a>' : ''}
       ${BRAND.giftCards?.url ? '<a class="row nav" href="#/giftcards"><span class="grow">Gift cards</span></a>' : ''}
     </div>
     <p class="muted small center">${closedToday} check${closedToday === 1 ? '' : 's'} closed today · cards through ${esc(payService(P).name)}</p>`;
-  $('#pos-cur').onclick = () => currentOrders(staff, P);
+  $('#pos-cur')?.addEventListener('click', () => currentOrders(staff, P));
   $$('[data-area]').forEach((b) => b.onclick = () => { LS.set('posArea', b.dataset.area); posView(); });
   $$('[data-t]').forEach((b) => b.onclick = async () => {
     const t = tables.find((x) => x.id === b.dataset.t);
     const c = open.find((k) => k.tableId === t.id || (!k.tableId && k.name === tableName(t)));
-    if (c) { location.hash = '#/poscheck/' + c.id; return; }
+    if (c) { if (canTake()) location.hash = '#/poscheck/' + c.id; else toast(`${tableName(t)} · ${c.guests} guest${c.guests > 1 ? 's' : ''} · ${(c.serverName || 'Server').split(' ')[0]} · ${mins(c.opened)} min`); return; }
+    if (dirty[t.id]) { if (await clearSheet(t, dirty[t.id])) posView(); return; }
     seatTable(t);
   });
 }
@@ -179,12 +191,32 @@ export async function posView() {
 async function seatTable(t) {
   let guests = Math.min(t.seats || 2, 2) || 1;
   const max = Math.max(12, t.seats || 0);
+  const take = canTake();
+  // A host seats guests for a server (RRA-132): pick whose table it is.
+  const servers = take ? [] : (await data.list('staff')).filter((s) => !s.removed && (s.role === 'manager' || jobAllows('orders', s)));
+  let server = null;
   const ok = await sheet({
-    title: `Seat ${tableName(t)}`, right: 'Open',
-    body: `<div class="pr-lab">How many guests?</div>${numPick('g', max, guests)}<p class="muted small">${t.seats} seat${t.seats > 1 ? 's' : ''} at this ${(KINDS[t.kind] || 'table').toLowerCase()}.</p>`,
-    onMount(api) { wirePick(api.el, 'g', (v) => { guests = v; api.close(true); }); }, // one tap opens the table
+    title: `Seat ${tableName(t)}`, right: take ? 'Open' : 'Seat',
+    body: `<div class="pr-lab">How many guests?</div>${numPick('g', max, guests)}<p class="muted small">${t.seats} seat${t.seats > 1 ? 's' : ''} at this ${(KINDS[t.kind] || 'table').toLowerCase()}.</p>
+      ${take ? '' : `<label class="field"><span>Server</span><select id="sv">${servers.map((s) => `<option value="${s.id}">${esc(s.name)} · ${esc(s.position || '')}</option>`).join('')}</select></label>`}`,
+    onMount(api) {
+      wirePick(api.el, 'g', (v) => { guests = v; if (take) api.close(true); }); // one tap opens the table
+      api.onRight = () => { server = $('#sv', api.el)?.value || null; api.close(true); };
+    },
   });
   if (!ok) return;
+  const dirty = await data.get('tablestate', t.id);
+  if (dirty?.dirty) await data.put('tablestate', { ...dirty, dirty: false, clearedBy: meName(), clearedAt: Date.now() });
+  if (!take) {
+    const P = await posSettings();
+    const no = (P.seq ?? 100) + 1;
+    await savePos({ seq: no });
+    const sv = servers.find((s) => s.id === server) || null;
+    await data.put('check', { no, name: tableName(t), tableId: t.id, kind: t.kind === 'bar' ? 'tab' : 'table', guests, server: sv?.id || meId(), serverName: sv?.name || meName(), seatedBy: meName(), opened: Date.now(), items: [], payments: [], tax: P.tax });
+    toast(`${tableName(t)} seated${sv ? ' for ' + sv.name.split(' ')[0] : ''}`);
+    posView();
+    return;
+  }
   const P = await posSettings();
   const no = (P.seq ?? 100) + 1; // seq is 0 after Clear test data (RRA-130), so the next check is #1
   await savePos({ seq: no });
@@ -216,18 +248,19 @@ async function currentOrders(staff, P) {
 // The Orders popup (RRA-114): opened from the menu, it offers Seating and
 // brings the current orders straight up.
 export async function posMenu() {
-  if (!canOrder() && !canKitchen()) { location.hash = '#/pos'; return; }
+  if (!canOrder() && !canKitchen()) { location.hash = canClear() ? '#/tables' : '#/pos'; return; }
   const P = await posSettings(), staff = await data.list('staff');
-  const list = canOrder() ? (await openChecks()).filter((c) => boss() || c.server === meId()).sort((a, b) => a.opened - b.opened) : [];
+  const list = canTake() ? (await openChecks()).filter((c) => boss() || c.server === meId()).sort((a, b) => a.opened - b.opened) : [];
   const go = await sheet({
     title: 'Orders', left: 'Close',
     body: `<div class="group">
-        ${canOrder() ? '<button class="row nav" type="button" data-go="#/pos"><span class="grow"><span class="title">Seating</span><span class="sub">Seat a table and take its order</span></span></button>' : ''}
+        ${canSeat() ? `<button class="row nav" type="button" data-go="#/pos"><span class="grow"><span class="title">Seating</span><span class="sub">${canTake() ? 'Seat a table and take its order' : 'Seat guests for a server'}</span></span></button>` : ''}
+        ${canClear() ? '<button class="row nav" type="button" data-go="#/tables"><span class="grow">Tables to clear</span></button>' : ''}
         ${canKitchen() ? '<button class="row nav" type="button" data-go="#/tickets"><span class="grow">Kitchen and bar screen</span></button>' : ''}
         ${canSales() ? '<button class="row nav" type="button" data-go="#/possales"><span class="grow">Today\'s sales</span></button>' : ''}
         ${boss() ? '<button class="row nav" type="button" data-go="#/seating"><span class="grow">Change the seating layout</span></button>' : ''}
       </div>
-      ${canOrder() ? `<div class="section-label">Current orders</div>${list.length ? `<div class="group">${list.map((c) => { const nm = staffName(c.server, staff); return `<button class="row nav" type="button" data-go="#/poscheck/${c.id}">${avatar(nm)}<span class="grow"><span class="title">${esc(c.name)}</span><span class="sub">${c.guests} guest${c.guests > 1 ? 's' : ''} · ${mins(c.opened)} min</span></span><span class="pr-num"><b>${money(totals(c, P.tax).total)}</b></span></button>`; }).join('')}</div>` : '<p class="muted small">No open orders.</p>'}` : ''}`,
+      ${canTake() ? `<div class="section-label">Current orders</div>${list.length ? `<div class="group">${list.map((c) => { const nm = staffName(c.server, staff); return `<button class="row nav" type="button" data-go="#/poscheck/${c.id}">${avatar(nm)}<span class="grow"><span class="title">${esc(c.name)}</span><span class="sub">${c.guests} guest${c.guests > 1 ? 's' : ''} · ${mins(c.opened)} min</span></span><span class="pr-num"><b>${money(totals(c, P.tax).total)}</b></span></button>`; }).join('')}</div>` : '<p class="muted small">No open orders.</p>'}` : ''}`,
     onMount(api) { $$('[data-go]', api.el).forEach((b) => b.onclick = () => api.close(b.dataset.go)); },
   });
   if (go) location.hash = go;
@@ -360,7 +393,7 @@ export async function posCheckView(id) {
   setChrome({ tab: 'more', back: true });
   const c = await data.get('check', id);
   if (!c || c.closed) { location.hash = '#/pos'; return; }
-  if (!canOrder()) { setTitle(c.name); view.innerHTML = lock('Orders are for servers, bartenders and managers.'); return; }
+  if (!canTake()) { setTitle(c.name); view.innerHTML = lock('Orders are for servers, bartenders and managers.'); return; }
   const P = await posSettings(), M = await menu();
   setTitle(c.name, `<span class="muted small">#${c.no} · ${esc((c.serverName || '').split(' ')[0])}</span>`);
   let section = LS.get('posSec', M[0]?.section);
@@ -540,7 +573,7 @@ async function payPopup(id) {
   for (;;) {
     const c = await data.get('check', id);
     if (!c || c.closed) return true;
-    if (!canOrder()) { toast('Taking payment is for servers, bartenders and managers'); return false; }
+    if (!canTake()) { toast('Taking payment is for servers, bartenders and managers'); return false; }
     const P = await posSettings();
     const t = totals(c, P.tax), ps = parts(c, P.tax), mode = c.split?.mode || 'whole', locked = (c.payments || []).length > 0, svc = payService(P);
     const r = await sheet({
@@ -581,6 +614,7 @@ async function payPart(c, part, P) {
   const next = { ...cur, payments };
   if (totals(next, P.tax).due <= 0.004) {
     await data.put('check', { ...next, closed: Date.now(), closedDate: data.today() });
+    if (next.tableId) await data.put('tablestate', { id: next.tableId, dirty: true, at: Date.now(), checkNo: next.no, name: next.name }); // RRA-132: needs clearing
     toast(`${c.name} paid and closed`); return true;
   }
   await data.put('check', next); toast('Payment recorded'); return false;
@@ -693,14 +727,16 @@ export function startPickups() {
 
 // ------------------------------------------------------------ kitchen and bar screen
 export async function ticketsView() {
-  setChrome({ tab: 'more', back: true });
+  setChrome({ tab: jobAreas() ? 'tickets' : 'more', back: !jobAreas() });
   if (!canKitchen()) { setTitle('Kitchen screen'); view.innerHTML = lock('The kitchen and bar screen is for the kitchen, the bar, managers and the Admin.'); return; }
-  let station = LS.get('posStation', job() === 'bar' ? 'Bar' : 'Kitchen');
+  const sts = kitchenSt();
+  let station = LS.get('posStation', sts[0]);
+  if (!sts.includes(station)) station = sts[0];
   setTitle(station === 'Bar' ? 'Bar tickets' : 'Kitchen tickets', can86() ? '<button class="btn plain small" id="e86" type="button">86 list</button>' : '');
   const all = (await data.list('ticket')).filter((t) => !t.bumped);
   const live = all.filter((t) => t.station === station).sort((a, b) => a.at - b.at);
   view.innerHTML = `
-    <div class="segmented">${['Kitchen', 'Bar'].map((s) => `<button type="button" data-st="${s}" class="${s === station ? 'on' : ''}">${s} (${all.filter((t) => t.station === s).length})</button>`).join('')}</div>
+    <div class="segmented"${sts.length < 2 ? ' hidden' : ''}>${sts.map((s) => `<button type="button" data-st="${s}" class="${s === station ? 'on' : ''}">${s} (${all.filter((t) => t.station === s).length})</button>`).join('')}</div>
     <div class="pos-tix">${live.map((t) => { const m = mins(t.at); return `
       <div class="card pos-ticket ${m >= 15 ? 'late' : m >= 8 ? 'warm' : ''}">
         <div class="pos-th"><b>${esc(t.checkName)}</b><span>${m} min</span></div>
@@ -802,4 +838,48 @@ export async function posSettingsView() {
     if (ok) { await savePos({ pickupDelay: v }); toast(`Order-up alert: ${v} min`); posSettingsView(); }
   };
   $('#tax').onclick = async () => { const v = await sheet({ title: 'Sales tax', right: 'Save', body: `<label class="field"><span>Percent</span><input type="text" inputmode="decimal" id="tx" value="${(P.tax * 100).toFixed(2)}"></label><p class="muted small">New checks use the new rate; open checks keep theirs.</p>`, onMount: (api) => { api.onRight = () => api.close(parseFloat($('#tx', api.el).value)); } }); if (v >= 0 && v < 20) { await savePos({ tax: v / 100 }); posSettingsView(); } };
+}
+
+
+// ------------------------------------------------------------ tables to clear (RRA-132)
+// When a check is paid its table turns "Needs clearing". Bussers, servers,
+// hosts, managers and the Admin tap Clear once it's bussed.
+async function dirtyTables() {
+  return Object.fromEntries((await data.list('tablestate')).filter((x) => x.dirty).map((x) => [x.id, x]));
+}
+async function clearSheet(t, d) {
+  if (!canClear()) { toast(`${tableName(t)} needs clearing`); return false; }
+  const ok = await sheet({
+    title: `Clear ${tableName(t)}?`, right: 'Cleared',
+    body: `<p>Paid ${mins(d.at)} minutes ago${d.checkNo ? ` (check #${d.checkNo})` : ''}. Tap Cleared once it's bussed and reset, so it shows as free.</p>`,
+  });
+  if (!ok) return false;
+  await data.put('tablestate', { ...d, dirty: false, clearedBy: meName(), clearedAt: Date.now() });
+  toast(`${tableName(t)} is free`);
+  return true;
+}
+export async function tablesView() {
+  setChrome({ tab: jobAreas() ? 'tables' : 'more', back: !jobAreas() });
+  setTitle('Tables');
+  if (!canClear()) { view.innerHTML = lock('Clearing tables is for bussers, servers, hosts, managers and the Admin.'); return; }
+  const P = await posSettings();
+  const all = tablesOf(P), areas = areasOf(P), area = curArea(areas);
+  const tables = all.filter((t) => t.area === area);
+  const open = await openChecks(), dirty = await dirtyTables();
+  const list = all.filter((t) => dirty[t.id]).sort((a, b) => dirty[a.id].at - dirty[b.id].at);
+  view.innerHTML = `
+    ${list.length ? `<div class="section-label">Needs clearing · ${list.length}</div><div class="group">${list.map((t) => `<div class="row"><span class="grow"><span class="title">${esc(tableName(t))}</span><span class="sub">${esc(areas.find((a) => a.id === t.area)?.name || '')} · paid ${mins(dirty[t.id].at)} min ago</span></span><button class="btn small" type="button" data-clear="${t.id}">Cleared</button></div>`).join('')}</div>`
+      : '<div class="card center muted">All tables are clear.</div>'}
+    ${areaTabs(areas, area, all, open)}
+    ${floorHtml(tables, open, P, false, sizeOf(areas.find((a) => a.id === area)), dirty)}
+    <div class="fl-key small muted"><span><i class="fl-dot"></i> Free</span><span><i class="fl-dot busy"></i> Seated</span><span><i class="fl-dot dirty"></i> Needs clearing</span></div>`;
+  $$('[data-area]').forEach((b) => b.onclick = () => { LS.set('posArea', b.dataset.area); tablesView(); });
+  $$('[data-clear]').forEach((b) => b.onclick = async () => { const t = all.find((x) => x.id === b.dataset.clear); await data.put('tablestate', { ...dirty[t.id], dirty: false, clearedBy: meName(), clearedAt: Date.now() }); toast(`${tableName(t)} is free`); tablesView(); });
+  $$('[data-t]').forEach((b) => b.onclick = async () => {
+    const t = tables.find((x) => x.id === b.dataset.t);
+    const c = open.find((k) => k.tableId === t.id || (!k.tableId && k.name === tableName(t)));
+    if (c) { if (canTake()) location.hash = '#/poscheck/' + c.id; else toast(`${tableName(t)} · ${c.guests} guest${c.guests > 1 ? 's' : ''} · ${mins(c.opened)} min`); return; }
+    if (dirty[t.id]) { if (await clearSheet(t, dirty[t.id])) tablesView(); return; }
+    if (canSeat()) seatTable(t); else toast(`${tableName(t)} is free`);
+  });
 }

@@ -3,12 +3,26 @@
 import * as data from './data.js';
 import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session, isWide, LS } from './ui.js';
 const chipHtml = (t, k) => `<span class="chip${k ? ' ' + k : ''}">${esc(t)}</span>`;
-import { canChange, myStaff, isHost, canTime, level } from './perms.js';
+import { canChange, myStaff, isHost, canTime, level, JOB_AREAS, defaultJobAreas } from './perms.js';
 import { ROLES, myEcdhPublic, myPublicKey } from './access.js';
 import { printButtons, wirePrint } from './pdf.js';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-export const POSITIONS = ['Chef', 'Line cook', 'Prep cook', 'Dishwasher', 'Server', 'Bartender', 'Host stand', 'Manager'];
+// Job titles (RRA-131): these are the starting list. The team's own list lives
+// in settings.positions, so managers can add titles like Busser or Barback.
+export const POSITIONS = ['Chef', 'Line cook', 'Prep cook', 'Dishwasher', 'Server', 'Bartender', 'Busser', 'Host stand', 'Manager'];
+export async function positionList(keep) {
+  const set = await data.settings();
+  const list = Array.isArray(set.positions) && set.positions.length ? set.positions : POSITIONS;
+  return [...new Set([...list, keep].filter(Boolean))];
+}
+async function addPosition(title) {
+  const set = await data.settings();
+  const list = Array.isArray(set.positions) && set.positions.length ? set.positions : POSITIONS;
+  if (list.some((p) => p.toLowerCase() === title.toLowerCase())) return list.find((p) => p.toLowerCase() === title.toLowerCase());
+  await data.saveSettings({ ...set, positions: [...list, title] });
+  return title;
+}
 export const staffList = async () => (await data.list('staff')).sort(data.byName);
 
 function addDays(iso, n) {
@@ -391,6 +405,57 @@ export async function scheduleView(focus) {
 
 // RRA-091: Settings → Shift times. Anyone who can change the schedule edits
 // the quick buttons (optionally for one role) and what "cl" means.
+// Job views (RRA-132): the Admin picks the screens a job sees.
+async function jobScreensSheet(title, cur, custom) {
+  const on = new Set(cur);
+  const res = await sheet({
+    title: title, right: 'Save',
+    body: `<p class="muted small">What people with the Staff role and the job "${esc(title)}" see. The Employee lounge, their clock, My pay and Settings are always there.</p>
+      <div class="group">${Object.entries(JOB_AREAS).map(([k, l]) => `<div class="row"><span class="grow">${esc(l)}</span><button type="button" class="toggle ${on.has(k) ? 'on' : ''}" data-k="${k}" aria-label="${esc(l)}"></button></div>`).join('')}</div>
+      <button class="btn plain block" type="button" id="jv-def">Use the suggested screens</button>
+      <p class="muted small">Taking orders also needs Seating. A person's own Roles and permissions can still turn an area off for just them.</p>`,
+    onMount(api) {
+      $$('[data-k]', api.el).forEach((b) => b.onclick = () => { const k = b.dataset.k; if (on.has(k)) on.delete(k); else on.add(k); if (k === 'orders' && on.has('orders')) on.add('seating'); if (k === 'seating' && !on.has('seating')) on.delete('orders'); $$('[data-k]', api.el).forEach((x) => x.classList.toggle('on', on.has(x.dataset.k))); });
+      $('#jv-def', api.el).onclick = () => api.close('default');
+      api.onRight = () => api.close([...on]);
+    },
+  });
+  if (!res) return;
+  const set = await data.settings();
+  const jobViews = { ...(set.jobViews || {}) };
+  if (res === 'default') delete jobViews[title]; else jobViews[title] = Object.keys(JOB_AREAS).filter((k) => res.includes(k));
+  await data.saveSettings({ ...set, jobViews });
+  toast(res === 'default' ? `${title}: suggested screens` : `${title}: screens saved`);
+  jobTitlesView();
+}
+
+// Job titles (RRA-131): add, remove or put back the starting list.
+export async function jobTitlesView() {
+  setChrome({ tab: 'more', back: true });
+  setTitle('Job titles');
+  const change = canChange('schedule') || canChange('settings');
+  const list = await positionList();
+  const staff = await staffList();
+  const used = (p) => staff.filter((s) => s.position === p).length;
+  // Job views (RRA-132): which screens each job sees (Staff role only).
+  const jv = (await data.settings()).jobViews || {};
+  const screens = (p) => (Array.isArray(jv[p]) ? jv[p] : defaultJobAreas(p));
+  const short = (p) => screens(p).map((k) => JOB_AREAS[k].split(':')[0].replace(' and order guides', '').replace('Take orders and payments', 'Orders')).join(', ');
+  view.innerHTML = `
+    <div class="group">${list.map((p, i) => `<div class="row">${change ? `<button class="rm" type="button" data-rmp="${i}" aria-label="Remove ${esc(p)}">−</button>` : ''}<span class="grow"${isHost() ? ` data-jv="${i}" style="cursor:pointer"` : ''}><span class="title">${esc(p)}</span><span class="sub">${used(p) ? `${used(p)} on staff` : 'No one yet'} · sees ${esc(short(p))}${Array.isArray(jv[p]) ? '' : ' (suggested)'}</span></span>${isHost() ? '<span class="meta">Screens ›</span>' : ''}</div>`).join('')}</div>
+    ${isHost() ? '<p class="muted small">Tap a job to choose the screens people with that job see. Everyone also gets the Employee lounge, their clock, My pay and Settings for their own phone. Chefs, managers and the Admin see what their role allows.</p>' : ''}
+    ${change ? `<div class="row" style="padding:0;gap:8px"><input type="text" id="jt-new" placeholder="New job title, e.g. Barback" autocapitalize="words" style="flex:1"><button class="btn" id="jt-add" type="button">Add</button></div>
+    <button class="btn plain block" id="jt-reset" type="button" style="margin-top:10px">Add back any missing starting titles</button>` : ''}
+    <p class="muted small">Job titles show in the Position list when you add or edit staff. Removing a title doesn't change anyone who already has it. Tip pool points follow the title (Payroll settings → Tip rules), and the point of sale uses it to tell front of house from the kitchen.</p>`;
+  $$('[data-jv]').forEach((el) => el.onclick = () => jobScreensSheet(list[+el.dataset.jv], screens(list[+el.dataset.jv]), Array.isArray(jv[list[+el.dataset.jv]])));
+  if (!change) return;
+  const save = async (positions) => { const set = await data.settings(); await data.saveSettings({ ...set, positions }); jobTitlesView(); };
+  $('#jt-add').onclick = async () => { const t = $('#jt-new').value.trim().replace(/\s+/g, ' '); if (!t) return; if (list.some((p) => p.toLowerCase() === t.toLowerCase())) { toast('Already on the list'); return; } await save([...list, t]); toast('Added ' + t); };
+  $('#jt-new').onkeydown = (e) => { if (e.key === 'Enter') $('#jt-add').click(); };
+  $('#jt-reset').onclick = async () => { const add = POSITIONS.filter((p) => !list.includes(p)); if (!add.length) { toast('All the starting titles are there'); return; } await save([...list, ...add]); toast(`Added ${add.join(', ')}`); };
+  $$('[data-rmp]').forEach((b) => b.onclick = async () => { const p = list[+b.dataset.rmp]; if (list.length <= 1) return; await save(list.filter((x) => x !== p)); toast(`Removed ${p}${used(p) ? ' (people who have it keep it)' : ''}`); });
+}
+
 export async function shiftTimesView() {
   setChrome({ tab: 'more', back: true });
   setTitle('Shift times');
@@ -497,6 +562,7 @@ export async function staffView() {
     <div class="group">${staff.map((s) => `<div class="row">${change ? `<button class="rm" type="button" data-rm="${s.id}" aria-label="Remove ${esc(s.name)}">−</button>` : ''}
       <span class="grow"${change ? ` data-edit="${s.id}" style="cursor:pointer"` : ''}><span class="title">${esc(s.name)}</span><span class="sub">${esc(s.position || '')} · ${esc(ROLES[s.role] || 'Staff')}${s.dev ? '' : ` ${chipHtml('Not linked', 'warn')}`}</span></span></div>`).join('') || '<div class="row muted">No staff yet.</div>'}</div>
     ${change ? '<button class="btn tonal block" id="add" type="button">+ Add staff</button>' : ''}
+    <div class="group" style="margin-top:14px"><a class="row nav" href="#/jobtitles"><span class="grow"><span class="title">Job titles</span><span class="sub">${esc((await positionList()).join(', '))}</span></span></a></div>
     <p class="muted small">Not linked: this person hasn't opened the app on their phone yet, so Change role isn't available for them.</p>
     <p class="muted small">Staff appear on the schedule. To give someone the app on their phone, send an invite from Settings → Invite and approve phones. Removing someone takes them off the schedule and ends their app access. Their hours stay in Time sheets.</p>`;
   $$('[data-merge]', view).forEach((b) => { b.onclick = async () => { const x = matches[+b.dataset.merge]; if (await offerMerge(x.g, x.to)) staffView(); }; });
@@ -521,19 +587,34 @@ async function staffDialog(existing) {
   const seeRate = canTime() && level('payrates') !== 'none';
   const pay = seeRate && existing ? await data.get('payrate', existing.id) : null;
   let rate = pay?.rate ?? '';
+  const positions = await positionList(s.position);
+  let newTitle = '';
   const ok = await sheet({
     title: existing ? 'Staff member' : 'Add staff', right: 'Save',
     body: `<label class="field"><span>Name</span><input type="text" id="st-n" value="${esc(s.name)}" placeholder="Name as it appears on their invite"></label>
-      <label class="field"><span>Position</span><select id="st-p">${POSITIONS.map((p) => `<option ${p === s.position ? 'selected' : ''}>${p}</option>`).join('')}</select></label>
+      <label class="field"><span>Position</span><select id="st-p">${positions.map((p) => `<option ${p === s.position ? 'selected' : ''}>${esc(p)}</option>`).join('')}<option value="__new">+ Add a job title…</option></select></label>
+      <label class="field" id="st-pnew-f" hidden><span>New job title</span><input type="text" id="st-pnew" placeholder="e.g. Busser, Barback, Expo" autocapitalize="words"></label>
       ${!existing ? '<p class="muted small">Their app role comes from the invite you send them (Settings → Invite and approve phones).</p>'
         : s.dev ? `<div class="field"><span>App role</span><div style="padding:10px 0"><b>${esc(ROLES[s.role] || 'Staff')}</b> <button class="btn plain small" id="st-role" type="button">Change role ›</button></div></div>`
         : `<div class="field"><span>App role</span><div style="padding:10px 0"><b>${esc(ROLES[s.role] || 'Staff')}</b> ${chipHtml('Not linked', 'warn')}</div>
           <p class="muted small" style="margin:0">Change role unlocks once ${esc(s.name)} opens the app on their phone (after an invite). Until then their role comes from their invite.</p></div>`}
       ${seeRate ? `<label class="field"><span>Hourly rate (only managers the Admin allows see this)</span><input type="text" inputmode="decimal" id="st-rate" value="${esc(rate)}" placeholder="$ per hour"${canChange('payrates') ? '' : ' readonly'}></label>` : ''}`,
-    onMount: (api) => { $('#st-role', api.el)?.addEventListener('click', () => api.close('role')); api.onRight = () => { const n = $('#st-n', api.el).value.trim(); if (!n) return; Object.assign(s, { name: n, position: $('#st-p', api.el).value }); if ($('#st-rate', api.el)) rate = $('#st-rate', api.el).value.trim().replace('$', ''); api.close(true); }; },
+    onMount: (api) => {
+      $('#st-role', api.el)?.addEventListener('click', () => api.close('role'));
+      $('#st-p', api.el).onchange = (e) => { const f = $('#st-pnew-f', api.el); f.hidden = e.target.value !== '__new'; if (!f.hidden) $('#st-pnew', api.el).focus(); };
+      api.onRight = () => {
+        const n = $('#st-n', api.el).value.trim(); if (!n) return;
+        let p = $('#st-p', api.el).value;
+        if (p === '__new') { newTitle = $('#st-pnew', api.el).value.trim().replace(/\s+/g, ' '); if (!newTitle) { toast('Type the new job title'); return; } p = newTitle; }
+        Object.assign(s, { name: n, position: p });
+        if ($('#st-rate', api.el)) rate = $('#st-rate', api.el).value.trim().replace('$', '');
+        api.close(true);
+      };
+    },
   });
   if (!ok) return;
   if (ok === 'role') { location.hash = `#/person/${s.id}`; return; }
+  if (newTitle) s.position = await addPosition(newTitle);
   await data.put('staff', s);
   if (seeRate && canChange('payrates') && String(rate) !== String(pay?.rate ?? '')) await data.put('payrate', { id: s.id, staffId: s.id, rate: rate === '' ? '' : +rate || 0 });
   // RRA-092: added back with the same name as a removed person who has hours.

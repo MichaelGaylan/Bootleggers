@@ -4,8 +4,8 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.8.5';
-export const BUILD = '2026.11.26-20';
+export const VERSION = '0.9.0';
+export const BUILD = '2026.11.26-22';
 
 // Text that names the restaurant uses tokens, so it reads right after a
 // changeout (RRA-123): {name} = short name, {restaurant} = full name,
@@ -14,6 +14,22 @@ export const brandText = (s) => String(s ?? '')
   .replace(/\{name\}/g, BRAND.shortName).replace(/\{restaurant\}/g, BRAND.restaurant).replace(/\{app\}/g, BRAND.appName);
 
 const WHATS_NEW_RAW = [
+  {
+    version: '0.9.0', build: '2026.11.26-22', date: '2026-11-26',
+    lines: [
+      'The app now fits each job. A busser sees Tables and the Employee lounge; servers see Seating, their orders and tables; bartenders see Seating, orders and the bar tickets; hosts seat guests for a server; cooks see the kitchen tickets, prep, recipes and stock. The bottom tabs change to match, and other parts of the app stay closed.',
+      'Tables to clear: when a check is paid, its table turns orange ("Clear") on the seating layout. A busser, server, host or manager taps it, or the Cleared button on Tables, once it\'s reset, and it shows as free again.',
+      'Hosts seat guests and pick the server; the table then shows on that server\'s layout. People who don\'t take orders don\'t see check amounts.',
+      'The Admin chooses what each job sees in Settings → People → Job titles (tap a job, then switch screens on or off). Chefs, managers and the Admin see what their role allows, as before.',
+    ],
+  },
+  {
+    version: '0.8.6', build: '2026.11.26-21', date: '2026-11-26',
+    lines: [
+      'You can add your own job titles. When adding or editing staff, pick "+ Add a job title…" in Position, or manage the list in Settings → People → Job titles. Busser is now on the list next to Bartender.',
+      'Tip pool points for "Host" now also count for "Host stand".',
+    ],
+  },
   {
     version: '0.8.5', build: '2026.11.26-20', date: '2026-11-26',
     lines: [
