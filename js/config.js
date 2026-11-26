@@ -4,8 +4,8 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.8.4';
-export const BUILD = '2026.11.24-19';
+export const VERSION = '0.8.5';
+export const BUILD = '2026.11.26-20';
 
 // Text that names the restaurant uses tokens, so it reads right after a
 // changeout (RRA-123): {name} = short name, {restaurant} = full name,
@@ -14,6 +14,12 @@ export const brandText = (s) => String(s ?? '')
   .replace(/\{name\}/g, BRAND.shortName).replace(/\{restaurant\}/g, BRAND.restaurant).replace(/\{app\}/g, BRAND.appName);
 
 const WHATS_NEW_RAW = [
+  {
+    version: '0.8.5', build: '2026.11.26-20', date: '2026-11-26',
+    lines: [
+      'Clear test data (Admin, in Settings) has a "Pick sales and time logs" button, and can now restart check numbers at 1, empty the 86 list, clear daily prep check-offs and clear past schedules only. Used one-time coupons are paused when checks go. Stock is never touched.',
+    ],
+  },
   {
     version: '0.8.4', build: '2026.11.24-19', date: '2026-11-24',
     lines: [
