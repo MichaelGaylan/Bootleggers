@@ -959,3 +959,13 @@ button.row.cpn-disc:disabled { opacity: .55; cursor: default; }
 /* RRA-141: dishes with no price yet */
 .pos-tile.noprice { opacity: .55; }
 .pos-tile.noprice .pos-cap small { color: var(--text-2); font-style: italic; }
+
+/* RRA-146: "Update ready" bar. Waits for a tap; orange after a day. */
+.upd-bar { position: fixed; z-index: 41; top: calc(var(--safe-t) + 8px); left: 0; right: 0; margin: 0 auto; width: min(420px, calc(100vw - 20px));
+  display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--card); border: 2px solid var(--accent);
+  box-shadow: 0 6px 22px rgba(0,0,0,.22); animation: pk-in .25s ease-out; }
+.upd-bar b { display: block; font-size: .95rem; }
+.upd-bar small { display: block; color: var(--text-2); font-size: .78rem; }
+.upd-bar.old { border-color: #ff9500; background: color-mix(in srgb, #ff9500 14%, var(--card)); }
+.upd-bar .btn { flex: none; }
+.has-upd .pickups { top: calc(var(--safe-t) + 94px); }

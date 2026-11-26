@@ -80,12 +80,14 @@ export async function load(per) {
   for (const [d, v] of Object.entries(posSales)) if (!(d in sold)) sold[d] = v;
   return {
     staff: staff.filter((s) => !s.removed).sort(data.byName),
+    gone: staff.filter((s) => s.removed), // RRA-147: open punches of removed staff still show up
     punches: punches.filter((p) => inPer(dateOf(p.in))).sort((a, b) => a.in - b.in),
     rates: Object.fromEntries(rates.map((r) => [r.staffId || r.id, r])),
     pools: pool,
     sales: Object.values(sold).reduce((t, v) => t + v, 0),
     advances: advances.filter((a) => a.period === per.start),
     rules: payRules(settings),
+    per,
   };
 }
 
@@ -137,6 +139,29 @@ export function compute(D, P) {
     hours: r2(rows.reduce((t, x) => t + x.h.total, 0)), labor: D.sales ? wages / D.sales : null,
     open: D.punches.filter((p) => !p.out) };
 }
+
+// RRA-147: someone clocked in right now (an open punch from the last 16 hours,
+// so a late bar shift past midnight still counts) is "On shift", not a
+// missing clock-out. It only needs fixing once the pay period has ended.
+export const ON_SHIFT_MS = 16 * 36e5;
+export const onShift = (p) => !p.out && Date.now() - p.in < ON_SHIFT_MS;
+export const needsFix = (p, per) => !p.out && (!onShift(p) || per.end < dateOf(Date.now()));
+
+// Open punches whose person isn't on the Staff list (removed, or unknown):
+// one row each so they can always be fixed.
+export function strays(D) {
+  const out = new Map();
+  for (const p of D.punches) {
+    if (p.out || D.staff.some((s) => s.id === p.staffId)) continue;
+    const id = p.staffId || '?' + (p.name || '');
+    if (out.has(id)) continue;
+    const was = (D.gone || []).find((s) => s.id === p.staffId);
+    out.set(id, { ...(was || {}), id, name: was?.name || p.name || 'Unknown person', stray: true,
+      position: was ? `${was.position || 'Staff'} · removed from Staff` : 'Not on the Staff list' });
+  }
+  return [...out.values()];
+}
+export const punchesOf = (st, D) => D.punches.filter((p) => st.stray && !p.staffId ? !p.staffId && (p.name || '') === (st.name === 'Unknown person' ? '' : st.name) : p.staffId === st.id);
 
 // Who gets the Payroll screens
 export const PAY_KEYS = ['timesheets', 'payrates', 'payrun', 'advances'];

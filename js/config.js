@@ -4,8 +4,8 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.14.1';
-export const BUILD = '2026.11.26-28';
+export const VERSION = '0.15.0';
+export const BUILD = '2026.11.26-29';
 
 // Text that names the restaurant uses tokens, so it reads right after a
 // changeout (RRA-123): {name} = short name, {restaurant} = full name,
@@ -14,6 +14,13 @@ export const brandText = (s) => String(s ?? '')
   .replace(/\{name\}/g, BRAND.shortName).replace(/\{restaurant\}/g, BRAND.restaurant).replace(/\{app\}/g, BRAND.appName);
 
 const WHATS_NEW_RAW = [
+  {
+    version: '0.15.0', build: '2026.11.26-29', date: '2026-11-26',
+    lines: [
+      'Updates wait for you: a new version downloads quietly and an "Update ready · Update now" bar shows at the top. The app no longer reloads by itself in the middle of an order. It updates on its own only when you open it fresh. The bar turns orange if an update has waited more than a day.',
+      'Review hours: the "without a clock-out" note now names who is missing one and counts only the tab you are on, with "+N in other tabs" when the cause is elsewhere. Someone clocked in right now shows On shift instead of Fix. A forgotten clock-out by someone no longer on the Staff list now shows up as its own row so it can be fixed.',
+    ],
+  },
   {
     version: '0.14.1', build: '2026.11.26-28', date: '2026-11-26',
     lines: [

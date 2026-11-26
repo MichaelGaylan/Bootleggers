@@ -16,7 +16,7 @@ import { canSee, canChange, isHost, myStaff } from './perms.js';
 import { BRAND } from './config.js';
 import {
   RATES, payrollSettings, savePayrollSettings, PAYROLL_DEFAULTS, periodFor, currentPeriod, previousPeriod, addDays, dateOf, label,
-  deptOf, ptsOf, load, compute, poolSplit, hoursOf, isChefApprover, hasPayroll,
+  deptOf, ptsOf, load, compute, poolSplit, hoursOf, isChefApprover, hasPayroll, onShift, needsFix, strays, punchesOf,
 } from './paycalc.js';
 import * as provider from './provider.js';
 
@@ -46,7 +46,8 @@ function attention(D, T, P, pst, run) {
   if (pend.length && canChange('advances')) out.push({ k: 'adv', pill: 'info', l: 'Early', title: `${pend.length} early pay request${pend.length > 1 ? 's' : ''}`, sub: pend.map((a) => `${(D.staff.find((s) => s.id === a.staffId) || {}).name || '?'} ${money(a.amount)}`).join(' · ') });
   if (run) return out;
   if (pst.readyBy && canChange('payrun')) out.unshift({ k: 'run', pill: 'okp', l: 'Ready', title: 'Pay run ready to submit', sub: `Sent by ${pst.readyBy.name}` });
-  if (T.open.length && canSee('timesheets')) out.push({ k: 'run', pill: 'lo', l: '!', title: `${T.open.length} punch${T.open.length > 1 ? 'es' : ''} without a clock-out`, sub: [...new Set(T.open.map((p) => p.name))].join(', ') });
+  const fix = T.open.filter((p) => needsFix(p, D.per));
+  if (fix.length && canSee('timesheets')) out.push({ k: 'run', pill: 'lo', l: '!', title: `${fix.length} punch${fix.length > 1 ? 'es' : ''} without a clock-out`, sub: [...new Set(fix.map((p) => p.name || 'Unknown person'))].join(', ') });
   const nr = T.rows.filter((x) => x.noRate || x.salaryMissing);
   if (nr.length && canSee('payrates')) out.push({ k: 'run', pill: 'lo', l: '$', title: `${nr.length} without a pay rate`, sub: nr.map((x) => x.st.name.split(' ')[0]).join(', ') });
   const ot = T.rows.filter((x) => x.type === 'hourly' && x.h.ot + x.h.dbl > 0);
@@ -110,15 +111,15 @@ async function kitchenView(P) {
   const D = await load(per);
   const pst = (await data.get('payperiod', per.start)) || { id: per.start };
   const cooks = D.staff.filter((s) => deptOf(s) === 'Kitchen' && (s.role || 'staff') === 'staff');
-  const open = D.punches.filter((p) => !p.out && cooks.some((c) => c.id === p.staffId));
+  const open = D.punches.filter((p) => needsFix(p, per) && cooks.some((c) => c.id === p.staffId));
   view.innerHTML = `
     <div class="card"><div class="pr-lab">${perLabel(per)}</div>
       <div class="pr-mid">${pst.kitchenOK ? `Approved by ${esc(pst.kitchenOK.name)}` : 'Waiting for your approval'}</div>
       <div class="pr-lab">Fix and approve the cooks' hours. Pay rates and dollars stay hidden.</div></div>
     ${open.length ? `<div class="hint"><b>${open.length} punch${open.length > 1 ? 'es' : ''} without a clock-out.</b> Tap the cook to fix.</div>` : ''}
-    <div class="group">${cooks.map((c) => { const ps = D.punches.filter((p) => p.staffId === c.id); const h = hoursOf(ps, D.rules); const m = ps.some((p) => !p.out); return `
+    <div class="group">${cooks.map((c) => { const ps = D.punches.filter((p) => p.staffId === c.id); const h = hoursOf(ps, D.rules); const m = ps.some((p) => needsFix(p, per)), on = !m && ps.some(onShift); return `
       <button class="row nav" type="button" data-p="${c.id}">${avatar(c)}<span class="grow"><span class="title">${esc(c.name)}</span><span class="sub">${esc(c.position || '')}</span></span>
-        <span class="pr-num">${hrs(h.total)}${m ? '<small><span class="pill lo">Fix</span></small>' : h.ot ? `<small><span class="pill pr-ot">OT ${h.ot}</span></small>` : ''}</span></button>`; }).join('') || '<div class="row muted">No kitchen punches yet. Punches made before the Admin turned on chef approval show up once the Admin\'s phone opens Payroll.</div>'}</div>
+        <span class="pr-num">${hrs(h.total)}${m ? '<small><span class="pill lo">Fix</span></small>' : on ? '<small><span class="pill okp">On shift</span></small>' : h.ot ? `<small><span class="pill pr-ot">OT ${h.ot}</span></small>` : ''}</span></button>`; }).join('') || '<div class="row muted">No kitchen punches yet. Punches made before the Admin turned on chef approval show up once the Admin\'s phone opens Payroll.</div>'}</div>
     <button class="btn block" id="ok" type="button" ${open.length || pst.kitchenOK ? 'disabled' : ''}>${pst.kitchenOK ? 'Kitchen hours approved' : open.length ? 'Fix clock-outs to approve' : 'Approve kitchen hours'}</button>`;
   $$('[data-p]').forEach((b) => b.onclick = () => personSheet(D.staff.find((s) => s.id === b.dataset.p), D, per, { hoursOnly: true }).then(() => kitchenView(P)));
   $('#ok').onclick = async () => { await data.put('payperiod', { ...pst, id: per.start, kitchenOK: { name: session.profile.name, at: Date.now() } }); toast('Kitchen hours approved'); kitchenView(P); };
@@ -147,20 +148,35 @@ export async function payRunView(start) {
   if (step === 1 || !canSee('payrates')) {
     setTitle('Review hours');
     const seeR = canSee('payrates'), tap = canChange('timesheets') || canChange('payrates');
-    const flag = (x) => x.h.open.length || (seeR && (x.noRate || x.salaryMissing));
-    const rows = T.rows.filter((x) => inDept(x.st)).sort((a, b) => flag(b) - flag(a) || a.st.name.localeCompare(b.st.name));
-    const nOpen = T.open.length, nRate = seeR ? T.rows.filter((x) => x.noRate || x.salaryMissing).length : 0;
-    const blocked = nOpen || nRate;
+    // RRA-147: only punches that really need a clock-out count; someone
+    // clocked in right now is On shift. Open punches of people not on the
+    // Staff list get their own row (All tab) so they can be fixed.
+    const lost = strays(D).map((st) => ({ st, stray: true, h: { total: 0, ot: 0, dbl: 0, open: punchesOf(st, D).filter((p) => !p.out) } }));
+    const fixOf = (x) => x.h.open.filter((p) => needsFix(p, per));
+    const flag = (x) => !!fixOf(x).length || (!x.stray && seeR && (x.noRate || x.salaryMissing));
+    const onNow = (x) => !fixOf(x).length && x.h.open.some(onShift);
+    const all = T.rows.concat(lost);
+    const here = (x) => x.stray ? dept === 'All' : inDept(x.st);
+    const rows = all.filter(here).sort((a, b) => flag(b) - flag(a) || a.st.name.localeCompare(b.st.name));
+    const missing = all.filter((x) => fixOf(x).length), missHere = missing.filter(here), missElse = missing.length - missHere.length;
+    const rateRows = seeR ? T.rows.filter((x) => x.noRate || x.salaryMissing) : [], rateHere = rateRows.filter(here), rateElse = rateRows.length - rateHere.length;
+    const blocked = missing.length || rateRows.length;
+    const first = (x) => esc(x.st.name.split(/\s+/)[0]);
+    const elseN = missElse + rateElse;
+    const why = [
+      missHere.length ? `Missing a clock-out: ${missHere.map(first).join(', ')}` : '',
+      rateHere.length ? `No pay rate: ${rateHere.map(first).join(', ')}` : '',
+    ].filter(Boolean).join(' · ');
     view.innerHTML = `${stepBar(1)}<div class="pr-lab" style="margin:-4px 0 10px">${perLabel(per)}</div>${seg}
       ${chefOn ? `<div class="hint">${pst.kitchenOK ? `✓ Kitchen hours approved by ${esc(pst.kitchenOK.name)}` : 'Kitchen hours are waiting on the chef.'}</div>` : ''}
-      ${blocked ? `<div class="hint"><b>${[nOpen ? `${nOpen} without a clock-out` : '', nRate ? `${nRate} without a pay rate` : ''].filter(Boolean).join(' · ')}.</b> ${tap ? 'Tap anyone marked Fix.' : 'Ask the Admin or a manager to fix these.'}</div>` : ''}
+      ${blocked ? `<div class="hint">${why ? `<b>${why}.</b> ` : ''}${elseN ? `<b>+${elseN} in other tabs.</b> ` : ''}${why ? (tap ? 'Tap anyone marked Fix.' : 'Ask the Admin or a manager to fix these.') : 'Switch to All to see them.'}</div>` : ''}
       <div class="group">${rows.map((x) => `
-        <button class="row ${tap ? 'nav' : ''}" type="button" data-p="${x.st.id}" ${tap ? '' : 'disabled'}>${avatar(x.st)}
-          <span class="grow"><span class="title">${esc(x.st.name)}</span><span class="sub">${esc(x.st.position || '')} · ${deptOf(x.st)}${seeR ? ' · ' + (x.type === 'salary' ? 'salary' : x.rate > 0 ? money(x.rate) + '/h' : '<span style="color:var(--danger)">no rate</span>') : ''}</span></span>
-          <span class="pr-num">${x.type === 'salary' ? '—' : hrs(x.h.total)}${flag(x) ? '<small><span class="pill lo">Fix</span></small>' : x.h.ot + x.h.dbl ? `<small><span class="pill pr-ot">OT ${x.h.ot + x.h.dbl}</span></small>` : ''}</span></button>`).join('') || '<div class="row muted">No hours in this period yet.</div>'}</div>
+        <button class="row ${tap ? 'nav' : ''}" type="button" data-p="${esc(x.st.id)}" ${tap ? '' : 'disabled'}>${avatar(x.st)}
+          <span class="grow"><span class="title">${esc(x.st.name)}</span><span class="sub">${esc(x.st.position || '')}${x.stray ? '' : ' · ' + deptOf(x.st)}${seeR && !x.stray ? ' · ' + (x.type === 'salary' ? 'salary' : x.rate > 0 ? money(x.rate) + '/h' : '<span style="color:var(--danger)">no rate</span>') : ''}</span></span>
+          <span class="pr-num">${x.type === 'salary' ? '—' : hrs(x.h.total)}${flag(x) ? '<small><span class="pill lo">Fix</span></small>' : onNow(x) ? '<small><span class="pill okp">On shift</span></small>' : x.h.ot + x.h.dbl ? `<small><span class="pill pr-ot">OT ${x.h.ot + x.h.dbl}</span></small>` : ''}</span></button>`).join('') || '<div class="row muted">No hours in this period yet.</div>'}</div>
       ${seeR ? `<button class="btn block" id="next" type="button" ${blocked || !T.rows.length ? 'disabled' : ''}>${blocked ? 'Fix the items above to continue' : `Continue · ${T.hours.toFixed(1)} hrs`}</button>` : '<p class="muted small center">Pay amounts are hidden for your role.</p>'}`;
     bindSeg();
-    if (tap) $$('[data-p]').forEach((b) => b.onclick = () => personSheet(D.staff.find((s) => s.id === b.dataset.p), D, per, {}).then(() => payRunView(per.start)));
+    if (tap) $$('[data-p]').forEach((b) => b.onclick = () => personSheet(all.find((x) => x.st.id === b.dataset.p).st, D, per, {}).then(() => payRunView(per.start)));
     $('#next')?.addEventListener('click', () => setStep(2));
     return;
   }
@@ -224,9 +240,9 @@ export async function payRunView(start) {
 
 // One sheet per person: clock-outs + pay setup (rate, hourly/salary, department)
 async function personSheet(st, D, per, { hoursOnly = false } = {}) {
-  const ps = D.punches.filter((p) => p.staffId === st.id);
+  const ps = punchesOf(st, D);
   const pr = D.rates[st.id] || {};
-  const editT = canChange('timesheets') || hoursOnly, editR = !hoursOnly && canChange('payrates');
+  const editT = canChange('timesheets') || hoursOnly, editR = !hoursOnly && !st.stray && canChange('payrates');
   const segH = (name, opts, cur) => `<div class="segmented" data-seg="${name}">${opts.map(([v, l]) => `<button type="button" data-v="${v}" class="${cur === v ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   const type = pr.type || 'hourly';
   const hm = (ms) => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
@@ -238,7 +254,7 @@ async function personSheet(st, D, per, { hoursOnly = false } = {}) {
         <label class="field"><span>Salary ($ per pay period, if salaried)</span><input type="text" inputmode="decimal" id="pr-sal" value="${+pr.salary || ''}" placeholder="e.g. 2000"></label>
         <div class="section-label pr-flush">Department</div>${segH('dept', [['Kitchen', 'Kitchen'], ['Front', 'Front'], ['Bar', 'Bar']], deptOf(st))}` : ''}
       <div class="section-label pr-flush">Punches${editT ? ' · set any missing clock-out' : ''}</div>
-      <div class="group">${ps.map((p) => `<div class="row"><span class="grow"><span class="title">${dl(p.in)}</span><span class="sub">In ${tm(p.in)}${p.out ? '' : ' · <span style="color:var(--danger)">no clock-out</span>'}${p.editedBy ? ` · fixed by ${esc(p.editedBy)}` : ''}</span></span>
+      <div class="group">${ps.map((p) => `<div class="row"><span class="grow"><span class="title">${dl(p.in)}</span><span class="sub">In ${tm(p.in)}${p.out ? '' : onShift(p) ? ' · <b>on shift now</b>' : ' · <span style="color:var(--danger)">no clock-out</span>'}${p.editedBy ? ` · fixed by ${esc(p.editedBy)}` : ''}</span></span>
         <input type="time" data-pu="${p.id}" value="${p.out ? hm(p.out) : ''}" style="width:120px" aria-label="Clock out" ${editT ? '' : 'disabled'}></div>`).join('') || '<div class="row muted">No punches this period</div>'}</div>
       <p class="muted small">A clock-out earlier than the clock-in counts as the next morning.</p>`,
     onMount(api) {
