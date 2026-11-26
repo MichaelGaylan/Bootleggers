@@ -384,7 +384,7 @@ export async function couponSheet(checkId) {
           setTimeout(() => { busy = false; }, scanned ? 1800 : 0); // don't re-read the same bad code at once
           return;
         }
-        if (tagOf(r.line)) { api.close({ needId: r.line }); return; } // a veteran card etc.: confirm the ID first
+        if (tagOf(r.line)) { api.close({ needId: r.line, needCp: r.coupon }); return; } // a veteran card etc.: pick the seat and confirm the ID first
         await applyLine(checkId, r.line);
         api.close(true);
       };
@@ -394,8 +394,33 @@ export async function couponSheet(checkId) {
     },
   });
   stop();
-  if (result?.needId) return (await sawId(result.needId)) && applyLine(checkId, result.needId);
+  if (result?.needId) return standing(checkId, result.needCp);
   return !!result;
+}
+
+// RRA-152: which seat showed ID? Skipped when the check has one guest.
+async function pickSeat(check, label) {
+  const n = +check.guests || 1;
+  if (n < 2) return 1;
+  const taken = new Map((check.coupons || []).filter((k) => tagOf(k) && k.seat).map((k) => [k.seat, tagOf(k).label]));
+  return sheet({
+    title: 'Which seat showed ID?', left: 'Cancel',
+    body: `<p class="muted small" style="margin-top:0">The ${esc(label.toLowerCase())} discount comes off that seat's items only.</p>
+      <div class="pos-choices">${Array.from({ length: n }, (_, i) => i + 1).map((s) => `<button type="button" class="btn tonal" data-seat-pick="${s}" ${taken.has(s) ? 'disabled' : ''}>Seat ${s}${taken.has(s) ? ` · ${esc(taken.get(s))}` : ''}</button>`).join('')}</div>`,
+    onMount(api) { $$('[data-seat-pick]', api.el).forEach((b) => b.onclick = () => api.close(+b.dataset.seatPick)); },
+  });
+}
+
+// A standing discount: seat, rules for that seat, ID seen, then on the check.
+async function standing(checkId, cp) {
+  const check = await data.get('check', checkId);
+  const seat = await pickSeat(check, tagOf(cp).label);
+  if (!seat) return false;
+  const [checks, fresh] = await Promise.all([data.list('check'), data.get('check', checkId)]);
+  const r = canApplyStanding({ coupon: cp, checks, check: fresh, seat });
+  if (!r.ok) { toast(r.error); return false; }
+  if (!(await sawId(r.line))) return false;
+  return applyLine(checkId, r.line);
 }
 
 async function applyLine(checkId, line) {
@@ -408,22 +433,23 @@ async function applyLine(checkId, line) {
 // The server confirms they saw the guest's ID (RRA-128).
 function sawId(line) {
   const t = tagOf(line);
-  return sheet({ title: `${t.label} discount`, left: 'Cancel', right: 'Yes, add it', body: `<p style="font-size:1.1rem"><b>Did you see the guest's ${esc(t.id)}?</b></p><p class="muted">${esc(headline(line))}. The check will show it as a ${esc(t.label.toLowerCase())} discount.</p>` });
+  return sheet({ title: `${t.label} discount`, left: 'Cancel', right: 'Yes, add it', body: `<p style="font-size:1.1rem"><b>Did you see ${line.seat ? `seat ${line.seat}'s` : "the guest's"} ${esc(t.id)}?</b></p><p class="muted">${esc(line.seat ? headline(line).replace('your check', `seat ${line.seat}'s items only`) : headline(line))}. The check will show it as a ${esc(t.label.toLowerCase())} discount.</p>` });
 }
 
 // Discounts on a check (RRA-128): the standing discounts, no code needed.
 export async function discountsSheet(checkId) {
   const [coupons, checks, check] = await Promise.all([data.list('coupon'), data.list('check'), data.get('check', checkId)]);
   const list = coupons.filter((cp) => tagOf(cp));
-  const rows = list.map((cp) => ({ cp, r: canApplyStanding({ coupon: cp, checks, check }) }));
+  // RRA-152: each seat can have its own; the seat is asked next, so a row only
+  // shows the rules that don't depend on the seat (dates, paused, used up).
+  const rows = list.map((cp) => ({ cp, r: canApplyStanding({ coupon: cp, checks, check: { ...check, coupons: (check.coupons || []).filter((k) => !tagOf(k)) }, seat: -1 }) }));
   const pick = await sheet({
     title: 'Discounts', left: 'Cancel',
     body: `${rows.map(({ cp, r }, i) => `<button type="button" class="row nav cpn-disc" data-i="${i}" ${r.ok ? '' : 'disabled'}><span class="grow"><span class="title">${tagOf(cp).icon} ${esc(tagOf(cp).label)}</span><span class="sub" style="white-space:normal">${esc(r.ok ? headline(cp).split(': ')[1] : r.error)}</span></span></button>`).join('') || '<p class="muted">No standing discounts yet. A manager adds them under More → Coupons.</p>'}`,
     onMount(api) { $$('[data-i]', api.el).forEach((b) => b.onclick = () => api.close(rows[+b.dataset.i])); },
   });
   if (!pick?.r.ok) return false;
-  if (!(await sawId(pick.r.line))) return false;
-  return applyLine(checkId, pick.r.line);
+  return standing(checkId, pick.cp);
 }
 
 // Reads one picture (a video frame or a canvas). The area inside the aiming

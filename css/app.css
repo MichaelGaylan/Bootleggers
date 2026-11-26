@@ -995,3 +995,19 @@ button.row.cpn-disc:disabled { opacity: .55; cursor: default; }
 .pos-chgamt { color: var(--text); white-space: nowrap; }
 .pos-ti em.pos-chgs { color: var(--text); font-size: .9rem; }
 .pos-ti em.pos-chgs .pos-chg.chg-no b { text-decoration: underline; }
+
+/* RRA-155: Edit list rows open the item; names look like links */
+.wtable tr.tap-row { cursor: pointer; }
+.wtable tr.tap-row:hover td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.wtable tr.tap-row .link { color: var(--accent); font-weight: 600; }
+
+/* RRA-153: seat labels on the check, larger and green */
+.pos-seat > .pr-lab { font-size: .95rem; font-weight: 700; color: color-mix(in srgb, var(--ok) 80%, var(--text)); margin: 2px 0; letter-spacing: .01em; }
+
+/* RRA-154: Kitchen / Bar flags on the ticket tabs */
+.tix-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; }
+.tix-tabs .tix-n { color: var(--text-2); font-weight: 500; }
+.tix-tabs .tix-new { font-style: normal; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; display: inline-grid; place-items: center; }
+.tix-tabs .tix-flag { font-style: normal; font-size: .9rem; padding: 0 4px; border-radius: 8px; }
+.tix-tabs .tix-flag.warm { background: color-mix(in srgb, var(--warn) 30%, transparent); }
+.tix-tabs .tix-flag.late { background: color-mix(in srgb, var(--danger) 35%, transparent); }

@@ -457,8 +457,12 @@ export async function posCheckView(id, opt = {}) {
           <span class="pos-price">${money(lineTotal(x))}</span></div>`).join('')}</div>`).join('')
       : `<p class="muted center" style="margin:6px 0">No items yet. Tap a dish to add it.</p>${(c.payments || []).length ? '' : '<button class="btn plain block small" id="free" type="button">Seated by mistake? Free the table</button>'}`}
       <div class="pos-tot"><span>Subtotal</span><span>${money(t.sub)}</span></div>
-      ${dl.map((k, i) => `<div class="pos-tot pos-cpn"><button type="button" data-cpn="${i}" ${locked ? 'disabled' : ''}><span>${tagOf(k) ? `${tagOf(k).icon} ${esc(tagOf(k).label)}` : `🎟 ${esc(k.code)}`}</span><small>${esc(tagOf(k) ? headline(k).split(': ')[1] : headline(k))}${k.note ? ` · <b style="color:var(--warn)">${esc(k.note)}</b>` : ''}</small></button><span>${k.amount ? '−' + money(k.amount) : money(0)}</span></div>`).join('')}
-      ${c.items.length && !locked && dl.every((k) => k.stack) ? `<div class="pos-addcpn"><button class="btn plain small" id="cpn" type="button">🎟 ${dl.length ? 'Add another coupon' : 'Add a coupon'}</button>${hasStanding ? '<button class="btn plain small" id="disc" type="button">🎖 Discounts</button>' : ''}</div>` : ''}
+      ${dl.map((k, i) => `<div class="pos-tot pos-cpn"><button type="button" data-cpn="${i}" ${locked ? 'disabled' : ''}><span>${tagOf(k) ? `${tagOf(k).icon} ${esc(tagOf(k).label)}${k.seat ? ` · Seat ${k.seat}` : ''}` : `🎟 ${esc(k.code)}`}</span><small>${esc(tagOf(k) ? headline(k).split(': ')[1].replace('your check', k.seat ? `seat ${k.seat}` : 'your check') : headline(k))}${k.note ? ` · <b style="color:var(--warn)">${esc(k.note)}</b>` : ''}</small></button><span>${k.amount ? '−' + money(k.amount) : money(0)}</span></div>`).join('')}
+      ${(() => { // RRA-152: seat discounts don't block another seat's discount
+        const canCpn = dl.every((k) => k.stack), seatsFree = dl.filter((k) => tagOf(k) && k.seat).length < (c.guests || 1);
+        const canDisc = hasStanding && seatsFree && dl.every((k) => k.stack || (tagOf(k) && k.seat));
+        return c.items.length && !locked && (canCpn || canDisc) ? `<div class="pos-addcpn">${canCpn ? `<button class="btn plain small" id="cpn" type="button">🎟 ${dl.length ? 'Add another coupon' : 'Add a coupon'}</button>` : ''}${canDisc ? '<button class="btn plain small" id="disc" type="button">🎖 Discounts</button>' : ''}</div>` : '';
+      })()}
       <div class="pos-tot"><span>Tax ${((c.tax ?? P.tax) * 100).toFixed(1)}%</span><span>${money(t.tax)}</span></div>
       <div class="pos-tot big"><span>Total</span><span>${money(t.total)}</span></div>
       ${t.paid ? `<div class="pos-tot"><span>Paid</span><span>−${money(t.paid)}</span></div><div class="pos-tot big"><span>Due</span><span>${money(t.due)}</span></div>` : ''}
@@ -507,7 +511,7 @@ export async function posCheckView(id, opt = {}) {
     const ok = await sheet({ title: tagOf(k) ? 'Take off discount?' : 'Take off coupon?', right: 'Take off', body: `<p><b>${esc(tagOf(k) ? tagOf(k).label : k.code)}</b> · ${esc(headline(k))}</p><p class="muted small">It can be added again afterwards.</p>` });
     if (!ok) return;
     const cur = await data.get('check', c.id);
-    await data.put('check', { ...cur, coupons: (cur.coupons || []).filter((x) => x.code !== k.code) });
+    await data.put('check', { ...cur, coupons: (cur.coupons || []).filter((x) => !(x.code === k.code && (x.seat || 0) === (k.seat || 0))) });
     toast('Coupon taken off'); posCheckView(id);
   });
   $('#fold')?.addEventListener('click', () => { LS.set('posFold', !LS.get('posFold', true)); posCheckView(id); });
@@ -700,8 +704,12 @@ function parts(c, tax) {
   } else if (mode === 'seat') {
     const rate = c.tax ?? tax;
     const seats = [...new Set(c.items.filter((x) => !x.voided).map((x) => x.seat))].sort((a, b) => a - b);
-    const k = t.sub ? t.net / t.sub : 1; // coupons shared out by what each seat ordered
-    ps = seats.map((s) => { const sub = r2(k * c.items.filter((x) => x.seat === s).reduce((a, x) => a + lineTotal(x), 0)); return { key: 's' + s, label: `Seat ${s}`, amount: r2(sub + r2(sub * rate)) }; });
+    // Whole-check coupons are shared out by what each seat ordered; a seat's
+    // own discount (RRA-152, military etc.) comes off that seat only.
+    const dl = discounts(c).list;
+    const own = (s) => dl.filter((k) => k.seat === s).reduce((a, k) => a + k.amount, 0);
+    const whole = dl.filter((k) => !k.seat).reduce((a, k) => a + k.amount, 0);
+    ps = seats.map((s) => { const items = c.items.filter((x) => x.seat === s).reduce((a, x) => a + lineTotal(x), 0); const sub = r2(items - own(s) - (t.sub ? whole * items / t.sub : 0)); return { key: 's' + s, label: `Seat ${s}`, amount: r2(sub + r2(sub * rate)) }; });
     const diff = r2(t.total - ps.reduce((s, p) => s + p.amount, 0)); if (ps.length && diff) ps[ps.length - 1].amount = r2(ps[ps.length - 1].amount + diff);
   } else ps = [{ key: 'w', label: 'Whole check', amount: t.total }];
   return ps.map((p) => ({ ...p, paid: paidFor(p.key), due: r2(Math.max(0, p.amount - paidFor(p.key))) }));
@@ -888,8 +896,19 @@ export async function ticketsView() {
   setTitle(station === 'Bar' ? 'Bar tickets' : 'Kitchen tickets', can86() ? '<button class="btn plain small" id="e86" type="button">86 list</button>' : '');
   const all = (await data.list('ticket')).filter((t) => !t.bumped);
   const live = all.filter((t) => t.station === station).sort((a, b) => a.at - b.at);
+  // RRA-154: a flag on each tab. Red with a number = new tickets nobody has
+  // looked at on this device yet (opening the tab clears it); orange or red
+  // with 🚩 = a ticket there has waited 8 / 15 minutes or more.
+  const seenT = new Set(LS.get('posSeenTix', []));
+  live.forEach((t) => seenT.add(t.id));
+  LS.set('posSeenTix', [...seenT].filter((id) => all.some((t) => t.id === id)));
+  const flag = (s) => {
+    const its = all.filter((t) => t.station === s), fresh = its.filter((t) => !seenT.has(t.id)).length;
+    const old = its.reduce((m, t) => Math.max(m, mins(t.at)), 0), heat = old >= 15 ? 'late' : old >= 8 ? 'warm' : '';
+    return `${its.length ? ` <small class="tix-n">${its.length}</small>` : ''}${heat ? ` <i class="tix-flag ${heat}" title="Waiting ${old} min">🚩</i>` : ''}${fresh ? ` <i class="tix-new" aria-label="${fresh} new">${fresh}</i>` : ''}`;
+  };
   view.innerHTML = `
-    <div class="segmented"${sts.length < 2 ? ' hidden' : ''}>${sts.map((s) => `<button type="button" data-st="${s}" class="${s === station ? 'on' : ''}">${s} (${all.filter((t) => t.station === s).length})</button>`).join('')}</div>
+    <div class="segmented tix-tabs"${sts.length < 2 ? ' hidden' : ''}>${sts.map((s) => `<button type="button" data-st="${s}" class="${s === station ? 'on' : ''}">${s}${flag(s)}</button>`).join('')}</div>
     <div class="pos-tix">${live.map((t) => { const m = mins(t.at); return `
       <div class="card pos-ticket ${m >= 15 ? 'late' : m >= 8 ? 'warm' : ''}">
         <div class="pos-th"><b>${esc(t.checkName)}</b><span>${m} min</span></div>

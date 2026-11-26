@@ -4,8 +4,8 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.16.0';
-export const BUILD = '2026.11.26-30';
+export const VERSION = '0.17.0';
+export const BUILD = '2026.11.26-31';
 
 // Text that names the restaurant uses tokens, so it reads right after a
 // changeout (RRA-123): {name} = short name, {restaurant} = full name,
@@ -14,6 +14,15 @@ export const brandText = (s) => String(s ?? '')
   .replace(/\{name\}/g, BRAND.shortName).replace(/\{restaurant\}/g, BRAND.restaurant).replace(/\{app\}/g, BRAND.appName);
 
 const WHATS_NEW_RAW = [
+  {
+    version: '0.17.0', build: '2026.11.26-31', date: '2026-11-26',
+    lines: [
+      'Military, first responder and senior discounts now come off one seat only: tap Discounts, pick the discount, then the seat that showed ID. Each seat can have its own. The check shows e.g. "🎖 Military / veteran · Seat 2", and split by seat gives the discount to that seat.',
+      'Seat labels on the check are larger, bold and green.',
+      'Kitchen screen: the Kitchen and Bar tabs each show a red number for new tickets you haven\'t looked at yet, and a 🚩 when a ticket there has waited 8 minutes (orange) or 15 minutes (red).',
+      'Stock → Edit list on a tablet or computer: tap anywhere on an item\'s row to change its par, unit or vendor. Items with no par show "Set par".',
+    ],
+  },
   {
     version: '0.16.0', build: '2026.11.26-30', date: '2026-11-26',
     lines: [
