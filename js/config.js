@@ -4,8 +4,8 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.12.0';
-export const BUILD = '2026.11.26-25';
+export const VERSION = '0.13.0';
+export const BUILD = '2026.11.26-26';
 
 // Text that names the restaurant uses tokens, so it reads right after a
 // changeout (RRA-123): {name} = short name, {restaurant} = full name,
@@ -14,6 +14,13 @@ export const brandText = (s) => String(s ?? '')
   .replace(/\{name\}/g, BRAND.shortName).replace(/\{restaurant\}/g, BRAND.restaurant).replace(/\{app\}/g, BRAND.appName);
 
 const WHATS_NEW_RAW = [
+  {
+    version: '0.13.0', build: '2026.11.26-26', date: '2026-11-26',
+    lines: [
+      'Time-off requests: ask for a day or a few days off from the Employee lounge (My week) or the Schedule, with a note. Managers and the Admin get an alert badge and tap OK or No; they see any shifts already scheduled on those days first.',
+      'An approved request puts Time off on those days of the schedule. The person who asked gets a badge and a pop-up with the answer, and can take a request back until it is answered.',
+    ],
+  },
   {
     version: '0.12.0', build: '2026.11.26-25', date: '2026-11-26',
     lines: [

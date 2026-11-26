@@ -15,6 +15,7 @@ import { isHost, myStaff, jobAllows, canSee } from './perms.js';
 import { myPickups, canTake, posSettings } from './pos.js';
 import { unreadPosts } from './board.js';
 import { swapBadge } from './schedule.js';
+import { timeOffBadge } from './timeoff.js';
 import { unseenReports } from './reports.js';
 
 const role = () => session.profile?.role;
@@ -35,7 +36,7 @@ export const KINDS = {
   seated: { label: 'New guests in my section', sub: 'The server the host picked', who: () => canTake(), open: '#/pos' },
   late: { label: 'Check or ticket waiting too long', sub: 'Managers, plus the server or station', who: () => boss() || canTake() || role() === 'chef' || staffJob('kitchen') || staffJob('bar'), open: '#/pos' },
   message: { label: 'New message or problem-report reply', sub: 'Whoever it is for', who: () => true, open: '#/lounge' },
-  schedule: { label: 'Swap request or answer', sub: 'Managers, and the person who asked', who: () => canSee('schedule'), open: '#/schedule' },
+  schedule: { label: 'Swap or time-off request or answer', sub: 'Managers, and the person who asked', who: () => canSee('schedule'), open: '#/schedule' },
   stock: { label: '86 or low stock', sub: 'Chefs and managers (low stock), servers (86)', who: () => boss() || role() === 'chef' || canTake(), open: '#/stock' },
 };
 
@@ -92,7 +93,7 @@ export async function collect() {
     for (let i = 0; i < n; i++) add({ key: 'm:' + i, kind: 'message', where: 'lounge', quiet: true });
   }
   // 8: swap requests (managers) and answers (the person who asked).
-  if (kindOn('schedule')) { const n = await swapBadge(); for (let i = 0; i < n; i++) add({ key: 'w:' + i, kind: 'schedule', where: 'lounge', quiet: true }); }
+  if (kindOn('schedule')) { const n = (await swapBadge()) + (await timeOffBadge()); /* RRA-139 */ for (let i = 0; i < n; i++) add({ key: 'w:' + i, kind: 'schedule', where: 'lounge', quiet: true }); }
   // 9: low stock (chefs, managers, the Admin) and newly 86'd items (servers).
   if (kindOn('stock')) {
     // An item counts until someone here opens Stock or Needed; it comes back if it goes low again.

@@ -6,6 +6,7 @@ const chipHtml = (t, k) => `<span class="chip${k ? ' ' + k : ''}">${esc(t)}</spa
 import { canChange, myStaff, isHost, canTime, level, JOB_AREAS, defaultJobAreas } from './perms.js';
 import { ROLES, myEcdhPublic, myPublicKey } from './access.js';
 import { printButtons, wirePrint } from './pdf.js';
+import { timeOffSection, askTimeOff } from './timeoff.js'; // RRA-139
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 // Job titles (RRA-131): these are the starting list. The team's own list lives
@@ -245,6 +246,7 @@ export async function scheduleView(focus) {
   const swaps = (await data.list('swap')).filter((s) => s.status === 'asked' || (me && s.from === me.id && s.status !== 'withdrawn' && s.week >= data.weekStart()) || s.id === focus).sort((a, b) => a.at - b.at);
   const conflictsOf = {};
   for (const r of swaps) conflictsOf[r.id] = r.status === 'asked' ? swapConflicts(r, r.week === wk ? week : await data.get('week', r.week)) : [];
+  const toff = await timeOffSection(() => scheduleView()); // RRA-139
   const STATUS = { approved: chipHtml('Approved', 'ok'), declined: chipHtml('Declined', 'danger'), withdrawn: chipHtml('Removed', '') };
   setTitle('Schedule', change ? `<button class="btn plain small" id="pub" type="button">${week.published ? 'Unpublish' : 'Publish'}</button>` : '');
   const visible = change || week.published;
@@ -283,8 +285,10 @@ export async function scheduleView(focus) {
         ${(change || (me && r.from === me.id)) && r.status === 'asked' ? answerHtml(r) : ''}</span>
       <span class="swap-acts">${r.status !== 'asked' ? STATUS[r.status] || ''
         : `${change ? `<button class="btn tonal small" data-q type="button">Ask</button><button class="btn small" data-ok type="button">OK</button><button class="btn danger small" data-no type="button">No</button>` : '<span class="chip warn">Waiting</span>'}${me && r.from === me.id ? '<button class="btn plain small danger-text" data-rmswap type="button">Remove</button>' : ''}`}</span></div>`).join('')}</div>` : ''}
+    ${toff.html}
     <div class="group" style="margin-top:14px">
       ${me && week.published ? '<button class="row nav" id="ask" type="button"><span class="grow">Ask for a shift swap</span></button>' : ''}
+      ${me ? '<button class="row nav" id="ask-off" type="button"><span class="grow">Ask for time off</span></button>' : ''}
       ${change ? `<a class="row" href="#/staff"><span class="grow">Add or remove staff</span><span class="meta">${staff.length}</span></a>` : ''}
       ${change ? '<a class="row" href="#/shifts"><span class="grow">Shift times</span><span class="meta">Quick buttons</span></a>' : ''}
       ${staff.length ? '<button class="row nav" id="print-weeks" type="button"><span class="grow">Print schedule</span></button>' : ''}
@@ -364,6 +368,8 @@ export async function scheduleView(focus) {
       scheduleView();
     };
   });
+  toff.wire(view);
+  $('#ask-off')?.addEventListener('click', async () => { if (await askTimeOff()) scheduleView(); });
   $('#ask')?.addEventListener('click', async () => {
     const mine = DAYS.map((d, i) => ({ d, i, v: week.shifts?.[me.id]?.[i] })).filter((x) => x.v);
     const r = await sheet({

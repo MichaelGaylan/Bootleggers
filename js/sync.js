@@ -22,7 +22,8 @@ const COLLS = ['recipe', 'stock', 'vendor', 'staff', 'prepitem', 'prepday', 'pos
   'payrun', 'paystub', 'advance', 'tipshare', 'possales', 'tippool', 'payperiod', // payroll (RRA-095)
   'check', 'ticket', 'pickup', // point of sale (RRA-101, RRA-124)
   'coupon', // coupons (RRA-122)
-  'tablestate']; // tables that need clearing (RRA-132)
+  'tablestate', // tables that need clearing (RRA-132)
+  'timeoff']; // time-off requests (RRA-139)
 const te = new TextEncoder();
 const td = new TextDecoder();
 

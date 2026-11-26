@@ -26,6 +26,7 @@ import { payrollSettings, hasPayroll } from './paycalc.js';
 import { posView, posCheckView, posPayView, ticketsView, posSalesView, posSettingsView, canOrder, canKitchen, canSales, posMenu, seatingView, startPickups, showPickups, tablesView, canSeat, canClear } from './pos.js';
 import { giftCardsView } from './giftcards.js';
 import { startAlerts, setLoungeExtra, alertsView, badge } from './alerts.js'; // RRA-137
+import { timeOffPopups } from './timeoff.js'; // RRA-139
 import { couponsView, couponView } from './coupons.js';
 import { musicView } from './music.js';
 import { clearDataView } from './cleardata.js';
@@ -952,7 +953,7 @@ async function route() {
   }
   await (routes[name] || routes[homeRoute()] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
   // RRA-078: swap conflicts for managers, and a manager's question for the requester.
-  if (location.hash === at && !dlg.open && $('#splash').hidden && (await swapPopups().catch(() => false) || await reportPopups().catch(() => false) || await eventPopups().catch(() => false)) && location.hash === at) (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
+  if (location.hash === at && !dlg.open && $('#splash').hidden && (await swapPopups().catch(() => false) || await timeOffPopups().catch(() => false) || await reportPopups().catch(() => false) || await eventPopups().catch(() => false)) && location.hash === at) (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
   // A slow screen can finish after a quicker tap: show what the address says.
   if (location.hash !== at && !dlg.open) route();
 }
