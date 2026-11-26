@@ -20,6 +20,8 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-099 · Payroll: connect a real payroll service and POS through the restaurant's server (keys, pulls, money movement) — needs the server first · Infra · L
 
 ## 🟣 Done
+### 0.13.1 · build 2026.11.26-27
+- [x] RRA-140 · Order screen keeps its place: tapping a menu item no longer jumps back to the top. After the first pick the seat bar sits at the top and stays there until pulled down (Gaylan, 2026-11-26) · Fix · S · added 2026-11-26 · Gaylan said "Build list" 2026-11-26 · in 0.13.1
 ### 0.13.0 · build 2026.11.26-26
 - [x] RRA-139 · Time-off requests (Gaylan, 2026-11-26): staff ask for a day or days off from the Employee lounge or Schedule, with an optional note. Managers and the Admin get an alert badge (RRA-137, kind 8) and approve or decline. An approved request puts Time off on the schedule. The person who asked gets a badge and a pop-up with the answer, like swap answers. Warn the manager if the day is already scheduled or short-staffed · Feature · M · added 2026-11-26 · Gaylan said "Go ahead and build it" 2026-11-26 · in 0.13.0
 

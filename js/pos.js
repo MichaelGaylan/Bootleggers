@@ -10,7 +10,7 @@
 // payments are practice runs and nothing is charged.
 
 import * as data from './data.js';
-import { $, $$, esc, view, dlg, sheet, toast, setTitle, setChrome, session, LS } from './ui.js';
+import { $, $$, esc, view, dlg, sheet, toast, setTitle, setChrome, session, LS, isWide } from './ui.js';
 import { canSee, canChange, isHost, myStaff, jobAllows, jobAreas } from './perms.js';
 import { BRAND } from './config.js';
 import { dishPhoto } from './menu.js';
@@ -398,8 +398,29 @@ function tableSheet(t, tables) {
 }
 
 // ------------------------------------------------------------ one check
-export async function posCheckView(id) {
-  setChrome({ tab: 'more', back: true });
+// RRA-140: redrawing the same order keeps the screen where it was. After a
+// dish is picked, the seat bar ("Adding to") sits at the top of the screen on
+// a phone; the check above it only comes back when the server pulls down.
+const posAnchor = () => $('#pos-seatbar') || $('.pos-right');
+function posPlace(id) {
+  if (posCheckView.shown !== id || !$('.pos-wrap')) return null;
+  const a = posAnchor();
+  return { y: window.scrollY, a: a ? a.getBoundingClientRect().top : null, left: $('.pos-left')?.scrollTop || 0 };
+}
+function posRestore(place, pin) {
+  if (!place) return;
+  const left = $('.pos-left'); if (left) left.scrollTop = place.left;
+  const a = posAnchor();
+  if (!pin || isWide() || !a || place.a == null) { window.scrollTo(0, place.y); return; }
+  const top = $('#top')?.getBoundingClientRect().bottom ?? 0;
+  // A pick puts the seat bar at the top, unless the server is already further down the menu.
+  const want = place.a > top ? top : place.a;
+  window.scrollTo(0, Math.max(0, window.scrollY + a.getBoundingClientRect().top - want));
+}
+
+export async function posCheckView(id, opt = {}) {
+  const place = posPlace(id);
+  setChrome({ tab: 'more', back: true, keep: !!place });
   const c = await data.get('check', id);
   if (!c || c.closed) { location.hash = '#/pos'; return; }
   if (!canTake()) { setTitle(c.name); view.innerHTML = lock('Orders are for servers, bartenders and managers.'); return; }
@@ -443,7 +464,7 @@ export async function posCheckView(id) {
         <button class="btn" id="pay" type="button" ${c.items.some((x) => !x.voided) ? '' : 'disabled'}>Pay ${money(t.due)}</button>
       </div>
     </div>
-    ${c.guests > 1 ? `<div class="pr-lab" style="margin:12px 0 4px">Adding to</div><div class="segmented">${Array.from({ length: c.guests }, (_, i) => `<button type="button" data-seat="${i + 1}" class="${seat === i + 1 ? 'on' : ''}">Seat ${i + 1}</button>`).join('')}</div>` : ''}
+    ${c.guests > 1 ? `<div id="pos-seatbar" class="pos-seatbar"><div class="pr-lab" style="margin:12px 0 4px">Adding to</div><div class="segmented">${Array.from({ length: c.guests }, (_, i) => `<button type="button" data-seat="${i + 1}" class="${seat === i + 1 ? 'on' : ''}">Seat ${i + 1}</button>`).join('')}</div></div>` : ''}
     </div>
     <div class="pos-right">
     ${happyNow({ ...HH_DEFAULT, ...(P.happyHour || {}) }) ? `<div class="pos-hhbar">🍻 Happy hour prices are on · ${esc(hhLabel({ ...HH_DEFAULT, ...P.happyHour }))}</div>` : ''}
@@ -452,8 +473,9 @@ export async function posCheckView(id) {
       <span class="pos-pic">${x.photo ? `<img src="${esc(x.photo)}" alt="" loading="lazy">` : `<span>${esc(short(x.name))}</span>`}</span>
       <span class="pos-cap"><span class="pos-tn">${esc(short(x.name))}</span><small>${out ? '86’d' : x.hh ? `<s>${money(x.base)}</s> <b class="pos-hh">${money(x.price)}</b>` : money(x.price)}${isAlcohol(x.kind) ? ' <span class="pos-21">21+</span>' : ''}</small></span></button>`; }).join('') || '<p class="muted small">No dishes with a price in this section. Add prices in Recipes.</p>'}</div>
     </div></div>`;
-  $$('[data-sec]').forEach((b) => b.onclick = () => { LS.set('posSec', b.dataset.sec); posCheckView(id); });
-  $$('[data-seat]').forEach((b) => b.onclick = () => { posCheckView.seat = +b.dataset.seat; posCheckView(id); });
+  posCheckView.shown = c.id; posRestore(place, opt.pin);
+  $$('[data-sec]').forEach((b) => b.onclick = () => { LS.set('posSec', b.dataset.sec); posCheckView(id, { pin: true }); });
+  $$('[data-seat]').forEach((b) => b.onclick = () => { posCheckView.seat = +b.dataset.seat; posCheckView(id, { pin: true }); });
   $$('[data-item]').forEach((b) => b.onclick = () => addItem(c, items.find((x) => x.id === b.dataset.item), seat));
   $$('[data-line]').forEach((b) => b.onclick = () => lineSheet(c, c.items.find((x) => x.id === b.dataset.line)));
   $$('[data-plus]').forEach((b) => b.onclick = () => bump(c, b.dataset.plus, +1));
@@ -527,7 +549,7 @@ async function addItem(c, x, seat) {
   // The same dish again on the same seat, not sent yet: one more of it.
   const same = !line.mods.length && !line.note && cur.items.find((y) => !y.sent && !y.voided && y.menuId === x.id && y.seat === seat && !(y.mods || []).length && !y.note);
   await data.put('check', { ...cur, items: same ? cur.items.map((y) => (y === same ? { ...y, qty: (y.qty || 1) + 1 } : y)) : [...cur.items, line] });
-  posCheckView(c.id);
+  posCheckView(c.id, { pin: true });
 }
 
 // RRA-135: 21+ ID check, once per seat. Saved on the check with who checked.
