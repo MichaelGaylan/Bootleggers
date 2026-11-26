@@ -4,8 +4,8 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.10.0';
-export const BUILD = '2026.11.26-23';
+export const VERSION = '0.11.0';
+export const BUILD = '2026.11.26-24';
 
 // Text that names the restaurant uses tokens, so it reads right after a
 // changeout (RRA-123): {name} = short name, {restaurant} = full name,
@@ -14,6 +14,18 @@ export const brandText = (s) => String(s ?? '')
   .replace(/\{name\}/g, BRAND.shortName).replace(/\{restaurant\}/g, BRAND.restaurant).replace(/\{app\}/g, BRAND.appName);
 
 const WHATS_NEW_RAW = [
+  {
+    version: '0.11.0', build: '2026.11.26-24', date: '2026-11-26',
+    lines: [
+      'Bar menu: new Draft Beer, Bottles & Cans, Wine, Liquor and Cocktails sections. Add each drink in Recipes with its price and photo, and it shows in Orders. Six starter cocktails (Margarita, Long Island, Rum & Coke and more) already have their pours; add a price to put them on.',
+      'Every beer, wine, liquor and mixed drink goes to the bar ticket, never the kitchen. Settings → Menu sections now shows where each section is sent, and you can switch food sections between Bar and Kitchen.',
+      '21+ ID check: the first alcoholic drink on a seat asks the server to check ID and shows the birth date to look for. Seats that were checked show 🪪 on the check.',
+      'Liquor and cocktails ask Rocks, Neat, Up, Shot or Double. A double pours twice and costs twice the price.',
+      'Pours count down Stock: when a drink is sent, its pours (like 1.5 oz Well vodka) come off that bottle in Stock. A voided drink puts them back. Bottles show part counts, like 2.96.',
+      'Happy hour: set the days and times in Settings → Point of sale, with dollars off every alcoholic drink or a happy hour price on any dish in Recipes. Orders shows the happy hour price while it is on.',
+      'Your menu changes are kept: a price, section or dish you changed or took out stays that way when a menu update comes out. Every menu section shows in Recipes with "+ Add to", even before it has a dish.',
+    ],
+  },
   {
     version: '0.10.0', build: '2026.11.26-23', date: '2026-11-26',
     lines: [

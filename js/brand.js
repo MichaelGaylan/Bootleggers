@@ -55,7 +55,7 @@ self.BRAND = {
   // Menu (RRA-108): sections, dish names and prices, as sent by the Admin on
   // 2026-11-19. The Recipe archive and the Point of sale are filled from it.
   // Change menuVersion after editing so phones pick it up.
-  menuVersion: '2026-11-19',               // change after editing the menu so phones pick it up
+  menuVersion: '2026-11-26',               // change after editing the menu so phones pick it up
   menu: [
     { section: 'Appetizers', items: [
       ['Fried Mushrooms', '7.99'], ['Fried Pickles', '7.99'], ['Mozzarella Sticks', '7.99'], ['Tots', '6.49'], ['Fries', '5.50'],
@@ -95,7 +95,39 @@ self.BRAND = {
       ['Orange Juice', '2.75'], ['Pineapple Juice', '2.75'], ['Red Bull', '4.25'], ['Red Bull Sugar Free', '4.25'], ['Sprite', '2.75'],
       ['Sweet Tea', '2.75'], ['Unsweet Tea', '2.75'],
     ] },
+    // Bar sections (RRA-135). Add each beer, wine and liquor in Recipes with
+    // its price. The starter cocktails have their pours but no price yet, so
+    // they only show in Orders once a price is added. [name, price, extras].
+    { section: 'Draft Beer', items: [] },
+    { section: 'Bottles & Cans', items: [] },
+    { section: 'Wine', items: [] },
+    { section: 'Liquor', items: [] },
+    { section: 'Cocktails', items: [
+      ['Margarita', '', { drink: 'cocktail', ingredients: [['1.5 oz', 'Well tequila'], ['0.75 oz', 'Triple sec'], ['3 oz', 'Sour mix'], ['1 wedge', 'Lemons/limes']] }],
+      ['Long Island Iced Tea', '', { drink: 'cocktail', ingredients: [['0.5 oz', 'Well vodka'], ['0.5 oz', 'Well gin'], ['0.5 oz', 'Well rum'], ['0.5 oz', 'Well tequila'], ['0.5 oz', 'Triple sec'], ['2 oz', 'Sour mix'], ['1 splash', 'Coca-Cola']] }],
+      ['Rum & Coke', '', { drink: 'cocktail', ingredients: [['1.5 oz', 'Well rum'], ['4 oz', 'Coca-Cola']] }],
+      ['Vodka Cranberry', '', { drink: 'cocktail', ingredients: [['1.5 oz', 'Well vodka'], ['4 oz', 'Cranberry juice']] }],
+      ['Screwdriver', '', { drink: 'cocktail', ingredients: [['1.5 oz', 'Well vodka'], ['4 oz', 'Orange juice']] }],
+      ['Whiskey & Coke', '', { drink: 'cocktail', ingredients: [['1.5 oz', 'Well whiskey'], ['4 oz', 'Coca-Cola']] }],
+    ] },
   ],
+
+  // Drinks (RRA-135). Which kind of drink each menu section holds; a dish can
+  // also be set on its own in Recipes. Every alcoholic drink goes to the bar
+  // ticket and asks for a 21+ ID check on its seat.
+  drinks: {
+    kinds: { na: 'Non-alcoholic', beer: 'Beer', wine: 'Wine', liquor: 'Liquor / shot', cocktail: 'Cocktail / mixed drink' },
+    sections: { 'N/A Beverages': 'na', 'Draft Beer': 'beer', 'Bottles & Cans': 'beer', 'Wine': 'wine', 'Liquor': 'liquor', 'Cocktails': 'cocktail' },
+    legalAge: 21,
+    // Pour sizes in ounces, used when a drink has no pours written in Recipes
+    // but its name matches a Stock item (e.g. a bottle of Jack Daniel's).
+    pourOz: { liquor: 1.5, wine: 5, beer: 16 },
+    // Choices asked for when a liquor or cocktail is added. [name, pours ×, price ×]
+    choices: {
+      liquor: { title: 'How', options: [['Rocks'], ['Neat'], ['Up'], ['Shot'], ['Double', 2, 2]] },
+      cocktail: { title: 'How', options: [['Rocks'], ['Up'], ['Double', 2, 2]] },
+    },
+  },
 
   // Example dish name shown in the Recipes "Name" box.
   dishExample: 'The Bootlegger',
@@ -147,6 +179,10 @@ self.BRAND = {
     ] },
     { group: 'Bar', items: [
       ['Draft beer, bottles and cans, liquor, wine, mixers, garnishes', '', 'To fill in: not on the website'],
+      // Well liquor and mixers for the starter cocktails (RRA-135). The size in
+      // the unit lets each pour count the bottle down.
+      ['Well vodka', 'bottle (1 L)'], ['Well gin', 'bottle (1 L)'], ['Well rum', 'bottle (1 L)'], ['Well tequila', 'bottle (1 L)'],
+      ['Well whiskey', 'bottle (1 L)'], ['Triple sec', 'bottle (1 L)'], ['Sour mix', 'bottle (1 L)'],
     ] },
     // Non-food supplies (RRA-058): each has its own tab at the top of Stock.
     { group: 'Cleaning and chemicals', items: [
