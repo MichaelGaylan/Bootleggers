@@ -3,7 +3,7 @@
 import * as data from './data.js';
 import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session, isWide, LS } from './ui.js';
 const chipHtml = (t, k) => `<span class="chip${k ? ' ' + k : ''}">${esc(t)}</span>`;
-import { canChange, myStaff, isHost, canTime, level } from './perms.js';
+import { canChange, myStaff, isHost, canTime, level, JOB_AREAS, defaultJobAreas } from './perms.js';
 import { ROLES, myEcdhPublic, myPublicKey } from './access.js';
 import { printButtons, wirePrint } from './pdf.js';
 
@@ -405,6 +405,30 @@ export async function scheduleView(focus) {
 
 // RRA-091: Settings → Shift times. Anyone who can change the schedule edits
 // the quick buttons (optionally for one role) and what "cl" means.
+// Job views (RRA-132): the Admin picks the screens a job sees.
+async function jobScreensSheet(title, cur, custom) {
+  const on = new Set(cur);
+  const res = await sheet({
+    title: title, right: 'Save',
+    body: `<p class="muted small">What people with the Staff role and the job "${esc(title)}" see. The Employee lounge, their clock, My pay and Settings are always there.</p>
+      <div class="group">${Object.entries(JOB_AREAS).map(([k, l]) => `<div class="row"><span class="grow">${esc(l)}</span><button type="button" class="toggle ${on.has(k) ? 'on' : ''}" data-k="${k}" aria-label="${esc(l)}"></button></div>`).join('')}</div>
+      <button class="btn plain block" type="button" id="jv-def">Use the suggested screens</button>
+      <p class="muted small">Taking orders also needs Seating. A person's own Roles and permissions can still turn an area off for just them.</p>`,
+    onMount(api) {
+      $$('[data-k]', api.el).forEach((b) => b.onclick = () => { const k = b.dataset.k; if (on.has(k)) on.delete(k); else on.add(k); if (k === 'orders' && on.has('orders')) on.add('seating'); if (k === 'seating' && !on.has('seating')) on.delete('orders'); $$('[data-k]', api.el).forEach((x) => x.classList.toggle('on', on.has(x.dataset.k))); });
+      $('#jv-def', api.el).onclick = () => api.close('default');
+      api.onRight = () => api.close([...on]);
+    },
+  });
+  if (!res) return;
+  const set = await data.settings();
+  const jobViews = { ...(set.jobViews || {}) };
+  if (res === 'default') delete jobViews[title]; else jobViews[title] = Object.keys(JOB_AREAS).filter((k) => res.includes(k));
+  await data.saveSettings({ ...set, jobViews });
+  toast(res === 'default' ? `${title}: suggested screens` : `${title}: screens saved`);
+  jobTitlesView();
+}
+
 // Job titles (RRA-131): add, remove or put back the starting list.
 export async function jobTitlesView() {
   setChrome({ tab: 'more', back: true });
@@ -413,11 +437,17 @@ export async function jobTitlesView() {
   const list = await positionList();
   const staff = await staffList();
   const used = (p) => staff.filter((s) => s.position === p).length;
+  // Job views (RRA-132): which screens each job sees (Staff role only).
+  const jv = (await data.settings()).jobViews || {};
+  const screens = (p) => (Array.isArray(jv[p]) ? jv[p] : defaultJobAreas(p));
+  const short = (p) => screens(p).map((k) => JOB_AREAS[k].split(':')[0].replace(' and order guides', '').replace('Take orders and payments', 'Orders')).join(', ');
   view.innerHTML = `
-    <div class="group">${list.map((p, i) => `<div class="row">${change ? `<button class="rm" type="button" data-rmp="${i}" aria-label="Remove ${esc(p)}">−</button>` : ''}<span class="grow"><span class="title">${esc(p)}</span><span class="sub">${used(p) ? `${used(p)} on staff` : 'No one yet'}</span></span></div>`).join('')}</div>
+    <div class="group">${list.map((p, i) => `<div class="row">${change ? `<button class="rm" type="button" data-rmp="${i}" aria-label="Remove ${esc(p)}">−</button>` : ''}<span class="grow"${isHost() ? ` data-jv="${i}" style="cursor:pointer"` : ''}><span class="title">${esc(p)}</span><span class="sub">${used(p) ? `${used(p)} on staff` : 'No one yet'} · sees ${esc(short(p))}${Array.isArray(jv[p]) ? '' : ' (suggested)'}</span></span>${isHost() ? '<span class="meta">Screens ›</span>' : ''}</div>`).join('')}</div>
+    ${isHost() ? '<p class="muted small">Tap a job to choose the screens people with that job see. Everyone also gets the Employee lounge, their clock, My pay and Settings for their own phone. Chefs, managers and the Admin see what their role allows.</p>' : ''}
     ${change ? `<div class="row" style="padding:0;gap:8px"><input type="text" id="jt-new" placeholder="New job title, e.g. Barback" autocapitalize="words" style="flex:1"><button class="btn" id="jt-add" type="button">Add</button></div>
     <button class="btn plain block" id="jt-reset" type="button" style="margin-top:10px">Add back any missing starting titles</button>` : ''}
     <p class="muted small">Job titles show in the Position list when you add or edit staff. Removing a title doesn't change anyone who already has it. Tip pool points follow the title (Payroll settings → Tip rules), and the point of sale uses it to tell front of house from the kitchen.</p>`;
+  $$('[data-jv]').forEach((el) => el.onclick = () => jobScreensSheet(list[+el.dataset.jv], screens(list[+el.dataset.jv]), Array.isArray(jv[list[+el.dataset.jv]])));
   if (!change) return;
   const save = async (positions) => { const set = await data.settings(); await data.saveSettings({ ...set, positions }); jobTitlesView(); };
   $('#jt-add').onclick = async () => { const t = $('#jt-new').value.trim().replace(/\s+/g, ' '); if (!t) return; if (list.some((p) => p.toLowerCase() === t.toLowerCase())) { toast('Already on the list'); return; } await save([...list, t]); toast('Added ' + t); };

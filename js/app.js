@@ -8,7 +8,7 @@ import * as access from './access.js';
 import * as store from './store.js';
 import * as data from './data.js';
 import * as sync from './sync.js';
-import { canSee, canChange, isHost, myStaff } from './perms.js';
+import { canSee, canChange, isHost, myStaff, setJobViews, jobAreas, jobAllows } from './perms.js';
 import { findDuplicates, countDuplicates } from './dedupe.js';
 import { reportsView, reportPopups, sendReportInApp, openReports } from './reports.js';
 import { recipesView, recipeView, printView } from './recipes.js';
@@ -23,7 +23,7 @@ import { settingsView, listView, rolesView, personView, dedupeView } from './set
 import { applyMenu, applyVendors, applySupplies } from './menu.js';
 import { payrollView, payRunView, payRunDoneView, payHistoryView, myPayView, tipRulesView, paySettingsView } from './payroll.js';
 import { payrollSettings, hasPayroll } from './paycalc.js';
-import { posView, posCheckView, posPayView, ticketsView, posSalesView, posSettingsView, canOrder, canKitchen, canSales, posMenu, seatingView, startPickups, showPickups } from './pos.js';
+import { posView, posCheckView, posPayView, ticketsView, posSalesView, posSettingsView, canOrder, canKitchen, canSales, posMenu, seatingView, startPickups, showPickups, tablesView, canSeat, canClear } from './pos.js';
 import { giftCardsView } from './giftcards.js';
 import { couponsView, couponView } from './coupons.js';
 import { musicView } from './music.js';
@@ -196,7 +196,8 @@ async function payFlags() { const ok = hasPayroll(await payrollSettings()); rend
 function renderSide() {
   const link = (r, label, extra = '') => `<a href="#/${r}" data-r="${r}"><span class="grow">${label}</span>${extra}</a>`;
   const items = [
-    link('recipes', 'Recipes'),
+    canSee('recipes') ? link('recipes', 'Recipes') : '',
+    jobAreas() && canClear() ? link('tables', 'Tables') : '',
     canSee('prep') ? link('prep', 'Prep') : '',
     canSee('stock') ? link('stock', 'Stock count') : '',
     canSee('stock') ? link('needed', 'Needed') : '',
@@ -211,7 +212,7 @@ function renderSide() {
     canKitchen() ? link('tickets', '<span class="sub-l">Kitchen and bar screen</span>') : '',
     canSee('coupons') ? link('coupons', 'Coupons') : '',
     BRAND.giftCards?.url ? link('giftcards', 'Gift cards') : '',
-    link('music', 'Music'),
+    jobAllows('music') ? link('music', 'Music') : '',
     canSee('events') ? link('events', 'Events (BEOs)', '<i id="ev-badge" class="sbadge" hidden></i>') : '',
     canSee('costs') ? link('costs', 'Costs and waste') : '',
     '<hr>',
@@ -245,7 +246,8 @@ function moreView() {
       ${canSales() ? '<a class="row" href="#/possales"><span class="grow">Today\'s sales</span></a>' : ''}
       ${canSee('coupons') ? '<a class="row" href="#/coupons"><span class="grow">Coupons</span></a>' : ''}
       ${BRAND.giftCards?.url ? '<a class="row" href="#/giftcards"><span class="grow">Gift cards</span></a>' : ''}
-      <a class="row" href="#/music"><span class="grow">Music</span></a>
+      ${canClear() ? '<a class="row" href="#/tables"><span class="grow">Tables to clear</span></a>' : ''}
+      ${jobAllows('music') ? '<a class="row" href="#/music"><span class="grow">Music</span></a>' : ''}
       ${moreView.pay ? '<a class="row" href="#/payroll"><span class="grow">Payroll</span></a>' : ''}
       ${myStaff() ? '<a class="row" href="#/mypay"><span class="grow">My pay &amp; tips</span></a>' : ''}
       ${canSee('schedule') ? '<a class="row" href="#/schedule"><span class="grow">Schedule</span></a>' : ''}
@@ -760,6 +762,7 @@ const routes = {
   schedule: (arg) => scheduleView(arg),
   'schedule-print': (arg) => schedulePrintView(arg),
   staff: () => staffView(),
+  tables: () => tablesView(), // RRA-132
   jobtitles: () => jobTitlesView(), // RRA-131
   shifts: () => shiftTimesView(),
   events: () => eventsView(),
@@ -839,10 +842,29 @@ async function offerDedupe() {
   if (go) location.hash = '#/dedupe';
 }
 
+// Job views (RRA-132): the bottom tabs, the first screen and which screens open
+// follow the person's job title. Chefs, managers and the Admin as before.
+const ROUTE_JOB = { recipes: 'recipes', recipe: 'recipes', print: 'recipes', prep: 'prep', stock: 'stock', 'stock-items': 'stock', needed: 'stock', orders: 'stock', vendors: 'stock', board: 'board', schedule: 'schedule', 'schedule-print': 'schedule', events: 'events', event: 'events', music: 'music' };
+function homeRoute() {
+  if (!jobAreas()) return 'recipes';
+  return canSeat() ? 'pos' : canClear() ? 'tables' : canKitchen() ? 'tickets' : canSee('prep') ? 'prep' : canSee('recipes') ? 'recipes' : 'lounge';
+}
+function applyTabs() {
+  const limited = !!jobAreas();
+  const show = (t, on) => { const a = $(`#tabs a[data-tab="${t}"]`); if (a) a.hidden = !on; };
+  show('pos', limited && canSeat());
+  show('tables', limited && canClear() && !canSeat());
+  show('tickets', limited && canKitchen());
+  show('recipes', !limited || canSee('recipes'));
+  show('prep', !limited || canSee('prep'));
+  show('stock', !limited || canSee('stock'));
+}
 async function route() {
   if (!profile) return;
-  const [, name = 'recipes', arg] = location.hash.match(/^#\/([^/]+)\/?(.*)$/) || [];
+  let [, name = '', arg] = location.hash.match(/^#\/([^/]+)\/?(.*)$/) || [];
   session.staff = await staffList(); // permissions (RRA-002) read this
+  setJobViews((await data.settings()).jobViews);
+  if (!name) name = homeRoute();
   // RRA-090: this phone's person was removed from the team. Lock it.
   if (profile.role !== 'owner' && profile.iid && (await data.settings()).removed?.[profile.iid]) {
     await access.wipeAccess(); profile = null; session.profile = null; location.hash = ''; location.reload(); return;
@@ -851,15 +873,21 @@ async function route() {
   if (isHost()) await adminPayKeyCheck();
   await payFlags();
   renderSide();
+  applyTabs();
   const at = location.hash;
-  await (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
+  if (jobAreas() && ROUTE_JOB[name] && !jobAllows(ROUTE_JOB[name])) {
+    setChrome({ tab: '', back: true }); setTitle('Not part of your job');
+    view.innerHTML = `<div class="empty">🔒 This part of the app isn't used by your job (${esc(myStaff()?.position || 'Staff')}).<br><span class="small">The Admin sets what each job sees in Settings → People → Job titles.</span></div><a class="btn block" href="#/${homeRoute()}">Go to my start screen</a>`;
+    return;
+  }
+  await (routes[name] || routes[homeRoute()] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
   // RRA-078: swap conflicts for managers, and a manager's question for the requester.
   if (location.hash === at && !dlg.open && $('#splash').hidden && (await swapPopups().catch(() => false) || await reportPopups().catch(() => false) || await eventPopups().catch(() => false)) && location.hash === at) (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
   // A slow screen can finish after a quicker tap: show what the address says.
   if (location.hash !== at && !dlg.open) route();
 }
 
-$('#btn-back').onclick = () => (history.length > 1 ? history.back() : (location.hash = '#/recipes'));
+$('#btn-back').onclick = () => (history.length > 1 ? history.back() : (location.hash = '#/' + homeRoute()));
 $('#btn-bell').onclick = () => { location.hash = '#/board'; };
 // RRA-114: Orders (POS) in the menu opens the Orders popup (Seating and the current orders).
 document.addEventListener('click', (e) => { const a = e.target.closest('a[data-pospop]'); if (!a || !profile) return; e.preventDefault(); posMenu(); });

@@ -20,6 +20,9 @@ Previews of RRA-001 to RRA-011 and Settings: /mnt/project-files/previews/rra-001
 - [ ] RRA-099 · Payroll: connect a real payroll service and POS through the restaurant's server (keys, pulls, money movement) — needs the server first · Infra · L
 
 ## 🟣 Done
+### 0.9.0 · build 2026.11.26-22
+- [x] RRA-132 · Job views: the app shows each employee only what their job uses (Gaylan, 2026-11-26). Staff-role people get screens by job title (suggested: Busser = Tables; Server = Seating, orders, tables; Bartender = Seating, orders, tables, bar tickets; Host = Seating, tables; Barback = bar tickets, tables, stock; cooks = kitchen tickets, recipes, prep, stock; dishwasher = kitchen tickets, prep; plus bulletin board and schedule), always with the Employee lounge, clock, My pay and Settings. Admin edits each job's screens in Settings → People → Job titles (settings.jobViews). Bottom tabs, sidebar, More and the first screen follow the job; other screens show a lock page (perms.level returns none for areas outside the job). Tables to clear: a paid check marks its table Needs clearing (tablestate, synced); busser/server/host/chef/manager clears it from the layout or the new Tables screen. Hosts seat guests and pick the server without taking orders; people who don't take orders don't see amounts. Chefs, managers and the Admin unchanged. Note: hidden screens' kitchen data (recipes, stock) is still stored on the phone; pay data stays sealed · Feature · L · added 2026-11-26
+
 ### 0.8.6 · build 2026.11.26-21
 - [x] RRA-131 · Job titles: add your own (Position → "+ Add a job title…" when adding or editing staff, or Settings → People → Job titles / Staff → Job titles: add, remove, put back the starting titles). Team list in settings.positions; removing a title never changes people who have it. Busser added to the starting list (Bartender was already there). Tip rules "Host" also matches "Host stand" (Gaylan, 2026-11-26) · UI · S · added 2026-11-26
 
