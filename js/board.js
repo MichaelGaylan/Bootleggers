@@ -54,8 +54,8 @@ export async function boardView() {
       <p class="muted small" id="p-hint" style="margin:6px 0 0"></p>
       <button class="btn block" id="p-send" type="button" style="margin-top:8px">Send</button></div>` : ''}
     ${posts.map((p) => `
-      <div class="msg${isPrivate(p) ? ' private' : ''}" data-id="${p.id}"><div class="who">${esc(p.by)} · ${when(p.at)} · ${isPrivate(p) ? `${lock} to ${esc(audienceLabel(p, staff))}` : 'Everyone'}</div>${esc(p.text).replace(/\n/g, '<br>')}
-        ${(p.replies || []).map((r) => `<div class="reply"><span class="who">${esc(r.by)} · ${when(r.at)}</span><br>${esc(r.text)}</div>`).join('')}
+      <div class="msg${isPrivate(p) ? ' private' : ''}" data-id="${p.id}"><div class="who">${esc(p.by)} · ${when(p.at)} · ${isPrivate(p) ? `${lock} to ${esc(audienceLabel(p, staff))}` : 'Everyone'}</div><span class="notr">${esc(p.text).replace(/\n/g, '<br>')}</span>
+        ${(p.replies || []).map((r) => `<div class="reply"><span class="who">${esc(r.by)} · ${when(r.at)}</span><br><span class="notr">${esc(r.text)}</span></div>`).join('')}
         <div class="btn-row" style="margin-top:6px">${canChange('board') ? '<button class="btn plain small" data-reply type="button">Reply</button>' : ''}
         ${sentByMe(p) || isHost() ? '<button class="btn danger small" data-del type="button">Delete</button>' : ''}</div>
       </div>`).join('') || `<div class="empty">${f === 'private' ? 'No private messages.' : f === 'mine' ? "You haven't sent anything yet." : 'No posts yet.'}</div>`}

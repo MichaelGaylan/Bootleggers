@@ -282,14 +282,187 @@ self.BRAND = {
     burger: { title: 'Temperature', options: ['Medium rare', 'Medium', 'Medium well', 'Well done'] },
     salad: { title: 'Dressing', options: ['Ranch', 'Blue Cheese', 'Honey Mustard', 'Italian', 'None'] },
   },
+  // Job titles (RRA-160): the 25 most common restaurant jobs, offered in
+  // Settings → People → Job titles and when adding staff. The team's own list
+  // (settings.positions) keeps any custom titles; these are merged in once,
+  // with no duplicates. Names on the right of jobTitleAliases count as the same
+  // job as the name on the left, so Host and Host stand never both show.
+  jobTitles: [
+    'General manager', 'Assistant manager', 'Manager', 'Kitchen manager', 'Bar manager',
+    'Shift lead', 'Executive chef', 'Chef', 'Sous chef', 'Line cook',
+    'Grill cook', 'Fry cook', 'Prep cook', 'Dishwasher', 'Porter',
+    'Server', 'Bartender', 'Barback', 'Busser', 'Host stand',
+    'Food runner', 'Expo', 'Cashier', 'Delivery driver', 'Event coordinator',
+  ],
+  jobTitleAliases: {
+    'Host stand': ['Host', 'Hostess', 'Host/Hostess'], 'Busser': ['Bus person', 'Busboy', 'Bus boy', 'Bus girl'], 'Server': ['Waiter', 'Waitress', 'Wait staff'],
+    'Chef': ['Head chef'], 'Food runner': ['Runner'], 'Expo': ['Expediter', 'Expeditor'], 'Dishwasher': ['Dish washer', 'Dishwasher/Porter'], 'Barback': ['Bar back'],
+    'General manager': ['GM'], 'Assistant manager': ['AM', 'Asst manager'], 'Line cook': ['Cook'], 'Delivery driver': ['Driver'], 'Event coordinator': ['Events coordinator'],
+  },
+  // My job duties (RRA-159): starter duties for each job, shown in the
+  // Employee lounge. o = opening, s = during the shift, c = closing, w = side
+  // work. The Admin and managers can rewrite any job's list in the app.
+  jobDuties: {
+    'General manager': {
+      o: ['Walk the whole building: dining room, bar, kitchen, restrooms and outside.', "Check the schedule, call-outs and reservations, and set the day's staffing.", "Read yesterday's sales, labor and waste, and the manager log."],
+      s: ['Lead the pre-shift meeting: specials, 86 items, goals and events.', 'Watch labor against sales and cut or call in staff as needed.', "Handle guest complaints, comps and anything a manager can't solve."],
+      c: ["Approve the time sheets, tip pool and the day's sales report.", 'Make sure the safe, cash drawers and doors are locked and the alarm is set.'],
+      w: ['Hire, train and coach the managers and team.', 'Own food cost, labor cost, inventory and vendor orders.', 'Keep health, alcohol and safety rules met and paperwork current.'],
+    },
+    'Assistant manager': {
+      o: ['Count the opening cash drawers and check the safe.', 'Check that every station is set and staffed before doors open.'],
+      s: ['Run the floor: help seat, run food and bus when it gets busy.', 'Approve voids, comps and discounts on the POS.', 'Cover breaks and step in for the manager when needed.'],
+      c: ['Check side work before anyone clocks out.', 'Close out the drawers and write the manager log.'],
+      w: ['Help with the schedule, ordering and new-hire training.'],
+    },
+    'Manager': {
+      o: ['Unlock, turn off the alarm and check the building is safe and clean.', 'Count the cash drawers and check the schedule and reservations.', 'Hold the pre-shift meeting: specials, 86 items and section assignments.'],
+      s: ['Touch every table, watch ticket times and help where the floor needs it.', 'Approve voids, comps and discounts, and handle guest problems.', 'Watch labor and send people home when it slows down.'],
+      c: ['Check every closing checklist and side work before people clock out.', 'Close the drawers, run the sales report and lock up.'],
+      w: ['Keep the schedule, time sheets and stock counts up to date.'],
+    },
+    'Kitchen manager': {
+      o: ['Check the walk-in, freezer and line temperatures and write them down.', 'Check deliveries against the invoice: count, quality and temperature.', 'Set the prep list for each station.'],
+      s: ['Watch ticket times and plate quality on the line.', 'Keep the 86 list current on the kitchen screen.'],
+      c: ['Check the line is broken down, labeled and stored.', 'Count stock and build the next order.'],
+      w: ['Track food cost and waste, and train the cooks.', 'Keep the kitchen ready for a health inspection every day.'],
+    },
+    'Bar manager': {
+      o: ['Count the bar drawer and check the liquor, beer and wine stock.', 'Check the draft lines, ice and garnishes are ready.'],
+      s: ['Run the bar: pour, check IDs and keep drinks moving.', 'Watch for guests who have had too much and stop service when needed.'],
+      c: ['Count the bar stock and log empty bottles.', 'Close the bar drawer and lock the liquor up.'],
+      w: ['Build the drink menu, set pours and track pour cost.', 'Place liquor, beer and wine orders and train bartenders.'],
+    },
+    'Shift lead': {
+      o: ['Open with the manager and check every station is staffed.'],
+      s: ['Lead the team on the floor and answer questions first.', 'Fill gaps: run food, bus, seat or cover a section.', 'Tell the manager about problems right away.'],
+      c: ['Check side work and closing lists before people leave.'],
+      w: ['Help train new team members on the floor.'],
+    },
+    'Executive chef': {
+      o: ['Check deliveries, temperatures and the walk-in.', 'Taste the sauces and specials before service.'],
+      s: ['Expedite or work the line on busy nights.', 'Check every plate looks like the recipe.'],
+      c: ['Check the kitchen is clean and food is labeled, dated and stored.'],
+      w: ['Write the menu, recipes and specials, and set plate costs.', 'Hire and train the kitchen team and run the kitchen schedule.', 'Keep food cost, waste and the health score where they should be.'],
+    },
+    'Chef': {
+      o: ["Check the walk-in, temperatures and today's prep list.", 'Taste the sauces and check the line is stocked.'],
+      s: ['Run the line: call tickets, watch times and check every plate.', 'Keep the 86 list current.'],
+      c: ['Check the line is cleaned, food is wrapped, labeled and dated.', "Approve the cooks' hours and write the next prep list."],
+      w: ['Keep recipes current and train cooks on them.', 'Count stock and help with orders.'],
+    },
+    'Sous chef': {
+      o: ['Check the prep list and set up the line with the cooks.', 'Check temperatures and write them down.'],
+      s: ['Work the busiest station or expedite.', 'Run the kitchen when the chef is off.'],
+      c: ['Check the line breakdown and cleaning.'],
+      w: ['Train cooks on recipes and plating.', 'Help with stock counts and ordering.'],
+    },
+    'Line cook': {
+      o: ['Set up your station: fill the cold well, check sauces and tools.', "Check your station's temperatures and what you need from prep."],
+      s: ['Cook every ticket to the recipe and the right temperature.', 'Call out when something is running low or out.', 'Keep your station clean as you go.'],
+      c: ['Wrap, label and date everything and put it away.', 'Clean the grill, fryer or flat top and your station.'],
+      w: ['Restock your station for the next shift.'],
+    },
+    'Grill cook': {
+      o: ['Light and scrape the grill and set up burgers, chicken and buns.'],
+      s: ['Cook burgers and meats to the temperature on the ticket.', 'Use a thermometer on chicken and anything ordered well done.'],
+      c: ['Scrape, oil and clean the grill and empty the grease tray.'],
+      w: ['Keep raw meat below ready-to-eat food in the cooler.'],
+    },
+    'Fry cook': {
+      o: ['Turn on the fryers, check the oil level and quality.', 'Set up wings, fries, tots, tenders and sauces.'],
+      s: ['Fry to the right time and shake and drain every basket.', 'Toss wings in the right sauce and call out when sauces run low.'],
+      c: ['Filter or change the oil and clean the fryers.'],
+      w: ['Keep the fry station floor dry and safe.'],
+    },
+    'Prep cook': {
+      o: ["Read today's prep list and start with what the line needs first."],
+      s: ['Cut, portion and make sauces to the recipe.', 'Label and date everything you make.', 'Use the oldest food first (first in, first out).'],
+      c: ['Mark finished items done on the prep list.', 'Clean your boards, knives and prep area.'],
+      w: ['Help put away deliveries and keep the walk-in organized.'],
+    },
+    'Dishwasher': {
+      o: ['Fill the dish machine and check the soap, rinse and sanitizer.'],
+      s: ['Keep plates, glasses and pans coming back to the line and bar.', 'Check the water temperature or sanitizer level during the shift.', 'Take out trash and keep the dish area dry.'],
+      c: ['Drain and clean the dish machine and sinks.', 'Sweep and mop the kitchen floor.'],
+      w: ['Put clean dishes where they belong.'],
+    },
+    'Porter': {
+      o: ['Check the restrooms, entry and parking lot are clean.'],
+      s: ['Empty trash and recycling and keep the dumpster area clean.', 'Check and restock the restrooms every hour.', 'Help carry deliveries and move heavy items.'],
+      c: ['Deep clean floors, mats and drains.'],
+      w: ['Report anything broken or unsafe to a manager.'],
+    },
+    'Server': {
+      o: ['Set your section: tables, silverware, menus and condiments.', 'Learn the specials and the 86 list at the pre-shift meeting.'],
+      s: ['Greet each table within a minute, take orders by seat and send them right away.', 'Check ID for every alcoholic drink when the app asks.', 'Pick up food when the app says Pick up, and check back after two bites.'],
+      c: ['Close your checks and hand in your cash.', 'Clean and reset your section.'],
+      w: ['Roll silverware, fill condiments and restock your station.'],
+    },
+    'Bartender': {
+      o: ['Count your drawer and set up the bar: ice, garnishes, juices and glasses.', 'Check the draft lines and the bar stock.'],
+      s: ['Check ID for every guest who looks under 40.', 'Pour to the recipe and measure every drink.', 'Make the bar tickets from servers in order.', 'Watch for guests who have had too much and tell a manager.'],
+      c: ['Close your tabs and count your drawer.', 'Clean the bar, wash the mats and lock up the liquor.'],
+      w: ['Cut garnishes and restock beer, wine and glasses.'],
+    },
+    'Barback': {
+      o: ['Fill the ice bins and stock beer, wine and liquor.'],
+      s: ['Keep the bartenders stocked with ice, glasses and garnishes.', 'Change kegs and bring up cases when the app counts them down.', 'Clear empty glasses and wipe the bar top.'],
+      c: ['Wash glassware, empty the trash and wash the floor mats.'],
+      w: ['Help count the bar stock.'],
+    },
+    'Busser': {
+      o: ['Fill water pitchers, set tables and check the dining room is clean.'],
+      s: ['Clear plates as guests finish and refill water.', 'Clear and reset tables right after guests leave, then tap Cleared.', 'Help run food when servers are busy.'],
+      c: ['Wipe chairs and booths, and sweep the dining room.'],
+      w: ['Restock napkins, silverware and to-go boxes.'],
+    },
+    'Host stand': {
+      o: ['Check reservations, the waitlist and the seating layout.', 'Clean menus and the host stand.'],
+      s: ['Greet every guest at the door with a smile.', "Seat guests evenly across the servers' sections.", 'Quote honest wait times and keep the waitlist current.'],
+      c: ['Wipe the menus, stock the host stand and tidy the entry.'],
+      w: ['Answer the phone and take to-go orders.'],
+    },
+    'Food runner': {
+      o: ['Set up trays, stands and the pass with plates and tickets.'],
+      s: ["Run food to the right seat as soon as it's up.", 'Check every plate against the ticket before it leaves.', 'Bring back dirty plates on the way.'],
+      c: ['Clean trays and the pass.'],
+      w: ['Restock sauce cups, napkins and silverware at the pass.'],
+    },
+    'Expo': {
+      o: ['Set up the pass with ramekins, garnishes and tickets.'],
+      s: ['Call tickets to the line and watch the timers.', 'Check every plate is complete and right before it leaves.', 'Bump tickets so the server gets Pick up.'],
+      c: ['Clean the pass and heat lamps.'],
+      w: ['Tell the chef about plates that came back.'],
+    },
+    'Cashier': {
+      o: ['Count your drawer with a manager.'],
+      s: ['Ring up to-go and counter orders and take payments.', 'Check every to-go order before it goes out the door.', 'Answer the phone and take orders.'],
+      c: ['Count your drawer and hand in the cash with a manager.'],
+      w: ['Restock to-go bags, boxes, cups and napkins.'],
+    },
+    'Delivery driver': {
+      o: ['Check your car, phone and delivery bags.'],
+      s: ['Check every order against the ticket before you leave.', 'Keep hot food hot and cold food cold on the way.', 'Drive safely and be polite at the door.'],
+      c: ['Hand in cash and tips with a manager.'],
+      w: ['Clean the delivery bags.'],
+    },
+    'Event coordinator': {
+      o: ['Check upcoming events in Events (BEOs) and confirm details with the guest.'],
+      s: ['Share the event sheet with the kitchen, bar and managers.', 'Set up the room and check the timeline during the event.'],
+      c: ['Make sure the room is reset and the event check is closed.'],
+      w: ['Book new parties and take deposits.'],
+    },
+  },
   // Dish changes (RRA-149): condiments and toppings a server can mark NO, ADD
   // or EXTRA on a dish, with each one's price (0 = free): ADD and EXTRA add it
   // to the dish, NO takes it off. Starter prices only: the Admin changes the
   // list and prices in Settings → Point of sale → Toppings.
   posToppings: [
-    ['Cheese', 1.00], ['Bacon', 2.00], ['Mushrooms', 1.00], ['Jalapeños', 0.75], ['Onions', 0.50],
-    ['Grilled onions', 0.75], ['Tomato', 0.50], ['Lettuce', 0], ['Pickles', 0], ['Sour cream', 0.75],
-    ['Salsa', 0.50], ['Guacamole', 1.50], ['Mayo', 0], ['Mustard', 0], ['Ketchup', 0],
+    // [English name, price, Spanish name (RRA-157, optional)]
+    ['Cheese', 1.00, 'Queso'], ['Bacon', 2.00, 'Tocino'], ['Mushrooms', 1.00, 'Champiñones'], ['Jalapeños', 0.75, 'Jalapeños'], ['Onions', 0.50, 'Cebolla'],
+    ['Grilled onions', 0.75, 'Cebolla asada'], ['Tomato', 0.50, 'Tomate'], ['Lettuce', 0, 'Lechuga'], ['Pickles', 0, 'Pepinillos'], ['Sour cream', 0.75, 'Crema agria'],
+    ['Salsa', 0.50, 'Salsa'], ['Guacamole', 1.50, 'Guacamole'], ['Mayo', 0, 'Mayonesa'], ['Mustard', 0, 'Mostaza'], ['Ketchup', 0, 'Kétchup'],
   ],
   // What comes on each dish: only these can be marked NO (or EXTRA); anything
   // else can only be ADDed (Gaylan, 2026-11-26). Dish name → toppings; a dish

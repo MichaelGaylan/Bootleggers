@@ -4,8 +4,8 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.17.1';
-export const BUILD = '2026.11.27-32';
+export const VERSION = '0.18.0';
+export const BUILD = '2026.11.27-33';
 
 // Text that names the restaurant uses tokens, so it reads right after a
 // changeout (RRA-123): {name} = short name, {restaurant} = full name,
@@ -14,6 +14,15 @@ export const brandText = (s) => String(s ?? '')
   .replace(/\{name\}/g, BRAND.shortName).replace(/\{restaurant\}/g, BRAND.restaurant).replace(/\{app\}/g, BRAND.appName);
 
 const WHATS_NEW_RAW = [
+  {
+    version: '0.18.0', build: '2026.11.27-33', date: '2026-11-27',
+    lines: [
+      'Spanish: pick English or Español for yourself in Settings → Language, and the whole app (screens, kitchen tickets and printouts) switches. The Admin sets the restaurant\'s language for everyone else and for new staff. Dishes and toppings can have a Spanish name (Recipes → Edit, and Settings → Point of sale → Toppings); recipes and notes stay as they were typed.',
+      'View as (Admin only): More → View as a job shows the app the way a Server, Cook, Manager or any job title sees it. A bar at the top says who you are viewing as, with Back to Admin. Your own account and permissions don\'t change.',
+      'My job duties in the Employee lounge: each person sees the opening, during the shift, closing and side work duties for their job. The Admin and managers can edit any job\'s list.',
+      'Job titles: the list now starts with the 25 most common restaurant jobs, merged with your own titles and without duplicates (Host and Host stand count as one).',
+    ],
+  },
   {
     version: '0.17.1', build: '2026.11.27-32', date: '2026-11-27',
     lines: [

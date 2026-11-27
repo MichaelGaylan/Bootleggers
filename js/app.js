@@ -1,5 +1,7 @@
 // Restaurant kitchen app: screens and navigation. Names come from js/brand.js.
 
+// RRA-157: languages first, so the very first screen is already in Spanish.
+import * as i18n from './i18n.js';
 import {
   BRAND, APP_NAME, VERSION, BUILD, WHATS_NEW, ROOT_KEYS, INACTIVITY_DAYS, INVITE_HOURS,
   WEB3FORMS_KEY, REPORT_PREFIX, NOTIFICATIONS_URL, brandText,
@@ -8,14 +10,15 @@ import * as access from './access.js';
 import * as store from './store.js';
 import * as data from './data.js';
 import * as sync from './sync.js';
-import { canSee, canChange, isHost, myStaff, setJobViews, jobAreas, jobAllows } from './perms.js';
+import { canSee, canChange, isHost, myStaff, setJobViews, jobAreas, jobAllows, setReal, realAdmin, viewAs, setViewAs, shownProfile } from './perms.js';
+import { viewAsSheet, viewAsBar } from './viewas.js'; // RRA-158
 import { findDuplicates, countDuplicates } from './dedupe.js';
 import { reportsView, reportPopups, sendReportInApp, openReports } from './reports.js';
 import { recipesView, recipeView, printView } from './recipes.js';
 import { stockView, neededView, ordersView, vendorsView } from './stock.js';
 import { boardView, unreadPosts } from './board.js';
 import { prepView } from './prep.js';
-import { scheduleView, staffView, ensureStaffFor, staffList, schedulePrintView, swapPopups, shiftTimesView, jobTitlesView, positionList } from './schedule.js';
+import { scheduleView, staffView, ensureStaffFor, staffList, schedulePrintView, swapPopups, shiftTimesView, jobTitlesView, positionList, mergeJobTitles } from './schedule.js';
 import { eventsView, eventView, dueEvents, eventPopups } from './events.js';
 import { costsView } from './costs.js';
 import { loungeView, timesheetView, timesheetsView, canTime } from './lounge.js';
@@ -275,8 +278,9 @@ function moreView() {
     <div class="group">
       <a class="row" href="#/alerts"><span class="grow">Alerts</span><span class="meta">Badges, chime, notifications</span></a>
       <a class="row" href="#/settings"><span class="grow">Settings</span><span class="meta">${esc(THEMES[getTheme()])}</span></a>
-      ${access.can(profile, 'invite') ? `<a class="row" href="#/team"><span class="grow">Invite and approve phones</span>${waiting.size ? `<span class="chip warn">${waiting.size} waiting</span>` : ''}</a>` : ''}
+      ${access.can(session.profile, 'invite') ? `<a class="row" href="#/team"><span class="grow">Invite and approve phones</span>${waiting.size ? `<span class="chip warn">${waiting.size} waiting</span>` : ''}</a>` : ''}
       ${isHost() ? `<a class="row" href="#/backup"><span class="grow">Admin backup</span>${LS.get('backupAt', 0) ? '' : '<span class="chip warn">Not made yet</span>'}</a>` : ''}
+      ${realAdmin() ? `<button class="row nav" id="view-as" type="button"><span class="grow"><span class="title">View as a job</span><span class="sub">See the app the way a Server, Cook, Manager or any job sees it</span></span>${viewAs() ? `<span class="meta">${esc(viewAs().title)}</span>` : ''}</button>` : ''}
     </div>
     <div class="group">
       <a class="row" href="#/about"><span class="grow">About and how-to</span></a>
@@ -284,19 +288,20 @@ function moreView() {
       <a class="row" href="#/report"><span class="grow">Report a problem</span></a>
       <button class="row nav" id="show-notice" type="button"><span class="grow">Notices of use</span></button>
     </div>
-    <div class="group">
+    ${viewAs() ? '' : `<div class="group">
       <button class="row" id="leave" type="button" style="color:var(--danger)"><span class="grow">Remove access from this phone</span></button>
-    </div>
+    </div>`}
     <p class="muted small center">${esc(APP_NAME)} ${VERSION} · build ${BUILD}</p>`;
   updateBadge();
   $('#show-notice').onclick = () => sheet({ title: 'Notices of use', left: null, right: 'Done', body: NOTICE_HTML });
-  $('#leave').onclick = async () => {
+  $('#view-as')?.addEventListener('click', () => viewAsSheet()); // RRA-158
+  $('#leave') && ($('#leave').onclick = async () => {
     const ok = await sheet({ title: 'Remove access?', right: 'Remove', body: `<p>This deletes the app's data from this phone, including recipes saved here. You'll need a new invite to use it again.</p>${profile.role === 'owner' ? '<p class="hint">This is the Admin phone. Removing access deletes the Admin key. You can get back in only with an Admin backup, or by adding a new key to the app.</p>' : ''}` });
     if (!ok) return;
     await access.wipeAccess();
     localStorage.removeItem(BRAND.dataPrefix + 'expiredNotice');
     location.hash = ''; location.reload();
-  };
+  });
 }
 
 // ------------------------------------------- keep access (RRA-037)
@@ -806,6 +811,7 @@ const routes = {
   vendors: () => vendorsView(),
   board: () => boardView(),
   lounge: () => loungeView(),
+  duties: (a) => import('./duties.js').then((m) => m.dutiesView(a)), // RRA-159
   timesheet: () => timesheetView(),
   timesheets: () => timesheetsView(),
   // Payroll (RRA-095)
@@ -934,9 +940,16 @@ function applyTabs() {
 }
 async function route() {
   if (!profile) return;
+  // RRA-158: the Admin viewing the app as another job.
+  setReal(profile);
+  if (profile.role === 'owner' && LS.get('viewAs', null) && !viewAs()) setViewAs(LS.get('viewAs', null));
+  session.profile = shownProfile(profile);
+  viewAsBar();
   let [, name = '', arg] = location.hash.match(/^#\/([^/]+)\/?(.*)$/) || [];
   session.staff = await staffList(); // permissions (RRA-002) read this
-  setJobViews((await data.settings()).jobViews);
+  const st = await data.settings();
+  setJobViews(st.jobViews);
+  if (i18n.setRestaurantLang(st.lang)) return; // RRA-157: the Admin changed the restaurant's language
   if (!name) name = homeRoute();
   // RRA-090: this phone's person was removed from the team. Lock it.
   if (profile.role !== 'owner' && profile.iid && (await data.settings()).removed?.[profile.iid]) {
@@ -976,6 +989,24 @@ function takeIncoming() {
   return decodeURIComponent(m[1]);
 }
 
+// RRA-157: Spanish names of dishes (Recipes → Edit) and toppings (Settings →
+// Point of sale → Toppings), for staff set to Spanish.
+async function langNames() {
+  if (!i18n.isEs()) return;
+  const { posSettings } = await import('./pos.js');
+  const { toppingList } = await import('./mods.js');
+  const trim = BRAND.posTrim || [];
+  const pairs = [];
+  for (const r of await data.list('recipe')) {
+    if (!r.nameEs) continue;
+    pairs.push([r.name, r.nameEs]);
+    const short = trim.reduce((t, w) => t.replace(w, ''), r.name);
+    if (short !== r.name) pairs.push([short, r.nameEs]);
+  }
+  for (const tp of toppingList(await posSettings())) if (tp.es) pairs.push([tp.n, tp.es]);
+  i18n.setNames(pairs);
+}
+
 async function boot() {
   const incoming = takeIncoming();
   await access.loadRevocations();
@@ -1008,6 +1039,7 @@ async function boot() {
     sync.start(profile, () => { if (location.hash.startsWith('#/settings')) route(); });
     data.onChange((coll, remote) => { if (remote) debounceRoute(); });
     data.onChange(() => updateBadge());
+    data.onChange((coll) => { if (coll === 'recipe' || coll === 'settings') langNames(); }); // RRA-157
     startPickups(); // RRA-124: order-up alerts
     startAlerts(); // RRA-137: badges for new work
   }
@@ -1022,11 +1054,13 @@ async function boot() {
     const added = await applyMenu(opt);
     await applyVendors(opt);
     await applySupplies(opt);
+    if (await mergeJobTitles(opt)) langNames(); // RRA-160
     if (added?.dishes || added?.sections) toast(`Menu update: ${[added.sections ? `${added.sections} new section${added.sections > 1 ? 's' : ''}` : '', added.dishes ? `${added.dishes} new item${added.dishes > 1 ? 's' : ''}` : ''].filter(Boolean).join(' and ')} added to Recipes`);
     if (canChange('settings')) setTimeout(() => offerDedupe(), 1500);
   };
   if (!sync.enabled() || await sync.whenSynced()) await starters();
   else sync.whenSynced(36e5).then((ok) => { if (ok) starters().then(() => { if (/^#\/(recipes?|pos|poscheck|list)/.test(location.hash)) route(); }); });
+  await langNames();
   await noticeGate();
   await homeTip();
   if (incoming && access.parse(incoming)?.kind === 'req') { location.hash = '#/team'; return teamView(incoming); }

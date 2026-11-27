@@ -32,7 +32,7 @@ export async function openReports() {
 const card = (p, team) => {
   const st = STATUS[p.about.report.status || 'open'];
   return `<div class="msg private report" data-id="${p.id}">
-    <div class="who">${esc(p.by)} · ${when(p.at)} · ${esc(p.about.report.where || '')} · ${esc(p.about.report.type || '')} ${chip(st[0], st[1])}</div>${esc(p.text).replace(/\n/g, '<br>')}
+    <div class="who">${esc(p.by)} · ${when(p.at)} · ${esc(p.about.report.where || '')} · ${esc(p.about.report.type || '')} ${chip(st[0], st[1])}</div><span class="notr">${esc(p.text).replace(/\n/g, '<br>')}</span>
     ${(p.replies || []).map((r) => `<div class="reply"><span class="who">${esc(r.by)} · ${when(r.at)}</span>${esc(r.text)}</div>`).join('')}
     <div class="btn-row" style="margin-top:6px;flex-wrap:wrap"><button class="btn plain small" data-reply type="button">Reply</button>
       ${team && st[0] === 'Open' ? '<button class="btn plain small" data-st="fixed" type="button">Mark fixed</button><button class="btn plain small" data-st="closed" type="button">Close</button>' : ''}
