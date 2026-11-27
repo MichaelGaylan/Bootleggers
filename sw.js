@@ -4,14 +4,14 @@
 // js/brand.js, so a changeout never keeps another restaurant's files cached.
 importScripts('js/brand.js');
 const B = self.BRAND;
-const CACHE = B.dataPrefix.replace(/\W+$/, '') + '-0.17.1-2026.11.27-32';
+const CACHE = B.dataPrefix.replace(/\W+$/, '') + '-0.18.0-2026.11.27-33';
 const CODE = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
-  'js/brand.js', 'js/app.js', 'js/config.js', 'js/access.js', 'js/crypto.js', 'js/store.js', 'js/starter-stock.js', 'js/menu.js', 'js/pdf.js', 'js/lounge.js',
+  'js/brand.js', 'js/lang-en.js', 'js/lang-es.js', 'js/i18n.js', 'js/app.js', 'js/config.js', 'js/access.js', 'js/crypto.js', 'js/store.js', 'js/starter-stock.js', 'js/menu.js', 'js/pdf.js', 'js/lounge.js',
   'js/ui.js', 'js/data.js', 'js/perms.js', 'js/recipes.js', 'js/stock.js', 'js/board.js', 'js/prep.js',
   'js/schedule.js', 'js/events.js', 'js/costs.js', 'js/settings.js', 'js/sync.js', 'js/audience.js', 'js/dedupe.js', 'js/reports.js',
   'js/payroll.js', 'js/paycalc.js', 'js/provider.js', 'js/pos.js', 'js/giftcards.js', 'js/music.js', 'js/cleardata.js',
-  'js/coupons.js', 'js/coupons-core.js', 'js/drinks.js', 'js/alerts.js', 'js/timeoff.js', 'js/mods.js', 'coupon.html', 'vendor/zxing/zxing.min.js', // RRA-122
+  'js/coupons.js', 'js/coupons-core.js', 'js/drinks.js', 'js/alerts.js', 'js/timeoff.js', 'js/mods.js', 'js/duties.js', 'js/viewas.js', 'coupon.html', 'vendor/zxing/zxing.min.js', // RRA-122
 ];
 const PICTURES = [B.logo, B.icon180, B.icon192, B.icon512, B.iconMaskable, B.favicon]
   .concat(Object.values(B.menuPhotos || {}).map((f) => (B.menuPhotoDir || '') + f))

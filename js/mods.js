@@ -14,6 +14,7 @@
 // changes list. The line keeps its menu price in base, and price = base + charge.
 
 import { esc, $$ } from './ui.js';
+import { nm, t as tt, tk } from './i18n.js';
 import { BRAND } from './config.js';
 
 const r2 = (n) => Math.round(n * 100) / 100;
@@ -22,8 +23,12 @@ export const WORD = { no: 'NO', add: 'ADD', extra: 'EXTRA' };
 // The topping list: the Admin's (Settings → Point of sale) or js/brand.js.
 export function toppingList(P) {
   const own = Array.isArray(P?.toppings) ? P.toppings : null;
-  const list = own || (BRAND.posToppings || []).map(([n, p]) => ({ n, p }));
-  return list.filter((t) => t && String(t.n || '').trim()).map((t) => ({ n: String(t.n).trim(), p: Math.max(0, +t.p || 0) }));
+  const starter = (BRAND.posToppings || []).map(([n, p, es]) => ({ n, p, es }));
+  const list = own || starter;
+  // RRA-157: a topping's Spanish name. A topping saved before 0.18.0 has none
+  // yet, so it takes the starter one from js/brand.js; a blank box stays blank.
+  const esOf = (t) => (t.es !== undefined ? t.es : starter.find((s) => s.n === String(t.n).trim())?.es) || '';
+  return list.filter((t) => t && String(t.n || '').trim()).map((t) => ({ n: String(t.n).trim(), p: Math.max(0, +t.p || 0), es: String(esOf(t)).trim() }));
 }
 
 // Is this topping already on the dish? (Gaylan, 2026-11-26: NO is only offered
@@ -63,9 +68,9 @@ export function withChanges(x, changes) {
 // Words for the check and the ticket, NO first: "NO Mushrooms", "ADD Tomato".
 const ORDER = { no: 0, add: 1, extra: 2 };
 export const sorted = (changes) => [...(changes || [])].sort((a, b) => ORDER[a.k] - ORDER[b.k]);
-export const changeWords = (changes) => sorted(changes).map((c) => `${WORD[c.k]} ${c.n}`);
+export const changeWords = (changes) => sorted(changes).map((c) => `${tt(WORD[c.k])} ${nm(c.n)}`);
 // HTML with NO in red and ADD / EXTRA in bold (class pos-chg).
-export const changesHtml = (changes) => sorted(changes).map((c) => `<span class="pos-chg chg-${c.k}"><b>${WORD[c.k]}</b> ${esc(c.n)}</span>`).join(' ');
+export const changesHtml = (changes) => sorted(changes).map((c) => `<span class="pos-chg chg-${c.k}"><b>${WORD[c.k]}</b> ${esc(nm(c.n))}</span>`).join(' ');
 // Same order on a check? Compare choices, note and changes.
 export const modKey = (x) => JSON.stringify([x.mods || [], x.note || '', sorted(x.changes).map((c) => c.k + c.n)]);
 
@@ -75,7 +80,7 @@ export function toppingsHtml(list, recipe, state) {
   const money = (p) => (p > 0 ? `+$${p.toFixed(2)}` : 'free');
   const rows = list.map((t) => ({ ...t, on: onDish(t.n, recipe) })).sort((a, b) => b.on - a.on);
   return `<div class="tp-list">${rows.map((t) => `<div class="tp-row" data-tp="${esc(t.n)}"><span class="tp-n">${esc(t.n)}${t.on ? ' <small class="tp-on">on the dish</small>' : ''}<small class="tp-p">${money(t.p)}</small></span>
-    <span class="tp-btns">${(t.on ? ['no', 'extra'] : ['add']).concat(state.get(t.n) && !(t.on ? ['no', 'extra'] : ['add']).includes(state.get(t.n)) ? [state.get(t.n)] : []).map((k) => `<button type="button" data-k="${k}" class="${state.get(t.n) === k ? 'on k-' + k : ''}">${k === 'no' ? 'No' : k === 'add' ? 'Add' : 'Extra'}</button>`).join('')}</span></div>`).join('')}</div>
+    <span class="tp-btns">${(t.on ? ['no', 'extra'] : ['add']).concat(state.get(t.n) && !(t.on ? ['no', 'extra'] : ['add']).includes(state.get(t.n)) ? [state.get(t.n)] : []).map((k) => `<button type="button" data-k="${k}" class="${state.get(t.n) === k ? 'on k-' + k : ''}">${tk('topping.' + k, k === 'no' ? 'No' : k === 'add' ? 'Add' : 'Extra')}</button>`).join('')}</span></div>`).join('')}</div>
     <p class="tp-sum muted small" id="tp-sum"></p>`;
 }
 // Wire the picker inside el. onChange(changes) runs after every tap.

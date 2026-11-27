@@ -46,7 +46,7 @@ export const currentPeriod = (P) => periodFor(data.today(), P);
 export const previousPeriod = (P) => periodFor(addDays(currentPeriod(P).start, -1), P);
 
 // ---------- people ----------
-export const guessDept = (pos = '') => /bar/i.test(pos) ? 'Bar' : /server|host|bus|wait|front|cashier|manager|gm/i.test(pos) ? 'Front' : 'Kitchen';
+export const guessDept = (pos = '') => /bar/i.test(pos) ? 'Bar' : /server|host|bus|wait|front|cashier|manager|gm|runner|expo|lead|event|driver/i.test(pos) ? 'Front' : 'Kitchen';
 export const deptOf = (st) => st.dept || guessDept(st.position);
 export function ptsOf(st, pr, P) {
   if ((st.role || 'staff') !== 'staff' || (pr?.type || 'hourly') !== 'hourly') return 0; // managers, chefs, salaried: no tips

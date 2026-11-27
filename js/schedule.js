@@ -7,20 +7,51 @@ import { canChange, myStaff, isHost, canTime, level, JOB_AREAS, defaultJobAreas 
 import { ROLES, myEcdhPublic, myPublicKey } from './access.js';
 import { printButtons, wirePrint } from './pdf.js';
 import { timeOffSection, askTimeOff } from './timeoff.js'; // RRA-139
+import { t as tt } from './i18n.js';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 // Job titles (RRA-131): these are the starting list. The team's own list lives
 // in settings.positions, so managers can add titles like Busser or Barback.
-export const POSITIONS = ['Chef', 'Line cook', 'Prep cook', 'Dishwasher', 'Server', 'Bartender', 'Busser', 'Host stand', 'Manager'];
+// RRA-160: the starting list is the 25 common restaurant jobs in js/brand.js.
+const BR = globalThis.BRAND || {};
+export const POSITIONS = BR.jobTitles?.length ? BR.jobTitles : ['Chef', 'Line cook', 'Prep cook', 'Dishwasher', 'Server', 'Bartender', 'Busser', 'Host stand', 'Manager'];
+// The same job under another name (Host = Host stand, Bus person = Busser).
+const jkey = (t) => String(t || '').toLowerCase().replace(/[^a-z]+/g, ' ').trim();
+const ALIAS = new Map();
+for (const [main, others] of Object.entries(BR.jobTitleAliases || {})) for (const o of [main, ...others]) ALIAS.set(jkey(o), main);
+export const sameJob = (a, b) => (ALIAS.get(jkey(a)) || jkey(a)) === (ALIAS.get(jkey(b)) || jkey(b));
 export async function positionList(keep) {
   const set = await data.settings();
   const list = Array.isArray(set.positions) && set.positions.length ? set.positions : POSITIONS;
   return [...new Set([...list, keep].filter(Boolean))];
 }
+// RRA-160: merge the 25 starting titles into the team's list once (Admin
+// device), keeping custom titles and never adding a near-duplicate. If the
+// list holds both a job and its other name (Host and Host stand), the other
+// name goes and the staff who had it move to the main one.
+export async function mergeJobTitles({ host } = {}) {
+  if (!host) return 0;
+  const set = await data.settings();
+  if (set.positionsV >= 2) return 0;
+  const list = Array.isArray(set.positions) && set.positions.length ? [...set.positions] : [];
+  const out = [];
+  for (const t of list) {
+    const main = ALIAS.get(jkey(t));
+    if (main && main !== t && list.includes(main)) {
+      for (const s of await data.list('staff')) if (s.position === t) await data.put('staff', { ...s, position: main });
+      continue;
+    }
+    if (!out.some((x) => sameJob(x, t))) out.push(t);
+  }
+  let added = 0;
+  for (const t of POSITIONS) if (!out.some((x) => sameJob(x, t))) { out.push(t); added++; }
+  await data.saveSettings({ ...(await data.settings()), positions: out, positionsV: 2 });
+  return added;
+}
 async function addPosition(title) {
   const set = await data.settings();
   const list = Array.isArray(set.positions) && set.positions.length ? set.positions : POSITIONS;
-  if (list.some((p) => p.toLowerCase() === title.toLowerCase())) return list.find((p) => p.toLowerCase() === title.toLowerCase());
+  if (list.some((p) => sameJob(p, title))) return list.find((p) => sameJob(p, title));
   await data.saveSettings({ ...set, positions: [...list, title] });
   return title;
 }
@@ -446,7 +477,7 @@ export async function jobTitlesView() {
   // Job views (RRA-132): which screens each job sees (Staff role only).
   const jv = (await data.settings()).jobViews || {};
   const screens = (p) => (Array.isArray(jv[p]) ? jv[p] : defaultJobAreas(p));
-  const short = (p) => screens(p).map((k) => JOB_AREAS[k].split(':')[0].replace(' and order guides', '').replace('Take orders and payments', 'Orders')).join(', ');
+  const short = (p) => screens(p).map((k) => JOB_AREAS[k].split(':')[0].replace(' and order guides', '').replace('Take orders and payments', 'Orders')).map((x) => tt(x)).join(', ');
   view.innerHTML = `
     <div class="group">${list.map((p, i) => `<div class="row">${change ? `<button class="rm" type="button" data-rmp="${i}" aria-label="Remove ${esc(p)}">−</button>` : ''}<span class="grow"${isHost() ? ` data-jv="${i}" style="cursor:pointer"` : ''}><span class="title">${esc(p)}</span><span class="sub">${used(p) ? `${used(p)} on staff` : 'No one yet'} · sees ${esc(short(p))}${Array.isArray(jv[p]) ? '' : ' (suggested)'}</span></span>${isHost() ? '<span class="meta">Screens ›</span>' : ''}</div>`).join('')}</div>
     ${isHost() ? '<p class="muted small">Tap a job to choose the screens people with that job see. Everyone also gets the Employee lounge, their clock, My pay and Settings for their own phone. Chefs, managers and the Admin see what their role allows.</p>' : ''}
@@ -456,9 +487,9 @@ export async function jobTitlesView() {
   $$('[data-jv]').forEach((el) => el.onclick = () => jobScreensSheet(list[+el.dataset.jv], screens(list[+el.dataset.jv]), Array.isArray(jv[list[+el.dataset.jv]])));
   if (!change) return;
   const save = async (positions) => { const set = await data.settings(); await data.saveSettings({ ...set, positions }); jobTitlesView(); };
-  $('#jt-add').onclick = async () => { const t = $('#jt-new').value.trim().replace(/\s+/g, ' '); if (!t) return; if (list.some((p) => p.toLowerCase() === t.toLowerCase())) { toast('Already on the list'); return; } await save([...list, t]); toast('Added ' + t); };
+  $('#jt-add').onclick = async () => { const t = $('#jt-new').value.trim().replace(/\s+/g, ' '); if (!t) return; const dup = list.find((p) => sameJob(p, t)); if (dup) { toast(tt('Already on the list as {0}', dup)); return; } await save([...list, t]); toast('Added ' + t); };
   $('#jt-new').onkeydown = (e) => { if (e.key === 'Enter') $('#jt-add').click(); };
-  $('#jt-reset').onclick = async () => { const add = POSITIONS.filter((p) => !list.includes(p)); if (!add.length) { toast('All the starting titles are there'); return; } await save([...list, ...add]); toast(`Added ${add.join(', ')}`); };
+  $('#jt-reset').onclick = async () => { const add = POSITIONS.filter((p) => !list.some((x) => sameJob(x, p))); if (!add.length) { toast('All the starting titles are there'); return; } await save([...list, ...add]); toast(`Added ${add.join(', ')}`); };
   $$('[data-rmp]').forEach((b) => b.onclick = async () => { const p = list[+b.dataset.rmp]; if (list.length <= 1) return; await save(list.filter((x) => x !== p)); toast(`Removed ${p}${used(p) ? ' (people who have it keep it)' : ''}`); });
 }
 

@@ -31,6 +31,7 @@ const openPunch = (all, staffId) => all.find((p) => p.staffId === staffId && !p.
 const inWeek = (p, wk) => p.in >= weekMs(wk) && p.in < weekMs(addDays(wk, 7));
 
 async function clock(me, all) {
+  if (me.preview) { toast('The time clock is off while viewing as another job'); return; } // RRA-158
   const open = openPunch(all, me.id);
   if (open) {
     open.out = Date.now();
@@ -91,8 +92,10 @@ export async function loungeView() {
         <div class="muted small">${open ? `Since ${t(open.in)} · <span id="clock-run">${dur(Date.now() - open.in)}</span>` : `This week ${hrs(mine.reduce((s, p) => s + punchHours(p), 0))}`}</div></div>
         <button class="btn clock-btn${open ? ' out' : ''}" id="clock" type="button">${open ? 'Clock out' : 'Clock in'}</button></div>
         <a class="row nav" href="#/timesheet"><span class="grow">My time sheet</span><span class="meta">${hrs(mine.reduce((s, p) => s + punchHours(p), 0))} this week</span></a>
-        <a class="row nav" href="#/mypay"><span class="grow">My pay &amp; tips</span></a>`
-    : `<p class="muted small" style="margin:0">${isHost() ? 'To use the time clock yourself, add your name in Settings → Staff (the same name as this phone).' : 'To use the time clock, ask a manager to add you in Settings → Staff with the same name as this phone.'}</p>`}
+        <a class="row nav" href="#/mypay"><span class="grow">My pay &amp; tips</span></a>
+        <a class="row nav" href="#/duties"><span class="grow">My job duties</span><span class="meta">${esc(me.position || '')}</span></a>`
+    : `<p class="muted small" style="margin:0">${isHost() ? 'To use the time clock yourself, add your name in Settings → Staff (the same name as this phone).' : 'To use the time clock, ask a manager to add you in Settings → Staff with the same name as this phone.'}</p>
+      <a class="row nav" href="#/duties"><span class="grow">Job duties</span></a>`}
     </div>
 
     ${canSee('schedule') ? `<div class="card l-card"><div class="l-head"><b>My week</b><a href="#/schedule">Full schedule <span class="chev-i">›</span></a></div>

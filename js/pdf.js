@@ -5,14 +5,18 @@
 // home screen apps ignore the print call. A PDF always works: the phone's
 // share sheet can print it, save it to Files or send it.
 
+import { tr, trLines, t } from './i18n.js';
+
 const PAGE_W = 612; // US letter, points
 const PAGE_H = 792;
 const MARGIN = 54;
 
 // The built-in PDF fonts only cover plain Latin text; swap the rest.
 const SWAP = { '×': 'x', '½': '1/2', '¼': '1/4', '¾': '3/4', '⅓': '1/3', '⅔': '2/3', '⅛': '1/8', '—': '-', '–': '-', '‘': "'", '’': "'", '“': '"', '”': '"', '…': '...', '·': '-', '•': '-', '→': '->', '°': ' deg' };
-const clean = (s) => String(s ?? '').replace(/[^\x20-\x7e]/g, (c) => SWAP[c] ?? '');
-const pdfStr = (s) => s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+// RRA-157: Spanish letters (á é í ó ú ñ ü ¿ ¡) are in the fonts' WinAnsi set, so
+// they stay, written as octal codes so the file keeps plain bytes.
+const clean = (s) => String(s ?? '').replace(/[^\x20-\x7e]/g, (c) => SWAP[c] ?? (c >= '\xa0' && c <= '\xff' ? c : ''));
+const pdfStr = (s) => s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)').replace(/[\xa0-\xff]/g, (c) => '\\' + c.charCodeAt(0).toString(8));
 
 function wrap(line, max) {
   const out = [];
@@ -29,6 +33,7 @@ function wrap(line, max) {
 
 // lines: array of strings; a line starting with "# " is printed bold and larger.
 export function textPdf(title, lines, { mono = false } = {}) {
+  title = tr(title); lines = trLines(lines); // RRA-157: printouts follow the reader's language
   const size = mono ? 9.5 : 11;
   const lead = size * 1.35;
   const perLine = Math.floor((PAGE_W - 2 * MARGIN) / (size * (mono ? 0.6 : 0.5)));
@@ -57,7 +62,7 @@ export function textPdf(title, lines, { mono = false } = {}) {
       y -= lead;
       stream += `/${r.head ? 'F2' : 'F1'} ${r.head ? size + 1.5 : size} Tf 1 0 0 1 ${MARGIN} ${y.toFixed(1)} Tm (${pdfStr(r.t)}) Tj\n`;
     }
-    stream += `/F1 8 Tf 1 0 0 1 ${MARGIN} ${MARGIN / 2} Tm (${pdfStr(`${globalThis.BRAND.restaurant} - page ${n + 1} of ${pages.length}`)}) Tj\nET`;
+    stream += `/F1 8 Tf 1 0 0 1 ${MARGIN} ${MARGIN / 2} Tm (${pdfStr(clean(`${globalThis.BRAND.restaurant} - ${t('page {0} of {1}', n + 1, pages.length)}`))}) Tj\nET`;
     const content = add(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
     kids.push(add(`<< /Type /Page /Parent ${pagesObj} 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 ${fBody} 0 R /F2 ${fBold} 0 R >> >> /Contents ${content} 0 R >>`));
   });

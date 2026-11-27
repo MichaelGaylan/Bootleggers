@@ -9,6 +9,7 @@
 // Clover Flex/Mini, or Toast's handheld). Nothing is connected yet: card
 // payments are practice runs and nothing is charged.
 
+import { nm } from './i18n.js';
 import * as data from './data.js';
 import { $, $$, esc, view, dlg, sheet, toast, setTitle, setChrome, session, LS, isWide } from './ui.js';
 import { canSee, canChange, isHost, myStaff, jobAllows, jobAreas } from './perms.js';
@@ -71,7 +72,8 @@ export function modsFor(name, section, kind = '') {
   return null;
 }
 // Shorter names on tiles and tickets (e.g. without "with Fries").
-const short = (n) => (BRAND.posTrim || []).reduce((t, w) => t.replace(w, ''), String(n || ''));
+// RRA-157: staff set to Spanish see the dish's Spanish name when it has one.
+const short = (n) => (nm(n) !== n ? nm(n) : (BRAND.posTrim || []).reduce((t, w) => t.replace(w, ''), String(n || '')));
 // RRA-108: the dish's picture. A Recipes photo wins, then js/brand.js menuPhotos.
 const photoOf = dishPhoto;
 const tint = (s) => COLORS[[...String(s)].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
@@ -452,7 +454,7 @@ export async function posCheckView(id, opt = {}) {
       <div class="pos-head"><span>Item</span><span>Qty</span><span>Amount</span></div>
       ${c.items.length ? seats.map((s) => `<div class="pos-seat">${c.guests > 1 || (c.ids || {})[s] ? `<div class="pr-lab">${c.guests > 1 ? `Seat ${s}` : ''}${(c.ids || {})[s] ? ` <span class="pos-idok">🪪 21+ checked</span>` : ''}</div>` : ''}${c.items.filter((x) => x.seat === s).map((x) => `
         <div class="pos-line${x.voided ? ' void' : ''}">
-          <button class="pos-name" type="button" data-line="${x.id}"><span>${esc(short(x.name))}</span>${x.mods?.length ? `<span class="pos-mod">${esc(x.mods.join(', '))}</span>` : ''}${x.changes?.length ? `<span class="pos-mod">${changesHtml(x.changes)}${lineExtra(x)}</span>` : ''}${x.note ? `<span class="pos-mod">“${esc(x.note)}”</span>` : ''}<span class="pos-st">${x.voided ? 'void' : x.sent ? '✓ sent' : '<b style="color:var(--warn)">new</b>'}</span></button>
+          <button class="pos-name" type="button" data-line="${x.id}"><span>${esc(short(x.name))}</span>${x.mods?.length ? `<span class="pos-mod">${esc(x.mods.join(', '))}</span>` : ''}${x.changes?.length ? `<span class="pos-mod">${changesHtml(x.changes)}${lineExtra(x)}</span>` : ''}${x.note ? `<span class="pos-mod notr">“${esc(x.note)}”</span>` : ''}<span class="pos-st">${x.voided ? 'void' : x.sent ? '✓ sent' : '<b style="color:var(--warn)">new</b>'}</span></button>
           <span class="pos-qty">${x.voided ? `<b>${x.qty || 1}</b>` : `<button type="button" data-minus="${x.id}" aria-label="One less">−</button><b>${x.qty || 1}</b><button type="button" data-plus="${x.id}" aria-label="One more">+</button>`}</span>
           <span class="pos-price">${money(lineTotal(x))}</span></div>`).join('')}</div>`).join('')
       : `<p class="muted center" style="margin:6px 0">No items yet. Tap a dish to add it.</p>${(c.payments || []).length ? '' : '<button class="btn plain block small" id="free" type="button">Seated by mistake? Free the table</button>'}`}
@@ -942,7 +944,7 @@ export async function ticketsView() {
       <div class="card pos-ticket ${m >= 15 ? 'late' : m >= 8 ? 'warm' : ''}">
         <div class="pos-th"><b>${esc(t.checkName)}</b><span>${m} min</span></div>
         <div class="pr-lab">${esc((t.server || '').split(' ')[0])} · ${tm(t.at)}</div>
-        ${t.items.map((it, i) => `<button type="button" class="pos-ti${it.done ? ' done' : ''}" data-t="${t.id}" data-i="${i}"><span>${(it.qty || 1) > 1 ? `<b class="pos-x">${it.qty}×</b> ` : ''}${esc(short(it.name))}${it.mods?.length ? `<em>${esc(it.mods.join(', '))}</em>` : ''}${it.changes?.length ? `<em class="pos-chgs">${changesHtml(it.changes)}</em>` : ''}${it.note ? `<em>“${esc(it.note)}”</em>` : ''}</span><small>S${it.seat}</small></button>`).join('')}
+        ${t.items.map((it, i) => `<button type="button" class="pos-ti${it.done ? ' done' : ''}" data-t="${t.id}" data-i="${i}"><span>${(it.qty || 1) > 1 ? `<b class="pos-x">${it.qty}×</b> ` : ''}${esc(short(it.name))}${it.mods?.length ? `<em>${esc(it.mods.join(', '))}</em>` : ''}${it.changes?.length ? `<em class="pos-chgs">${changesHtml(it.changes)}</em>` : ''}${it.note ? `<em class="notr">“${esc(it.note)}”</em>` : ''}</span><small>S${it.seat}</small></button>`).join('')}
         <button class="btn block small" type="button" data-bump="${t.id}">Bump</button>
       </div>`; }).join('') || `<div class="empty">No ${station.toLowerCase()} tickets right now.</div>`}</div>
     <p class="muted small center">Tap an item when it's up. Bump clears the ticket. Tickets turn orange at 8 minutes and red at 15.</p>`;
@@ -1057,7 +1059,8 @@ export async function posSettingsView() {
 // RRA-149: the toppings list and what an ADD or EXTRA costs (blank = free).
 async function toppingsSheet(P) {
   const rows = toppingList(P);
-  const row = (t = { n: '', p: 0 }) => `<div class="tp-edit"><input type="text" class="tp-en" value="${esc(t.n)}" placeholder="Topping, e.g. Bacon" aria-label="Topping"><input type="text" class="tp-ep" inputmode="decimal" value="${t.p ? t.p.toFixed(2) : ''}" placeholder="free" aria-label="Price"><button type="button" class="btn plain small tp-x" aria-label="Remove">✕</button></div>`;
+  const row = (t = { n: '', p: 0, es: '' }) => `<div class="tp-edit"><input type="text" class="tp-en" value="${esc(t.n)}" placeholder="Topping, e.g. Bacon" aria-label="Topping"><input type="text" class="tp-ep" inputmode="decimal" value="${t.p ? t.p.toFixed(2) : ''}" placeholder="free" aria-label="Price"><button type="button" class="btn plain small tp-x" aria-label="Remove">✕</button>
+    <input type="text" class="tp-es" value="${esc(t.es || '')}" placeholder="Spanish name (optional)" aria-label="Spanish name" lang="es"></div>`;
   const v = await sheet({
     title: 'Toppings', right: 'Save',
     body: `<p class="muted small" style="margin-top:0">Condiments and toppings only. ADD and EXTRA add this price to the dish; NO takes it off. Leave it blank for free.</p>
@@ -1067,7 +1070,7 @@ async function toppingsSheet(P) {
       const wire = () => $$('.tp-x', api.el).forEach((b) => b.onclick = () => b.closest('.tp-edit').remove());
       $('#tp-add', api.el).onclick = () => { $('#tp-rows', api.el).insertAdjacentHTML('beforeend', row()); wire(); $$('.tp-en', api.el).at(-1).focus(); };
       wire();
-      api.onRight = () => api.close($$('.tp-edit', api.el).map((r) => ({ n: $('.tp-en', r).value.trim(), p: Math.max(0, r2(parseFloat($('.tp-ep', r).value.replace('$', '')) || 0)) })).filter((t) => t.n));
+      api.onRight = () => api.close($$('.tp-edit', api.el).map((r) => ({ n: $('.tp-en', r).value.trim(), p: Math.max(0, r2(parseFloat($('.tp-ep', r).value.replace('$', '')) || 0)), es: $('.tp-es', r).value.trim() })).filter((t) => t.n));
     },
   });
   if (!v) return false;

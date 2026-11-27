@@ -44,8 +44,32 @@ export const isHost = () => session.profile?.role === 'owner';
 // The Admin sets each manager's access to hours and pay in Roles and permissions.
 export const canTime = () => isHost() || (session.profile?.role === 'manager' && level('timesheets') !== 'none');
 
+// ---------------------------------------------------------------- view as (RRA-158)
+// The Admin can look at the app as any job. Only what the screens show
+// changes: app.js gives the screens a copy of the Admin's profile with the
+// job's role, and myStaff() answers with a made-up staff record for that job.
+let REAL = null; // the phone's real profile
+let VIEW = null; // { title, role, staff }
+export const setReal = (p) => { REAL = p; if (p?.role !== 'owner') VIEW = null; };
+export const realAdmin = () => REAL?.role === 'owner';
+export const viewAs = () => VIEW;
+export function roleForTitle(title = '') {
+  const t = String(title).toLowerCase();
+  if (/manager|^gm$/.test(t)) return 'manager';
+  if (/chef/.test(t)) return 'chef';
+  return 'staff';
+}
+export function setViewAs(title) {
+  if (!title || !realAdmin()) { VIEW = null; return; }
+  const role = roleForTitle(title);
+  VIEW = { title, role, staff: { id: '', name: REAL?.name || '', position: title, role, preview: true } };
+}
+// The profile the screens use: the real one, or the job being viewed.
+export const shownProfile = (p) => (VIEW && p?.role === 'owner' ? { ...p, role: VIEW.role, viewAs: VIEW.title } : p);
+
 // The staff record that belongs to this phone's person, if any.
 export function myStaff() {
+  if (VIEW) return VIEW.staff;
   const p = session.profile;
   if (!p) return null;
   return (session.staff || []).find((s) => s.iid && s.iid === p.iid) || (session.staff || []).find((s) => s.name === p.name) || null;
@@ -88,7 +112,10 @@ export const JOB_AREAS = {
 const AREA_JOB = { recipes: ['recipes'], prep: ['prep'], stock: ['stock'], orders: ['stock'], schedule: ['schedule'], board: ['board'], events: ['events'], pos: ['seating', 'orders', 'tables', 'kitchen', 'bar'] };
 export function defaultJobAreas(title = '') {
   const t = String(title).toLowerCase();
-  if (/bus/.test(t)) return ['tables', 'board', 'schedule'];
+  if (/manager|lead/.test(t)) return Object.keys(JOB_AREAS); // RRA-160
+  if (/bus|porter/.test(t)) return ['tables', 'board', 'schedule'];
+  if (/event/.test(t)) return ['events', 'recipes', 'board', 'schedule'];
+  if (/driver/.test(t)) return ['kitchen', 'orders', 'board', 'schedule'];
   if (/barback/.test(t)) return ['bar', 'tables', 'stock', 'board', 'schedule'];
   if (/bar/.test(t)) return ['seating', 'orders', 'tables', 'bar', 'board', 'schedule', 'music'];
   if (/host/.test(t)) return ['seating', 'tables', 'board', 'schedule', 'music'];

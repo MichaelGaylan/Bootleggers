@@ -119,15 +119,15 @@ export async function recipeView(id) {
       ${uses.length ? `<h2>Uses house recipes</h2><div class="group">${uses.map((u) => `<a class="row" href="#/recipe/${u.id}"><span class="grow">${esc(u.name)}</span>${chip('Sub recipe', 'purple')}</a>`).join('')}</div>` : ''}
       <h2>${r.kind === 'dish' ? 'Build' : 'Ingredients'}</h2>
       ${drinkView(r)}
-      <div class="card"><ul class="ing">${(r.ingredients || []).map((i) => `<li><span class="qty">${esc(i.qty)}</span><span style="flex:1">${esc(i.item)}${subOf(i.item) ? ` <a href="#/recipe/${subOf(i.item).id}">${chip('Sub recipe', 'purple')}</a>` : ''}</span>${canSee('costs') && i.cost ? `<span class="muted small">${data.money(i.cost)}</span>` : ''}</li>`).join('')}</ul></div>
+      <div class="card"><ul class="ing">${(r.ingredients || []).map((i) => `<li><span class="qty">${esc(i.qty)}</span><span style="flex:1"><span class="notr">${esc(i.item)}</span>${subOf(i.item) ? ` <a href="#/recipe/${subOf(i.item).id}">${chip('Sub recipe', 'purple')}</a>` : ''}</span>${canSee('costs') && i.cost ? `<span class="muted small">${data.money(i.cost)}</span>` : ''}</li>`).join('')}</ul></div>
       ${showCost ? `<div class="card small"><b>Plate cost ${data.money(cost)}</b>${r.price ? ` · menu price ${data.money(r.price)} · <b>food cost ${Math.round((cost / r.price) * 100)}%</b>` : ''}</div>` : ''}
       <h2>Step by step</h2>
-      <div class="card"><ol class="steps">${(r.steps || []).map((s) => `<li>${esc(s)}</li>`).join('')}</ol></div>
+      <div class="card"><ol class="steps notr">${(r.steps || []).map((s) => `<li>${esc(s)}</li>`).join('')}</ol></div>
       ${usedIn.length ? `<h2>Used in</h2><div class="group">${usedIn.map((u) => `<a class="row" href="#/recipe/${u.id}"><span class="grow">${esc(u.name)}</span></a>`).join('')}</div>` : ''}
       <a class="btn tonal block" href="#/print/${r.id}" style="margin-top:8px">Print recipe</a>
       <details class="comments" id="comments">
         <summary>Comments (${(r.comments || []).length})</summary>
-        ${(r.comments || []).map((c) => `<div class="comment"><div class="who">${esc(c.by)} · ${fmtDate(c.at)}</div>${esc(c.text)}</div>`).join('')}
+        ${(r.comments || []).map((c) => `<div class="comment"><div class="who">${esc(c.by)} · ${fmtDate(c.at)}</div><span class="notr">${esc(c.text)}</span></div>`).join('')}
         <label class="field"><span>Add a comment</span><textarea id="c-text" style="min-height:64px"></textarea></label>
         <button class="btn tonal small" id="c-add" type="button">Add comment</button>
       </details>
@@ -181,8 +181,8 @@ export async function printView(id) {
     <div class="paper">
       <h3>${esc(r.name)}${k > 1 ? ` <small>(×${k})</small>` : ''}</h3>
       <div class="paper-meta">${esc(r.kind === 'house' ? r.category || 'House recipe' : r.section || 'Dish')}${r.yield ? ` · yield ${esc(scaleQty(r.yield, k))}` : ''}${r.storage ? ` · ${esc(r.storage)}` : ''} · printed ${new Date().toLocaleDateString()}</div>
-      <table>${(r.ingredients || []).map((i) => `<tr><td><b>${esc(scaleQty(i.qty, k))}</b></td><td>${esc(i.item)}</td></tr>`).join('')}</table>
-      <ol>${(r.steps || []).map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
+      <table>${(r.ingredients || []).map((i) => `<tr><td><b>${esc(scaleQty(i.qty, k))}</b></td><td class="notr">${esc(i.item)}</td></tr>`).join('')}</table>
+      <ol class="notr">${(r.steps || []).map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
       <div class="paper-foot">${esc(globalThis.BRAND.restaurant)} · Proprietary, do not share</div>
     </div>
     ${printButtons()}`;
@@ -242,6 +242,7 @@ export async function recipeDialog(existing, kind = 'house', section = null) {
     title: existing ? 'Edit recipe' : r.kind === 'dish' ? 'New dish' : 'New recipe', right: 'Save',
     body: `
       <label class="field"><span>Name</span><input type="text" id="r-name" value="${esc(r.name || '')}" placeholder="${r.kind === 'dish' ? ('e.g. ' + (globalThis.BRAND.dishExample || 'Classic Burger')) : 'e.g. Honey Sriracha wing sauce'}" autocomplete="off"></label>
+      <label class="field" id="r-es-f"><span>Spanish name (optional)</span><input type="text" id="r-name-es" value="${esc(r.nameEs || '')}" placeholder="Blank = staff set to Spanish see the English name" autocomplete="off" lang="es"></label>
       <div class="segmented" id="r-kind">
         <button type="button" data-k="dish">Dish</button><button type="button" data-k="house">House recipe</button>
       </div>
@@ -313,6 +314,7 @@ export async function recipeDialog(existing, kind = 'house', section = null) {
         const house = r.kind === 'house';
         Object.assign(r, {
           name, ingredients, steps,
+          nameEs: $('#r-name-es', el).value.trim() || undefined, // RRA-157
           category: house ? $('#r-cat', el).value : undefined,
           section: house ? undefined : $('#r-sec', el).value,
           yield: house ? $('#r-yield', el).value.trim() : undefined,

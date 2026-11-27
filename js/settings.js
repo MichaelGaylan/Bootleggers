@@ -10,6 +10,7 @@ import { staffList } from './schedule.js';
 import { INACTIVITY_DAYS } from './config.js';
 import * as sync from './sync.js';
 import { REMIND_DAYS, remindLabel, remindOf } from './events.js';
+import { LANG_NAMES, myLang, restaurantLang, lang, setMyLang, setRestaurantLang } from './i18n.js';
 
 export async function settingsView() {
   setChrome({ tab: 'more', back: true });
@@ -33,6 +34,13 @@ export async function settingsView() {
     <button class="acc-head${so === 'look' ? ' open' : ''}" type="button" data-g="look"><span class="grow">Appearance · this device</span><span class="meta">${esc(THEMES[theme])}</span></button>
     <div class="group acc-body pad-top"${so === 'look' ? '' : ' hidden'}><div class="segmented" id="theme" role="radiogroup" aria-label="Appearance">${Object.entries(THEMES).map(([k, v]) => `<button type="button" role="radio" aria-checked="${k === theme}" data-theme-opt="${k}" class="${k === theme ? 'on' : ''}">${v}</button>`).join('')}</div>
     <p class="muted small">Match device follows your phone's or iPad's own light and dark setting. The moon button at the top switches between light and dark in one tap. This choice is saved on this device only.</p></div>
+    <button class="acc-head${so === 'lang' ? ' open' : ''}" type="button" data-g="lang"><span class="grow">Language</span><span class="meta notr">${esc(LANG_NAMES[lang()])}</span></button>
+    <div class="group acc-body pad-top"${so === 'lang' ? '' : ' hidden'}>
+      <div class="segmented" id="my-lang" role="radiogroup" aria-label="Language">${[...Object.entries(LANG_NAMES), ['', '']].map(([k, v]) => `<button type="button" role="radio" aria-checked="${(myLang() || '') === k}" data-lang="${k}" class="${(myLang() || '') === k ? 'on' : ''}">${k ? `<span class="notr">${esc(v)}</span>` : 'Restaurant'}</button>`).join('')}</div>
+      <p class="muted small">Your language: what you see on this phone, including kitchen tickets and printouts. Restaurant follows the restaurant's language, set by the Admin.</p>
+      <p class="muted small">Recipes, notes and messages show as they were typed. Dishes and toppings show their Spanish name when the Admin has added one.</p>
+      ${isHost() ? `<div class="row"><span class="grow"><span class="title">Restaurant language</span><span class="sub">For everyone who hasn't picked their own, and for new staff</span></span><select id="rest-lang" class="notr">${Object.entries(LANG_NAMES).map(([k, v]) => `<option value="${k}"${k === (s.lang || 'en') ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></div>` : ''}
+    </div>
     ${seePay ? `<button class="acc-head${so === 'pay' ? ' open' : ''}" type="button" data-g="pay"><span class="grow">Pay</span></button>
     <div class="group acc-body"${so === 'pay' ? '' : ' hidden'}><button class="row nav" id="payrules" type="button"><span class="grow"><span class="title">Pay rules</span><span class="sub">${esc(PAY_PRESETS[rules.preset]?.name || 'Custom')}: ${esc(rulesText(rules))}</span></span></button>
       <a class="row nav" href="#/payroll"><span class="grow"><span class="title">Payroll</span><span class="sub">Review hours, review pay, submit</span></span></a>
@@ -69,6 +77,13 @@ export async function settingsView() {
     <p class="muted small center">${edit ? 'You can change Settings.' : 'Only the Admin, and people the Admin allows, can change Settings.'}</p>` : ''}</div>`;
   oneOpen(view, (g) => LS.set('setOpen', g));
   $$('[data-theme-opt]', view).forEach((b) => { b.onclick = () => { setTheme(b.dataset.themeOpt); settingsView(); }; });
+  // RRA-157: this person's language, and the restaurant's (Admin only).
+  $$('[data-lang]', view).forEach((b) => { b.onclick = () => { setMyLang(b.dataset.lang || null); settingsView(); }; });
+  $('#rest-lang')?.addEventListener('change', async (e) => {
+    const s2 = await data.settings();
+    await data.saveSettings({ ...s2, lang: e.target.value });
+    if (!setRestaurantLang(e.target.value)) { toast('Restaurant language saved'); settingsView(); }
+  });
   // RRA-085: pay rules for time sheets. The Admin, and managers allowed to change pay.
   $('#payrules')?.addEventListener('click', async () => {
     const can = canChange('payrates');
