@@ -8,7 +8,7 @@
 //   1. node tools/changeout.mjs start         saves old-brand.js and a fingerprint
 //                                             of every old picture (old-pictures.json)
 //   2. write the new js/brand.js              (the setup wizard does this)
-//      - new names, pictures, menu, starter stock, vendors, gift cards, radio
+//      - new names, pictures, menu, starter stock, vendors, gift cards
 //      - a NEW data space: dataPrefix, dbName, teamId (and its own firebase
 //        project or null, and its own reportKey)
 //   3. put the new pictures in assets/ and delete the old ones
@@ -126,7 +126,7 @@ const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } 
 function oldWords(O, B, allow = []) {
   const w = new Set();
   const add = (s) => { s = String(s || '').trim(); if (s.length >= 4) w.add(s); };
-  [O.coupon?.title, O.coupon?.tagline, O.appName, O.shortName, O.restaurant, O.location, O.teamId, O.dbName, O.dishExample, O.radioSearchArea,
+  [O.coupon?.title, O.coupon?.tagline, O.appName, O.shortName, O.restaurant, O.location, O.teamId, O.dbName, O.dishExample,
     host(O.websiteUrl), host(O.giftCards?.url), O.firebase?.projectId, O.reportKey,
     String(O.reportPrefix || '').replace(/[\s—–-]+$/, '')].forEach(add);
   // "Bootleggers" also catches "The Bootlegger".

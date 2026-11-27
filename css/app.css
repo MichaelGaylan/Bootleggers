@@ -773,27 +773,7 @@ svg.lock { width: 11px; height: 11px; vertical-align: -1px; }
   .pos-left .pos-check { margin-top: 0; }
 }
 
-/* RRA-109: Music */
-.mu-now { text-align: center; }
-.mu-title { font-weight: 700; font-size: 1.1rem; margin-top: 4px; overflow-wrap: anywhere; }
-.mu-ctrl { display: flex; justify-content: center; align-items: center; gap: 14px; margin: 14px 0 6px; }
-.mu-ctrl button { width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--card-2); color: var(--text); font-size: 1.2rem; cursor: pointer; }
-.mu-ctrl button.big { width: 64px; height: 64px; background: var(--accent); color: var(--on-accent); font-size: 1.5rem; }
-.mu-ctrl button.on { background: color-mix(in srgb, var(--accent) 22%, transparent); }
-.mu-ctrl button:disabled { opacity: .4; cursor: default; }
-.mu-vol { display: flex; align-items: center; gap: 8px; max-width: 320px; margin: 4px auto 0; }
-.mu-vol input { flex: 1; accent-color: var(--accent); }
-.mu-list .row.on .title { color: var(--accent); font-weight: 700; }
-.mu-n { width: 26px; text-align: center; color: var(--text-2); font-variant-numeric: tabular-nums; flex: none; }
-.mu-st { background: none; border: 0; padding: 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; display: flex; flex-direction: column; min-width: 0; }
-.row.on .mu-st .title { color: var(--accent); font-weight: 700; }
 label.btn { cursor: pointer; }
-.mu-mini { position: fixed; z-index: 25; right: 12px; bottom: calc(var(--tabs-h) + 10px); display: flex; align-items: center; gap: 6px; max-width: min(360px, calc(100vw - 24px)); padding: 6px 6px 6px 14px; border-radius: 999px; background: var(--card); box-shadow: 0 4px 18px rgba(0,0,0,.18); border: .5px solid var(--sep); }
-.mu-mini[hidden] { display: none; }
-.mu-mini-t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); font-weight: 600; font-size: .88rem; }
-.mu-mini button { width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--accent); color: var(--on-accent); cursor: pointer; flex: none; }
-@media (min-width: 768px) { .mu-mini { bottom: 16px; right: 16px; } }
-@media print { .mu-mini { display: none !important; } }
 
 /* RRA-111: Gift cards */
 .gc-card { text-align: center; }
@@ -862,39 +842,6 @@ label.btn { cursor: pointer; }
 /* Send turns a dull orange once everything on the check has gone to the kitchen (Gaylan, 2026-11-24). */
 .pos-actions .btn.pos-sent, .pos-actions .btn.pos-sent:disabled { background: #b8743a; color: #fff; opacity: 1; }
 
-/* Music: what the player is doing (connecting, or why it isn't playing). */
-.mu-status { margin: 2px 0 4px; font-size: 14px; font-weight: 600; color: var(--warn, #b8743a); }
-
-/* Radio dial (RRA-126): a faceplate with an AM/FM switch, scale, needle, knob and presets. */
-.radio { margin: 0 0 14px; padding: 14px; border-radius: var(--radius); background: linear-gradient(#2a2622, #1b1815); color: #f3e6cf; box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 2px 10px rgba(0,0,0,.18); }
-.rd-top { display: flex; align-items: center; gap: 12px; }
-.rd-lcd { flex: 1; min-width: 0; display: grid; grid-template-columns: auto 1fr; align-items: baseline; column-gap: 8px; padding: 8px 12px; border-radius: 10px; background: #0f1a12; box-shadow: inset 0 2px 6px rgba(0,0,0,.6); color: #9ff0b4; font-variant-numeric: tabular-nums; }
-.rd-f { font-size: 2.2rem; font-weight: 700; line-height: 1.05; letter-spacing: .02em; }
-.rd-b { font-size: .8rem; opacity: .8; }
-.rd-n { grid-column: 1 / -1; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .9; }
-.rd-band { display: inline-flex; border-radius: 999px; padding: 3px; background: rgba(0,0,0,.35); flex: none; }
-.rd-band button { min-width: 52px; height: 40px; border: 0; border-radius: 999px; background: transparent; color: inherit; font-weight: 700; font-size: 1rem; cursor: pointer; }
-.rd-band button.on { background: #e8b04a; color: #1b1815; }
-.sheet-body .rd-band { background: var(--card-2); margin-bottom: 10px; }
-.rd-dial { position: relative; height: 64px; margin: 14px 6px 4px; border-radius: 8px; background: linear-gradient(#efe3c8, #e2d2b0); box-shadow: inset 0 2px 5px rgba(0,0,0,.35); touch-action: none; cursor: ew-resize; overflow: hidden; }
-.rd-dial:focus-visible { outline: 3px solid #e8b04a; outline-offset: 2px; }
-.rd-dial i { position: absolute; top: 0; width: 1px; height: 12px; background: #5a4a33; }
-.rd-dial i.big { height: 20px; width: 2px; }
-.rd-lab { position: absolute; top: 22px; transform: translateX(-50%); font-size: .75rem; font-weight: 700; color: #3d3122; font-variant-numeric: tabular-nums; }
-.rd-dot { position: absolute; bottom: 8px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: #c0392b; }
-.rd-needle { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; background: #d1201b; box-shadow: 0 0 6px rgba(209,32,27,.7); transition: left .12s; }
-.rd-ctl { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 10px 0; }
-.rd-ctl button { width: 46px; height: 46px; border-radius: 50%; border: 0; background: rgba(255,255,255,.1); color: inherit; font-size: 1.3rem; cursor: pointer; }
-.rd-knob { width: 78px; height: 78px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #6b625a, #2b2622 70%); box-shadow: 0 3px 8px rgba(0,0,0,.5), inset 0 1px 1px rgba(255,255,255,.2); position: relative; touch-action: none; cursor: grab; }
-.rd-knob span { position: absolute; left: 50%; top: 7px; width: 4px; height: 16px; margin-left: -2px; border-radius: 2px; background: #e8b04a; }
-.rd-presets { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 10px; }
-.rd-presets button { display: flex; flex-direction: column; align-items: center; min-width: 76px; max-width: 140px; padding: 6px 10px; border: 0; border-radius: 10px; background: rgba(255,255,255,.1); color: inherit; cursor: pointer; }
-.rd-presets button b { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
-.rd-presets button small { font-size: .72rem; opacity: .85; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rd-presets button.on { background: #e8b04a; color: #1b1815; }
-.rd-presets .muted { color: #d9cbb2; }
-.radio .btn.tonal { background: rgba(255,255,255,.12); color: #f3e6cf; }
-@media (prefers-reduced-motion: reduce) { .rd-needle { transition: none; } }
 
 /* Order-up alerts (RRA-124): a small stack at the top of the screen. */
 .pickups { position: fixed; z-index: 40; top: calc(env(safe-area-inset-top) + 8px); right: 10px; display: flex; flex-direction: column; gap: 8px; width: min(360px, calc(100vw - 20px)); }
@@ -1036,3 +983,8 @@ ul.duties li { padding: 5px 0; line-height: 1.4; }
 .va-bar small { display: block; color: var(--text-2); font-size: .78rem; }
 .va-bar .btn { flex: none; }
 .has-va .view { padding-bottom: 90px; }
+
+/* RRA-162: store coupons */
+.rcpt { font-family: ui-monospace, Menlo, "Courier New", monospace; font-size: .82rem; white-space: pre; overflow-x: auto; line-height: 1.45; }
+.sc-table td { white-space: nowrap; }
+.sc-how .sub { display: block; white-space: normal; margin: 2px 0; }
