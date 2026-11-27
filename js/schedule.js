@@ -3,7 +3,7 @@
 import * as data from './data.js';
 import { $, $$, esc, view, sheet, toast, setTitle, setChrome, session, isWide, LS } from './ui.js';
 const chipHtml = (t, k) => `<span class="chip${k ? ' ' + k : ''}">${esc(t)}</span>`;
-import { canChange, myStaff, isHost, canTime, level, JOB_AREAS, defaultJobAreas } from './perms.js';
+import { canChange, myStaff, isHost, canTime, level, JOB_AREAS, defaultJobAreas, isMgmtTitle, mgmtTitles, setMgmtTitles } from './perms.js';
 import { ROLES, myEcdhPublic, myPublicKey } from './access.js';
 import { printButtons, wirePrint } from './pdf.js';
 import { timeOffSection, askTimeOff } from './timeoff.js'; // RRA-139
@@ -479,12 +479,21 @@ export async function jobTitlesView() {
   const screens = (p) => (Array.isArray(jv[p]) ? jv[p] : defaultJobAreas(p));
   const short = (p) => screens(p).map((k) => JOB_AREAS[k].split(':')[0].replace(' and order guides', '').replace('Take orders and payments', 'Orders')).map((x) => tt(x)).join(', ');
   view.innerHTML = `
-    <div class="group">${list.map((p, i) => `<div class="row">${change ? `<button class="rm" type="button" data-rmp="${i}" aria-label="Remove ${esc(p)}">−</button>` : ''}<span class="grow"${isHost() ? ` data-jv="${i}" style="cursor:pointer"` : ''}><span class="title">${esc(p)}</span><span class="sub">${used(p) ? `${used(p)} on staff` : 'No one yet'} · sees ${esc(short(p))}${Array.isArray(jv[p]) ? '' : ' (suggested)'}</span></span>${isHost() ? '<span class="meta">Screens ›</span>' : ''}</div>`).join('')}</div>
+    <div class="group">${list.map((p, i) => `<div class="row">${change ? `<button class="rm" type="button" data-rmp="${i}" aria-label="Remove ${esc(p)}">−</button>` : ''}<span class="grow"${isHost() ? ` data-jv="${i}" style="cursor:pointer"` : ''}><span class="title">${esc(p)}</span><span class="sub">${used(p) ? `${used(p)} on staff` : 'No one yet'} · sees ${esc(short(p))}${Array.isArray(jv[p]) ? '' : ' (suggested)'}</span></span>${isHost() ? `<button type="button" class="chip jt-mg${isMgmtTitle(p) ? ' ok' : ''}" data-mg="${i}" aria-pressed="${isMgmtTitle(p)}">${isMgmtTitle(p) ? '★ ' + tt('Management') : '+ ' + tt('Management')}</button><span class="meta">Screens ›</span>` : isMgmtTitle(p) ? `<span class="chip ok">★ ${tt('Management')}</span>` : ''}</div>`).join('')}</div>
+    <p class="muted small">${tt('★ Management: people in these jobs with the Manager role can invite and approve phones, and everyone in them gets a notice when someone is invited, approved or removed. The Admin always can.')}${isHost() ? ' ' + tt('Tap the button on a job to change it.') : ''}</p>
     ${isHost() ? '<p class="muted small">Tap a job to choose the screens people with that job see. Everyone also gets the Employee lounge, their clock, My pay and Settings for their own phone. Chefs, managers and the Admin see what their role allows.</p>' : ''}
     ${change ? `<div class="row" style="padding:0;gap:8px"><input type="text" id="jt-new" placeholder="New job title, e.g. Barback" autocapitalize="words" style="flex:1"><button class="btn" id="jt-add" type="button">Add</button></div>
     <button class="btn plain block" id="jt-reset" type="button" style="margin-top:10px">Add back any missing starting titles</button>` : ''}
     <p class="muted small">Job titles show in the Position list when you add or edit staff. Removing a title doesn't change anyone who already has it. Tip pool points follow the title (Payroll settings → Tip rules), and the point of sale uses it to tell front of house from the kitchen.</p>`;
   $$('[data-jv]').forEach((el) => el.onclick = () => jobScreensSheet(list[+el.dataset.jv], screens(list[+el.dataset.jv]), Array.isArray(jv[list[+el.dataset.jv]])));
+  // RRA-161: the Admin picks which jobs are management.
+  $$('[data-mg]').forEach((b) => b.onclick = async (e) => {
+    e.stopPropagation();
+    const p = list[+b.dataset.mg], on = isMgmtTitle(p);
+    const next = on ? mgmtTitles().filter((x) => !sameJob(x, p)) : [...mgmtTitles(), p];
+    const set = await data.settings(); await data.saveSettings({ ...set, mgmtTitles: next }); setMgmtTitles(next);
+    toast(on ? tt('{0} is no longer a management job', p) : tt('{0} is now a management job', p)); jobTitlesView();
+  });
   if (!change) return;
   const save = async (positions) => { const set = await data.settings(); await data.saveSettings({ ...set, positions }); jobTitlesView(); };
   $('#jt-add').onclick = async () => { const t = $('#jt-new').value.trim().replace(/\s+/g, ' '); if (!t) return; const dup = list.find((p) => sameJob(p, t)); if (dup) { toast(tt('Already on the list as {0}', dup)); return; } await save([...list, t]); toast('Added ' + t); };
@@ -616,7 +625,9 @@ export async function staffView() {
       // RRA-090: the team settings list removed phones; that phone locks itself.
       if (s.iid) { const set = await data.settings(); await data.saveSettings({ ...set, removed: { ...(set.removed || {}), [s.iid]: { name: s.name, at: Date.now(), by: session.profile?.name } } }); }
       if (s.iid && s.role === 'manager') import('./sync.js').then((m) => m.dropDoor(s.iid)).catch(() => {}); // RRA-134
-      await data.remove('staff', s.id); toast(s.iid ? 'Removed, and their app access ended' : 'Removed'); staffView();
+      await data.remove('staff', s.id); toast(s.iid ? 'Removed, and their app access ended' : 'Removed');
+      import('./teamnotice.js').then((m) => m.teamNotice('remove', s.name, s.position || '')).catch(() => {}); // RRA-161
+      staffView();
     };
   });
 }

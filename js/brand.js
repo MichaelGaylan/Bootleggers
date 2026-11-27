@@ -294,6 +294,14 @@ self.BRAND = {
     'Server', 'Bartender', 'Barback', 'Busser', 'Host stand',
     'Food runner', 'Expo', 'Cashier', 'Delivery driver', 'Event coordinator',
   ],
+  // RRA-161: job titles that count as management. Only someone with the Manager
+  // role AND one of these titles can invite and approve phones (the Admin always
+  // can), and they all get a notice when anyone invites, approves or removes a
+  // person. The Admin changes the list in Job titles.
+  managementTitles: [
+    'General manager', 'Assistant manager', 'Manager', 'Kitchen manager', 'Bar manager',
+    'Executive chef', 'Sous chef', 'Shift lead',
+  ],
   jobTitleAliases: {
     'Host stand': ['Host', 'Hostess', 'Host/Hostess'], 'Busser': ['Bus person', 'Busboy', 'Bus boy', 'Bus girl'], 'Server': ['Waiter', 'Waitress', 'Wait staff'],
     'Chef': ['Head chef'], 'Food runner': ['Runner'], 'Expo': ['Expediter', 'Expeditor'], 'Dishwasher': ['Dish washer', 'Dishwasher/Porter'], 'Barback': ['Bar back'],

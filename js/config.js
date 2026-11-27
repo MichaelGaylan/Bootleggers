@@ -4,8 +4,8 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.18.0';
-export const BUILD = '2026.11.27-33';
+export const VERSION = '0.19.0';
+export const BUILD = '2026.11.27-34';
 
 // Text that names the restaurant uses tokens, so it reads right after a
 // changeout (RRA-123): {name} = short name, {restaurant} = full name,
@@ -14,6 +14,14 @@ export const brandText = (s) => String(s ?? '')
   .replace(/\{name\}/g, BRAND.shortName).replace(/\{restaurant\}/g, BRAND.restaurant).replace(/\{app\}/g, BRAND.appName);
 
 const WHATS_NEW_RAW = [
+  {
+    version: '0.19.0', build: '2026.11.27-34', date: '2026-11-27',
+    lines: [
+      'Invite and approve phones is for management jobs only: the Admin, and people with the Manager role whose job is a management job (General manager, Assistant manager, Manager, Kitchen manager, Bar manager, Executive chef, Sous chef, Shift lead). The Admin changes which jobs count in Job titles.',
+      'When anyone invites, approves or removes a person, everyone in a management job and the Admin get a team notice (a pop-up and a private post on the bulletin board).',
+      'Fixed: with View as on a tablet or computer, the side menu showed Invite and approve for every job.',
+    ],
+  },
   {
     version: '0.18.0', build: '2026.11.27-33', date: '2026-11-27',
     lines: [
