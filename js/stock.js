@@ -58,12 +58,12 @@ export async function stockView(forceEdit) {
     <div class="wtable-wrap"><table class="wtable">
       <thead><tr><th>Item</th><th>Type</th><th>Unit</th><th class="num">On hand</th><th class="num">Par</th><th>Status</th><th>Vendor</th>${costs ? '<th class="num">Value</th>' : ''}</tr></thead>
       ${Object.entries(groups).map(([g, its]) => `<tbody><tr class="band acc-band${q || stockView.open === g ? ' open' : ''}" data-g="${esc(g)}"><td colspan="${costs ? 8 : 7}">${esc(g)} <span class="muted">· ${its.length}</span>${its.filter(isLow).length ? ` ${chip(`${its.filter(isLow).length} low`, 'orange')}` : ''}</td></tr></tbody><tbody${q || stockView.open === g ? '' : ' hidden'}>
-        ${its.map((s) => `<tr data-id="${s.id}">
+        ${its.map((s) => `<tr data-id="${s.id}"${editing ? ` data-row-edit="${s.id}" class="tap-row"` : ''}>
           <td>${editing ? `<button class="rm" type="button" data-rm="${s.id}" aria-label="Remove ${esc(s.name)}">−</button> <span class="link" data-edit="${s.id}">${esc(s.name)}</span>` : esc(s.name)}</td>
           <td>${isFood(s.group) ? chip('Ingredient', 'blue') : chip('Supply', 'gray')}</td>
           <td>${esc(s.unit)}</td>
           <td class="num">${!editing && change ? `<span class="stepper"><button type="button" data-d="-1">−</button><b>${esc(qtyText(s.onHand))}</b><button type="button" data-d="1">+</button></span>` : esc(qtyText(s.onHand))}</td>
-          <td class="num">${+s.par ? esc(s.par) : '—'}</td>
+          <td class="num">${+s.par ? esc(s.par) : editing ? '<span class="link">Set par</span>' : '—'}</td>
           <td>${status(s)}</td>
           <td>${esc(vName(s.vendor)) || '<span class="muted">—</span>'}</td>
           ${costs ? `<td class="num">${s.price ? data.money(+s.price * +s.onHand) : '—'}</td>` : ''}
@@ -102,7 +102,10 @@ export async function stockView(forceEdit) {
   // RRA-049: the mode lives in the address, so a redraw stays on the edit page.
   $('#edit')?.addEventListener('click', () => { location.hash = editing ? '#/stock' : '#/stock-items'; });
   $('#add')?.addEventListener('click', () => itemDialog());
-  $$('[data-edit]', view).forEach((el) => { el.onclick = async () => itemDialog(await data.get('stock', el.dataset.edit)); });
+  $$('[data-edit]', view).forEach((el) => { el.onclick = async (e) => { e.stopPropagation(); itemDialog(await data.get('stock', el.dataset.edit)); }; });
+  // RRA-155: in Edit list on a tablet or computer, the whole row opens the item
+  // (not just its name), except the red remove button.
+  $$('[data-row-edit]', view).forEach((tr) => { tr.onclick = async (e) => { if (e.target.closest('[data-rm]')) return; itemDialog(await data.get('stock', tr.dataset.rowEdit)); }; });
   $$('[data-rm]', view).forEach((b) => {
     b.onclick = async () => {
       const s = list.find((x) => x.id === b.dataset.rm);

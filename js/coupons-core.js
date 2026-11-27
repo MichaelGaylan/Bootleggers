@@ -146,8 +146,10 @@ export const snapshot = (cp, code) => ({
 });
 
 // Discount for one coupon on a check right now (items can change after it's added).
+// RRA-152: a standing discount (military, first responder, senior) with a seat
+// counts only that seat's items, so moving or voiding a dish updates it.
 export function discountOf(c, k) {
-  const lines = liveLines(c);
+  const lines = liveLines(c).filter((x) => !k.seat || x.seat === k.seat);
   const sub = lines.reduce((t, x) => t + x.price * (x.qty || 1), 0);
   const base = lines.filter((x) => !k.food || isFoodLine(x)).reduce((t, x) => t + x.price * (x.qty || 1), 0);
   if (k.min > 0 && (k.food ? base : sub) + 0.004 < k.min) return { amount: 0, note: `needs $${k.min.toFixed(2)}${k.food ? ' of food' : ''}` };
@@ -187,9 +189,10 @@ export function canApply({ coupons, checks, check, text, now = new Date() }) {
 }
 
 // A standing discount (RRA-128) picked from the list: same rules, no code read.
-export const canApplyStanding = ({ coupon, checks, check, now = new Date() }) => rules({ coupon, code: coupon.code, suffix: '', checks, check, now });
+// RRA-152: seat = the seat that showed ID; the discount covers that seat only.
+export const canApplyStanding = ({ coupon, checks, check, seat, now = new Date() }) => rules({ coupon, code: coupon.code, suffix: '', checks, check, now, seat });
 
-function rules({ coupon: cp, code, suffix, checks, check, now }) {
+function rules({ coupon: cp, code, suffix, checks, check, now, seat }) {
   if (cp.paused) return { error: `${cp.code} is paused.` };
   if (cp.unique && !suffix) return { error: `${cp.code} only works with its one-time code (e.g. ${cp.code}-XXXXXX).` };
   if (suffix && !(cp.codes || []).includes(suffix)) return { error: `${code} isn't one of the one-time codes made for ${cp.code}.` };
@@ -199,13 +202,20 @@ function rules({ coupon: cp, code, suffix, checks, check, now }) {
   if (cp.days && cp.days.length && cp.days.length < 7 && !cp.days.includes(t.day)) return { error: `${cp.code} is only good ${dayRange(cp.days)}.` };
   if (cp.from && cp.to && (t.hm < cp.from || t.hm > cp.to)) return { error: `${cp.code} is only good ${fmtHour(cp.from)}–${fmtHour(cp.to)}.` };
   const on = check.coupons || [];
-  if (on.some((k) => k.couponId === cp.id)) return { error: `${tagOf(cp) ? tagOf(cp).label + ' discount' : cp.code} is already on this check (one per check).` };
-  if (on.length && (!cp.stack || on.some((k) => !k.stack))) return { error: 'This check already has a coupon or discount, and these can\'t be combined.' };
+  if (tagOf(cp) && seat) {
+    // One standing discount per seat; each seat that shows ID can have its own.
+    const here = on.find((k) => tagOf(k) && k.seat === seat);
+    if (here) return { error: `Seat ${seat} already has the ${tagOf(here).label.toLowerCase()} discount.` };
+    if (on.some((k) => !tagOf(k) && (!k.stack || !cp.stack))) return { error: 'This check already has a coupon, and it can\'t be combined with a discount.' };
+  } else {
+    if (on.some((k) => k.couponId === cp.id)) return { error: `${tagOf(cp) ? tagOf(cp).label + ' discount' : cp.code} is already on this check (one per check).` };
+    if (on.length && (!cp.stack || on.some((k) => !k.stack))) return { error: 'This check already has a coupon or discount, and these can\'t be combined.' };
+  }
   const used = (checks || []).filter((k) => k.id !== check.id).flatMap((k) => k.coupons || []);
   if (suffix && used.some((k) => k.code === code)) return { error: `${code} has already been used.` };
   const uses = used.filter((k) => k.couponId === cp.id).length;
   if (+cp.maxUses > 0 && uses >= +cp.maxUses) return { error: `${cp.code} is used up (${cp.maxUses} of ${cp.maxUses}).` };
-  return { ok: true, line: snapshot(cp, code), coupon: cp };
+  return { ok: true, line: { ...snapshot(cp, code), ...(tagOf(cp) && seat ? { seat } : {}) }, coupon: cp };
 }
 
 // How many times a coupon has been used (on any check, open or closed).

@@ -457,8 +457,12 @@ export async function posCheckView(id, opt = {}) {
           <span class="pos-price">${money(lineTotal(x))}</span></div>`).join('')}</div>`).join('')
       : `<p class="muted center" style="margin:6px 0">No items yet. Tap a dish to add it.</p>${(c.payments || []).length ? '' : '<button class="btn plain block small" id="free" type="button">Seated by mistake? Free the table</button>'}`}
       <div class="pos-tot"><span>Subtotal</span><span>${money(t.sub)}</span></div>
-      ${dl.map((k, i) => `<div class="pos-tot pos-cpn"><button type="button" data-cpn="${i}" ${locked ? 'disabled' : ''}><span>${tagOf(k) ? `${tagOf(k).icon} ${esc(tagOf(k).label)}` : `🎟 ${esc(k.code)}`}</span><small>${esc(tagOf(k) ? headline(k).split(': ')[1] : headline(k))}${k.note ? ` · <b style="color:var(--warn)">${esc(k.note)}</b>` : ''}</small></button><span>${k.amount ? '−' + money(k.amount) : money(0)}</span></div>`).join('')}
-      ${c.items.length && !locked && dl.every((k) => k.stack) ? `<div class="pos-addcpn"><button class="btn plain small" id="cpn" type="button">🎟 ${dl.length ? 'Add another coupon' : 'Add a coupon'}</button>${hasStanding ? '<button class="btn plain small" id="disc" type="button">🎖 Discounts</button>' : ''}</div>` : ''}
+      ${dl.map((k, i) => `<div class="pos-tot pos-cpn"><button type="button" data-cpn="${i}" ${locked ? 'disabled' : ''}><span>${tagOf(k) ? `${tagOf(k).icon} ${esc(tagOf(k).label)}${k.seat ? ` · Seat ${k.seat}` : ''}` : `🎟 ${esc(k.code)}`}</span><small>${esc(tagOf(k) ? headline(k).split(': ')[1].replace('your check', k.seat ? `seat ${k.seat}` : 'your check') : headline(k))}${k.note ? ` · <b style="color:var(--warn)">${esc(k.note)}</b>` : ''}</small></button><span>${k.amount ? '−' + money(k.amount) : money(0)}</span></div>`).join('')}
+      ${(() => { // RRA-152: seat discounts don't block another seat's discount
+        const canCpn = dl.every((k) => k.stack), seatsFree = dl.filter((k) => tagOf(k) && k.seat).length < (c.guests || 1);
+        const canDisc = hasStanding && seatsFree && dl.every((k) => k.stack || (tagOf(k) && k.seat));
+        return c.items.length && !locked && (canCpn || canDisc) ? `<div class="pos-addcpn">${canCpn ? `<button class="btn plain small" id="cpn" type="button">🎟 ${dl.length ? 'Add another coupon' : 'Add a coupon'}</button>` : ''}${canDisc ? '<button class="btn plain small" id="disc" type="button">🎖 Discounts</button>' : ''}</div>` : '';
+      })()}
       <div class="pos-tot"><span>Tax ${((c.tax ?? P.tax) * 100).toFixed(1)}%</span><span>${money(t.tax)}</span></div>
       <div class="pos-tot big"><span>Total</span><span>${money(t.total)}</span></div>
       ${t.paid ? `<div class="pos-tot"><span>Paid</span><span>−${money(t.paid)}</span></div><div class="pos-tot big"><span>Due</span><span>${money(t.due)}</span></div>` : ''}
@@ -507,7 +511,7 @@ export async function posCheckView(id, opt = {}) {
     const ok = await sheet({ title: tagOf(k) ? 'Take off discount?' : 'Take off coupon?', right: 'Take off', body: `<p><b>${esc(tagOf(k) ? tagOf(k).label : k.code)}</b> · ${esc(headline(k))}</p><p class="muted small">It can be added again afterwards.</p>` });
     if (!ok) return;
     const cur = await data.get('check', c.id);
-    await data.put('check', { ...cur, coupons: (cur.coupons || []).filter((x) => x.code !== k.code) });
+    await data.put('check', { ...cur, coupons: (cur.coupons || []).filter((x) => !(x.code === k.code && (x.seat || 0) === (k.seat || 0))) });
     toast('Coupon taken off'); posCheckView(id);
   });
   $('#fold')?.addEventListener('click', () => { LS.set('posFold', !LS.get('posFold', true)); posCheckView(id); });
@@ -700,8 +704,12 @@ function parts(c, tax) {
   } else if (mode === 'seat') {
     const rate = c.tax ?? tax;
     const seats = [...new Set(c.items.filter((x) => !x.voided).map((x) => x.seat))].sort((a, b) => a - b);
-    const k = t.sub ? t.net / t.sub : 1; // coupons shared out by what each seat ordered
-    ps = seats.map((s) => { const sub = r2(k * c.items.filter((x) => x.seat === s).reduce((a, x) => a + lineTotal(x), 0)); return { key: 's' + s, label: `Seat ${s}`, amount: r2(sub + r2(sub * rate)) }; });
+    // Whole-check coupons are shared out by what each seat ordered; a seat's
+    // own discount (RRA-152, military etc.) comes off that seat only.
+    const dl = discounts(c).list;
+    const own = (s) => dl.filter((k) => k.seat === s).reduce((a, k) => a + k.amount, 0);
+    const whole = dl.filter((k) => !k.seat).reduce((a, k) => a + k.amount, 0);
+    ps = seats.map((s) => { const items = c.items.filter((x) => x.seat === s).reduce((a, x) => a + lineTotal(x), 0); const sub = r2(items - own(s) - (t.sub ? whole * items / t.sub : 0)); return { key: 's' + s, label: `Seat ${s}`, amount: r2(sub + r2(sub * rate)) }; });
     const diff = r2(t.total - ps.reduce((s, p) => s + p.amount, 0)); if (ps.length && diff) ps[ps.length - 1].amount = r2(ps[ps.length - 1].amount + diff);
   } else ps = [{ key: 'w', label: 'Whole check', amount: t.total }];
   return ps.map((p) => ({ ...p, paid: paidFor(p.key), due: r2(Math.max(0, p.amount - paidFor(p.key))) }));
@@ -770,11 +778,40 @@ function terminalSheet(part, P) {
     body: `<p class="muted small center">${svc.id === 'practice' ? 'Practice reader' : `Sent to ${esc(dev)} “${esc(P.device)}”`} · what the guest sees:</p>
       <div class="pos-term"><div class="pr-lab" style="color:#aaa">Amount</div><div class="pr-big" style="color:#fff">${money(part.due)}</div>
         <div class="pr-lab" style="color:#aaa;margin-top:10px">Add a tip</div>
-        <div class="pos-tips">${[18, 20, 22].map((p) => `<button type="button" data-tip="${r2(part.due * p / 100)}">${p}%<small>${money(part.due * p / 100)}</small></button>`).join('')}<button type="button" data-tip="0">No tip</button></div>
-        <div id="tap" class="pos-tap" hidden>Tap, insert or swipe<button class="btn block" type="button" id="ok" style="margin-top:12px">Approve (simulate)</button></div></div>`,
+        <div class="pos-tips">${[18, 20, 22].map((p) => `<button type="button" data-tip="${r2(part.due * p / 100)}">${p}%<small>${money(part.due * p / 100)}</small></button>`).join('')}<button type="button" id="ctip" class="wide">Custom</button><button type="button" data-tip="0">No tip</button></div>
+        <div id="cpad" class="pos-cpad" hidden>
+          <div class="cp-mode"><button type="button" data-cm="$" class="on">$ amount</button><button type="button" data-cm="%">% of bill</button></div>
+          <div class="cp-show" id="cpv">$0.00</div><div class="cp-sub" id="cps"></div>
+          <div class="cp-keys">${['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'].map((k) => `<button type="button" data-k="${k}">${k}</button>`).join('')}</div>
+          <button type="button" class="btn block" id="cpok" style="margin-top:10px">Use this tip</button>
+        </div>
+        <div id="tap" class="pos-tap" hidden><div id="tipline" class="cp-sub"></div>Tap, insert or swipe<button class="btn block" type="button" id="ok" style="margin-top:12px">Approve (simulate)</button></div></div>`,
     onMount(api) {
       let tip = null;
-      $$('[data-tip]', api.el).forEach((b) => b.onclick = () => { tip = +b.dataset.tip; $$('[data-tip]', api.el).forEach((x) => x.classList.toggle('on', x === b)); $('#tap', api.el).hidden = false; });
+      const pick = (v, b) => { tip = r2(v); $$('.pos-tips button', api.el).forEach((x) => x.classList.toggle('on', x === b)); $('#tipline', api.el).textContent = `Tip ${money(tip)} · Total ${money(part.due + tip)}`; $('#tap', api.el).hidden = false; };
+      $$('[data-tip]', api.el).forEach((b) => b.onclick = () => { $('#cpad', api.el).hidden = true; pick(+b.dataset.tip, b); });
+      // RRA-156: custom tip, typed as dollars or a percent of the bill.
+      let mode = '$', typed = '', sure = false;
+      const amt = () => { const v = parseFloat(typed) || 0; return r2(mode === '%' ? part.due * v / 100 : v); };
+      const show = () => {
+        sure = false; $('#cpok', api.el).textContent = 'Use this tip';
+        $('#cpv', api.el).textContent = mode === '%' ? `${typed || '0'}%` : `$${typed || '0.00'}`;
+        $('#cps', api.el).textContent = `Tip ${money(amt())} · Total ${money(part.due + amt())}`;
+      };
+      $('#ctip', api.el).onclick = () => { $('#cpad', api.el).hidden = false; $('#tap', api.el).hidden = true; tip = null; $$('.pos-tips button', api.el).forEach((x) => x.classList.toggle('on', x.id === 'ctip')); show(); };
+      $$('[data-cm]', api.el).forEach((b) => b.onclick = () => { mode = b.dataset.cm; typed = ''; $$('[data-cm]', api.el).forEach((x) => x.classList.toggle('on', x === b)); show(); });
+      $$('[data-k]', api.el).forEach((b) => b.onclick = () => {
+        const k = b.dataset.k;
+        if (k === '⌫') typed = typed.slice(0, -1);
+        else if (k === '.') { if (!typed.includes('.')) typed = (typed || '0') + '.'; }
+        else if (!/\.\d{2}$/.test(typed) && typed.replace('.', '').length < 6) typed = typed === '0' ? k : typed + k;
+        show();
+      });
+      $('#cpok', api.el).onclick = () => {
+        const v = amt();
+        if (v > part.due * 0.5 && !sure) { sure = true; $('#cpok', api.el).textContent = `Are you sure? Tap again for a ${money(v)} tip`; return; }
+        $('#cpad', api.el).hidden = true; pick(v, $('#ctip', api.el));
+      };
       $('#ok', api.el).onclick = () => api.close({ method: 'card', provider: svc.id, tip, ref: (svc.id === 'practice' ? 'PR-' : svc.id.slice(0, 2).toUpperCase() + '-') + Math.random().toString(36).slice(2, 8).toUpperCase() });
     },
   });
@@ -888,8 +925,19 @@ export async function ticketsView() {
   setTitle(station === 'Bar' ? 'Bar tickets' : 'Kitchen tickets', can86() ? '<button class="btn plain small" id="e86" type="button">86 list</button>' : '');
   const all = (await data.list('ticket')).filter((t) => !t.bumped);
   const live = all.filter((t) => t.station === station).sort((a, b) => a.at - b.at);
+  // RRA-154: a flag on each tab. Red with a number = new tickets nobody has
+  // looked at on this device yet (opening the tab clears it); orange or red
+  // with 🚩 = a ticket there has waited 8 / 15 minutes or more.
+  const seenT = new Set(LS.get('posSeenTix', []));
+  live.forEach((t) => seenT.add(t.id));
+  LS.set('posSeenTix', [...seenT].filter((id) => all.some((t) => t.id === id)));
+  const flag = (s) => {
+    const its = all.filter((t) => t.station === s), fresh = its.filter((t) => !seenT.has(t.id)).length;
+    const old = its.reduce((m, t) => Math.max(m, mins(t.at)), 0), heat = old >= 15 ? 'late' : old >= 8 ? 'warm' : '';
+    return `${its.length ? ` <small class="tix-n">${its.length}</small>` : ''}${heat ? ` <i class="tix-flag ${heat}" title="Waiting ${old} min">🚩</i>` : ''}${fresh ? ` <i class="tix-new" aria-label="${fresh} new">${fresh}</i>` : ''}`;
+  };
   view.innerHTML = `
-    <div class="segmented"${sts.length < 2 ? ' hidden' : ''}>${sts.map((s) => `<button type="button" data-st="${s}" class="${s === station ? 'on' : ''}">${s} (${all.filter((t) => t.station === s).length})</button>`).join('')}</div>
+    <div class="segmented tix-tabs"${sts.length < 2 ? ' hidden' : ''}>${sts.map((s) => `<button type="button" data-st="${s}" class="${s === station ? 'on' : ''}">${s}${flag(s)}</button>`).join('')}</div>
     <div class="pos-tix">${live.map((t) => { const m = mins(t.at); return `
       <div class="card pos-ticket ${m >= 15 ? 'late' : m >= 8 ? 'warm' : ''}">
         <div class="pos-th"><b>${esc(t.checkName)}</b><span>${m} min</span></div>
