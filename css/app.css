@@ -707,7 +707,8 @@ svg.lock { width: 11px; height: 11px; vertical-align: -1px; }
 .pos-item.out { opacity: .45; text-decoration: line-through; }
 .pos-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
 .pos-term { background: #111; color: #fff; border-radius: 18px; padding: 18px 16px; text-align: center; }
-.pos-tips { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.pos-tips { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
+.pos-tips button.wide { grid-column: span 2; }
 .pos-tips button { border: 0; border-radius: 12px; padding: 12px 6px; background: #2c2c2e; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
 .pos-tips button small { display: block; font-weight: 500; color: #aaa; }
 .pos-tips button.on { background: #0a84ff; }
@@ -1011,3 +1012,13 @@ button.row.cpn-disc:disabled { opacity: .55; cursor: default; }
 .tix-tabs .tix-flag { font-style: normal; font-size: .9rem; padding: 0 4px; border-radius: 8px; }
 .tix-tabs .tix-flag.warm { background: color-mix(in srgb, var(--warn) 30%, transparent); }
 .tix-tabs .tix-flag.late { background: color-mix(in srgb, var(--danger) 35%, transparent); }
+
+/* RRA-156: custom tip pad on the card screen */
+.pos-cpad { margin-top: 12px; }
+.pos-cpad .cp-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.pos-cpad .cp-mode button, .pos-cpad .cp-keys button { border: 0; border-radius: 10px; padding: 10px 6px; background: #2c2c2e; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.pos-cpad .cp-mode button.on { background: #0a84ff; }
+.pos-cpad .cp-show { font-size: 2rem; font-weight: 700; margin-top: 10px; }
+.pos-term .cp-sub { color: #aaa; font-size: .9rem; margin-bottom: 8px; }
+.pos-cpad .cp-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.pos-cpad .cp-keys button { font-size: 1.2rem; padding: 12px 6px; }

@@ -4,8 +4,8 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.17.0';
-export const BUILD = '2026.11.26-31';
+export const VERSION = '0.17.1';
+export const BUILD = '2026.11.27-32';
 
 // Text that names the restaurant uses tokens, so it reads right after a
 // changeout (RRA-123): {name} = short name, {restaurant} = full name,
@@ -14,6 +14,12 @@ export const brandText = (s) => String(s ?? '')
   .replace(/\{name\}/g, BRAND.shortName).replace(/\{restaurant\}/g, BRAND.restaurant).replace(/\{app\}/g, BRAND.appName);
 
 const WHATS_NEW_RAW = [
+  {
+    version: '0.17.1', build: '2026.11.27-32', date: '2026-11-27',
+    lines: [
+      'Custom tip on the card screen: tap Custom, type a dollar amount or a percent of the bill, and see the new total before you approve. A tip over half the bill asks "Are you sure?" first.',
+    ],
+  },
   {
     version: '0.17.0', build: '2026.11.26-31', date: '2026-11-26',
     lines: [

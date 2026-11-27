@@ -778,11 +778,40 @@ function terminalSheet(part, P) {
     body: `<p class="muted small center">${svc.id === 'practice' ? 'Practice reader' : `Sent to ${esc(dev)} “${esc(P.device)}”`} · what the guest sees:</p>
       <div class="pos-term"><div class="pr-lab" style="color:#aaa">Amount</div><div class="pr-big" style="color:#fff">${money(part.due)}</div>
         <div class="pr-lab" style="color:#aaa;margin-top:10px">Add a tip</div>
-        <div class="pos-tips">${[18, 20, 22].map((p) => `<button type="button" data-tip="${r2(part.due * p / 100)}">${p}%<small>${money(part.due * p / 100)}</small></button>`).join('')}<button type="button" data-tip="0">No tip</button></div>
-        <div id="tap" class="pos-tap" hidden>Tap, insert or swipe<button class="btn block" type="button" id="ok" style="margin-top:12px">Approve (simulate)</button></div></div>`,
+        <div class="pos-tips">${[18, 20, 22].map((p) => `<button type="button" data-tip="${r2(part.due * p / 100)}">${p}%<small>${money(part.due * p / 100)}</small></button>`).join('')}<button type="button" id="ctip" class="wide">Custom</button><button type="button" data-tip="0">No tip</button></div>
+        <div id="cpad" class="pos-cpad" hidden>
+          <div class="cp-mode"><button type="button" data-cm="$" class="on">$ amount</button><button type="button" data-cm="%">% of bill</button></div>
+          <div class="cp-show" id="cpv">$0.00</div><div class="cp-sub" id="cps"></div>
+          <div class="cp-keys">${['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'].map((k) => `<button type="button" data-k="${k}">${k}</button>`).join('')}</div>
+          <button type="button" class="btn block" id="cpok" style="margin-top:10px">Use this tip</button>
+        </div>
+        <div id="tap" class="pos-tap" hidden><div id="tipline" class="cp-sub"></div>Tap, insert or swipe<button class="btn block" type="button" id="ok" style="margin-top:12px">Approve (simulate)</button></div></div>`,
     onMount(api) {
       let tip = null;
-      $$('[data-tip]', api.el).forEach((b) => b.onclick = () => { tip = +b.dataset.tip; $$('[data-tip]', api.el).forEach((x) => x.classList.toggle('on', x === b)); $('#tap', api.el).hidden = false; });
+      const pick = (v, b) => { tip = r2(v); $$('.pos-tips button', api.el).forEach((x) => x.classList.toggle('on', x === b)); $('#tipline', api.el).textContent = `Tip ${money(tip)} · Total ${money(part.due + tip)}`; $('#tap', api.el).hidden = false; };
+      $$('[data-tip]', api.el).forEach((b) => b.onclick = () => { $('#cpad', api.el).hidden = true; pick(+b.dataset.tip, b); });
+      // RRA-156: custom tip, typed as dollars or a percent of the bill.
+      let mode = '$', typed = '', sure = false;
+      const amt = () => { const v = parseFloat(typed) || 0; return r2(mode === '%' ? part.due * v / 100 : v); };
+      const show = () => {
+        sure = false; $('#cpok', api.el).textContent = 'Use this tip';
+        $('#cpv', api.el).textContent = mode === '%' ? `${typed || '0'}%` : `$${typed || '0.00'}`;
+        $('#cps', api.el).textContent = `Tip ${money(amt())} · Total ${money(part.due + amt())}`;
+      };
+      $('#ctip', api.el).onclick = () => { $('#cpad', api.el).hidden = false; $('#tap', api.el).hidden = true; tip = null; $$('.pos-tips button', api.el).forEach((x) => x.classList.toggle('on', x.id === 'ctip')); show(); };
+      $$('[data-cm]', api.el).forEach((b) => b.onclick = () => { mode = b.dataset.cm; typed = ''; $$('[data-cm]', api.el).forEach((x) => x.classList.toggle('on', x === b)); show(); });
+      $$('[data-k]', api.el).forEach((b) => b.onclick = () => {
+        const k = b.dataset.k;
+        if (k === '⌫') typed = typed.slice(0, -1);
+        else if (k === '.') { if (!typed.includes('.')) typed = (typed || '0') + '.'; }
+        else if (!/\.\d{2}$/.test(typed) && typed.replace('.', '').length < 6) typed = typed === '0' ? k : typed + k;
+        show();
+      });
+      $('#cpok', api.el).onclick = () => {
+        const v = amt();
+        if (v > part.due * 0.5 && !sure) { sure = true; $('#cpok', api.el).textContent = `Are you sure? Tap again for a ${money(v)} tip`; return; }
+        $('#cpad', api.el).hidden = true; pick(v, $('#ctip', api.el));
+      };
       $('#ok', api.el).onclick = () => api.close({ method: 'card', provider: svc.id, tip, ref: (svc.id === 'practice' ? 'PR-' : svc.id.slice(0, 2).toUpperCase() + '-') + Math.random().toString(36).slice(2, 8).toUpperCase() });
     },
   });
