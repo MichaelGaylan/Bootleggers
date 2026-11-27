@@ -5,13 +5,21 @@
 // open it.
 
 import { session } from './ui.js';
-import { myStaff, isHost } from './perms.js';
+import { myStaff, isHost, inManagement } from './perms.js';
 
 export const GROUPS = {
   kitchen: { name: 'Kitchen team', roles: ['staff', 'chef'] },
   chefs: { name: 'Chefs', roles: ['chef'] },
   managers: { name: 'Managers', roles: ['manager', 'owner'] },
+  // RRA-161: everyone in a management job title, plus the Admin.
+  mgmt: { name: 'Management (all management jobs)', roles: ['owner'], titles: true },
 };
+// Is this staff record (or this phone, when st is left out) in the group?
+export function inGroup(g, st, role) {
+  const G = GROUPS[g]; if (!G) return false;
+  if (G.roles.includes(role)) return true;
+  return !!G.titles && inManagement(st);
+}
 
 // This phone's person: a staff record id, or 'admin' on an Admin device.
 export const myId = () => (isHost() ? 'admin' : myStaff()?.id || null);
@@ -34,7 +42,7 @@ export function canSeePost(p) {
   const a = audience(p);
   if (a.kind === 'all' || sentByMe(p)) return true;
   const role = session.profile?.role;
-  if (a.kind === 'group') return !!GROUPS[a.group]?.roles.includes(role);
+  if (a.kind === 'group') return inGroup(a.group, myStaff(), role);
   if (a.kind === 'person') return a.person === myId();
   return false;
 }
@@ -55,7 +63,7 @@ export function recipientKeys(p, staff, settings) {
   const keys = new Set();
   if (a.kind === 'group') {
     const roles = GROUPS[a.group]?.roles || [];
-    for (const s of staff) if (roles.includes(s.role) && s.ek) keys.add(s.ek);
+    for (const s of staff) if (inGroup(a.group, s, s.role) && s.ek) keys.add(s.ek);
     if (roles.includes('owner')) admins.forEach((k) => keys.add(k));
   } else if (a.kind === 'person') {
     if (a.person === 'admin') admins.forEach((k) => keys.add(k));

@@ -55,7 +55,7 @@ export const realAdmin = () => REAL?.role === 'owner';
 export const viewAs = () => VIEW;
 export function roleForTitle(title = '') {
   const t = String(title).toLowerCase();
-  if (/manager|^gm$/.test(t)) return 'manager';
+  if (isMgmtTitle(title) || /manager|^gm$/.test(t)) return 'manager'; // RRA-161
   if (/chef/.test(t)) return 'chef';
   return 'staff';
 }
@@ -89,6 +89,29 @@ export function level(area, who = null) {
   }
   return lv;
 }
+
+// ---------------------------------------------------------------- management (RRA-161)
+// Invite and approve phones: the Admin, or someone with the Manager role whose
+// job title is a management title (brand.js managementTitles, changed by the
+// Admin in Job titles). A manager with no job title counts as "Manager".
+const jkey = (t) => String(t || '').toLowerCase().replace(/[^a-z]+/g, ' ').trim();
+const JALIAS = new Map();
+for (const [main, others] of Object.entries(globalThis.BRAND?.jobTitleAliases || {})) for (const o of [main, ...others]) JALIAS.set(jkey(o), jkey(main));
+const jnorm = (t) => JALIAS.get(jkey(t)) || jkey(t);
+export const MGMT_DEFAULT = globalThis.BRAND?.managementTitles || ['Manager'];
+let MGMT = null;
+export const setMgmtTitles = (v) => { MGMT = Array.isArray(v) ? v : null; };
+export const mgmtTitles = () => MGMT || MGMT_DEFAULT;
+export const isMgmtTitle = (t) => !!t && mgmtTitles().some((x) => jnorm(x) === jnorm(t));
+export function canInvite(p = session.profile) {
+  if (!p) return false;
+  if (p.role === 'owner') return true;
+  if (p.role !== 'manager') return false;
+  const mine = p === session.profile ? myStaff()?.position : null;
+  return isMgmtTitle(mine || p.pos || 'Manager');
+}
+// A staff record in a management job (for notices): a management title, or the Manager role with no title.
+export const inManagement = (st) => !!st && (isMgmtTitle(st.position) || (st.role === 'manager' && !st.position));
 
 // ---------------------------------------------------------------- job views (RRA-132)
 // Each job title has its own set of screens. Only people with the Staff role

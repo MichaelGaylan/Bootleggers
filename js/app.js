@@ -10,7 +10,8 @@ import * as access from './access.js';
 import * as store from './store.js';
 import * as data from './data.js';
 import * as sync from './sync.js';
-import { canSee, canChange, isHost, myStaff, setJobViews, jobAreas, jobAllows, setReal, realAdmin, viewAs, setViewAs, shownProfile } from './perms.js';
+import { canSee, canChange, isHost, myStaff, setJobViews, jobAreas, jobAllows, setReal, realAdmin, viewAs, setViewAs, shownProfile, canInvite, setMgmtTitles, isMgmtTitle } from './perms.js';
+import { teamNotice, teamNoticePopup } from './teamnotice.js'; // RRA-161
 import { viewAsSheet, viewAsBar } from './viewas.js'; // RRA-158
 import { findDuplicates, countDuplicates } from './dedupe.js';
 import { reportsView, reportPopups, sendReportInApp, openReports } from './reports.js';
@@ -196,7 +197,7 @@ async function openDoor() {
   if (!sync.enabled() || !profile) return;
   const ek = await access.myEcdhPublic();
   const flag = BRAND.dataPrefix + 'door';
-  if (access.can(profile, 'invite')) { if (await sync.publishDoor(doorId(ek), ek).catch(() => false)) localStorage.setItem(flag, '1'); }
+  if (canInvite(profile)) { if (await sync.publishDoor(doorId(ek), ek).catch(() => false)) localStorage.setItem(flag, '1'); }
   else if (localStorage.getItem(flag)) { await sync.dropDoor(doorId(ek)); localStorage.removeItem(flag); }
 }
 
@@ -238,7 +239,8 @@ function renderSide() {
     canSee('costs') ? link('costs', 'Costs and waste') : '',
     '<hr>',
     link('settings', 'Settings'),
-    access.can(profile, 'invite') ? link('team', 'Invite and approve', waiting.size ? `<span class="chip warn">${waiting.size}</span>` : '') : '',
+    canInvite() ? link('team', 'Invite and approve', // RRA-161: follows View as and the job title
+      waiting.size ? `<span class="chip warn">${waiting.size}</span>` : '') : '',
     isHost() ? link('backup', 'Admin backup') : '',
     '<hr>',
     link('about', 'About and how-to'),
@@ -278,7 +280,7 @@ function moreView() {
     <div class="group">
       <a class="row" href="#/alerts"><span class="grow">Alerts</span><span class="meta">Badges, chime, notifications</span></a>
       <a class="row" href="#/settings"><span class="grow">Settings</span><span class="meta">${esc(THEMES[getTheme()])}</span></a>
-      ${access.can(session.profile, 'invite') ? `<a class="row" href="#/team"><span class="grow">Invite and approve phones</span>${waiting.size ? `<span class="chip warn">${waiting.size} waiting</span>` : ''}</a>` : ''}
+      ${canInvite() ? `<a class="row" href="#/team"><span class="grow">Invite and approve phones</span>${waiting.size ? `<span class="chip warn">${waiting.size} waiting</span>` : ''}</a>` : ''}
       ${isHost() ? `<a class="row" href="#/backup"><span class="grow">Admin backup</span>${LS.get('backupAt', 0) ? '' : '<span class="chip warn">Not made yet</span>'}</a>` : ''}
       ${realAdmin() ? `<button class="row nav" id="view-as" type="button"><span class="grow"><span class="title">View as a job</span><span class="sub">See the app the way a Server, Cook, Manager or any job sees it</span></span>${viewAs() ? `<span class="meta">${esc(viewAs().title)}</span>` : ''}</button>` : ''}
     </div>
@@ -502,7 +504,7 @@ const jobOptions = (list, pick = '') => `<option value="">Choose their job…</o
 const autoJob = (role) => (role === 'manager' ? 'Manager' : role === 'chef' ? 'Chef' : '');
 
 async function teamView(incoming) {
-  if (!access.can(profile, 'invite')) { location.hash = '#/more'; return; }
+  if (!canInvite()) { location.hash = '#/more'; return; } // RRA-161: management job titles only
   setChrome({ tab: 'more', back: true });
   setTitle('Team access');
   const invites = (await access.issuedInvites()).sort((a, b) => b.iat - a.iat);
@@ -511,7 +513,7 @@ async function teamView(incoming) {
     <div class="section-label">1. Send an invite</div>
     <div class="card">
       <label class="field" style="margin-top:0"><span>Their name</span><input type="text" id="i-name" placeholder="e.g. Sam" autocomplete="off"></label>
-      <label class="field"><span>Role</span><select id="i-role"><option value="staff">Staff</option><option value="chef">Chef</option>${access.can(profile, 'invite.manager') ? '<option value="manager">Manager (can invite and approve phones)</option>' : ''}</select></label>
+      <label class="field"><span>Role</span><select id="i-role"><option value="staff">Staff</option><option value="chef">Chef</option>${access.can(session.profile, 'invite.manager') ? '<option value="manager">Manager (management jobs can invite and approve phones)</option>' : ''}</select></label>
       <label class="field" id="i-job-f"><span>Job</span><select id="i-job">${jobOptions(jobs)}</select></label>
       <button class="btn block" id="i-make" type="button">Create invite</button>
       <p class="muted small">Each invite works once, on one phone, within ${INVITE_HOURS} hours.</p>
@@ -535,19 +537,26 @@ async function teamView(incoming) {
       : '<div class="row muted">None yet.</div>'}</div>
     <p class="muted small">To take access away right now, send the invite id to the app's developer so it can be added to the revoked list. Otherwise access ends by itself after ${INACTIVITY_DAYS} days without use.</p>`;
 
-  // Chefs and managers get their job title from their role.
-  const jobShown = () => { $('#i-job-f').hidden = ($('#i-role')?.value || 'staff') !== 'staff'; };
+  // Chefs get their job title from their role. RRA-161: a Manager picks one of
+  // the management titles (only those can invite and approve phones).
+  const mgmtJobs = () => { const m = jobs.filter((j) => isMgmtTitle(j)); return m.length ? m : ['Manager']; };
+  const jobShown = () => {
+    const r = $('#i-role')?.value || 'staff';
+    $('#i-job-f').hidden = r === 'chef';
+    $('#i-job').innerHTML = r === 'manager' ? mgmtJobs().map((j) => `<option${j === 'Manager' ? ' selected' : ''}>${esc(j)}</option>`).join('') : jobOptions(jobs);
+  };
   $('#i-role').onchange = jobShown; jobShown();
   $('#i-make').onclick = async () => {
     const name = $('#i-name').value.trim();
     if (!name) { $('#i-name').focus(); return; }
     const role = $('#i-role')?.value || 'staff';
-    const pos = autoJob(role) || $('#i-job').value;
+    const pos = role === 'chef' ? 'Chef' : $('#i-job').value || autoJob(role);
     if (!pos) { toast('Choose their job'); $('#i-job').focus(); return; }
     if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
     let code;
     try { code = await access.createInvite(profile, name, role, pos); }
     catch (e) { toast(e.message); return; }
+    teamNotice('invite', name, pos); // RRA-161
     const link = `${location.origin}${location.pathname}#t=${code}`;
     const text = `${APP_NAME} invite for ${name}. Open this on your own phone (works once, for ${INVITE_HOURS} hours):\n${link}`;
     await sheet({
@@ -572,7 +581,7 @@ async function teamView(incoming) {
     try { req = await access.readRequest($('#a-code').value); }
     catch (e) { toast(e.message); return; }
     const known = req.restore ? (await staffList()).find((x) => x.name.trim().toLowerCase() === req.invite.name.trim().toLowerCase()) : null;
-    const roles = ['staff', 'chef', ...(access.can(profile, 'invite.manager') ? ['manager'] : [])];
+    const roles = ['staff', 'chef', ...(access.can(session.profile, 'invite.manager') ? ['manager'] : [])];
     const def = roles.includes(known?.role) ? known.role : 'staff';
     const jobs = await positionList(known?.position);
     // Older invites carry no job title: ask for it now (RRA-133).
@@ -604,6 +613,7 @@ async function teamView(incoming) {
     let code;
     try { code = await access.approve(profile, req, req.restore ? ok.role : undefined, ok.pos); }
     catch (e) { toast(e.message); return; }
+    teamNotice('approve', req.invite.name, ok.pos || req.invite.pos || access.ROLES[ok.role] || ''); // RRA-161
     // RRA-134: the activation goes straight back to their phone, and the
     // request leaves every other manager's list.
     let sentBack = false;
@@ -881,7 +891,7 @@ async function checkRoleGrant() {
   const from = profile.role;
   profile = next; session.profile = next;
   await data.put('staff', { ...me, grantSeen: Date.now(), role: next.role });
-  if (access.can(profile, 'invite')) sync.onInbox(onRequest); else if (from === 'manager') sync.onInbox(null);
+  if (canInvite(profile)) sync.onInbox(onRequest); else if (from === 'manager') sync.onInbox(null);
   if (from !== next.role) openDoor(); // RRA-134
   if (next.role === 'manager') await sync.reopenPrivate();
   if (from === 'manager' && next.role !== 'manager') {
@@ -949,6 +959,7 @@ async function route() {
   session.staff = await staffList(); // permissions (RRA-002) read this
   const st = await data.settings();
   setJobViews(st.jobViews);
+  setMgmtTitles(st.mgmtTitles); // RRA-161
   if (i18n.setRestaurantLang(st.lang)) return; // RRA-157: the Admin changed the restaurant's language
   if (!name) name = homeRoute();
   // RRA-090: this phone's person was removed from the team. Lock it.
@@ -968,7 +979,7 @@ async function route() {
   }
   await (routes[name] || routes[homeRoute()] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
   // RRA-078: swap conflicts for managers, and a manager's question for the requester.
-  if (location.hash === at && !dlg.open && $('#splash').hidden && (await swapPopups().catch(() => false) || await timeOffPopups().catch(() => false) || await reportPopups().catch(() => false) || await eventPopups().catch(() => false)) && location.hash === at) (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
+  if (location.hash === at && !dlg.open && $('#splash').hidden && (await swapPopups().catch(() => false) || await timeOffPopups().catch(() => false) || await reportPopups().catch(() => false) || await eventPopups().catch(() => false) || await teamNoticePopup().catch(() => false)) && location.hash === at) (routes[name] || routes.recipes)(arg ? decodeURIComponent(arg) : undefined);
   // A slow screen can finish after a quicker tap: show what the address says.
   if (location.hash !== at && !dlg.open) route();
 }
@@ -1033,7 +1044,7 @@ async function boot() {
   }
   if (!boot.wired) {
     boot.wired = true;
-    if (access.can(profile, 'invite')) sync.onInbox(onRequest);
+    if (canInvite(profile)) sync.onInbox(onRequest);
     sync.onInboxGone(requestGone);
     openDoor();
     sync.start(profile, () => { if (location.hash.startsWith('#/settings')) route(); });
