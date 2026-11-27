@@ -18,6 +18,7 @@ export const AREAS = {
   settings: 'Settings',
   pos: 'Point of sale (orders, kitchen screen)', // RRA-101
   coupons: 'Coupons (make and send)', // RRA-122. Putting one on a check only needs the POS.
+  storecoupons: 'Store coupons (issue and void)', // RRA-162. Management jobs only; redeeming one on a check only needs the POS.
 };
 
 // Pay and hours (RRA-055): for managers only, and only the Admin sets them.
@@ -34,8 +35,8 @@ const PAY_NONE = { timesheets: 'none', payrates: 'none', payrun: 'none', advance
 export const ROLE_DEFAULTS = {
   // Managers review payroll by default; the Admin submits unless they allow it (RRA-095).
   manager: { ...ALL('change'), settings: 'change', timesheets: 'change', payrates: 'change', payrun: 'see', advances: 'change' },
-  chef: { ...ALL('change'), schedule: 'see', settings: 'see', coupons: 'none', ...PAY_NONE },
-  staff: { ...ALL('see'), prep: 'change', stock: 'change', board: 'change', costs: 'none', settings: 'none', pos: 'change', coupons: 'none', ...PAY_NONE },
+  chef: { ...ALL('change'), schedule: 'see', settings: 'see', coupons: 'none', storecoupons: 'none', ...PAY_NONE },
+  staff: { ...ALL('see'), prep: 'change', stock: 'change', board: 'change', costs: 'none', settings: 'none', pos: 'change', coupons: 'none', storecoupons: 'none', ...PAY_NONE },
 };
 
 export const isHost = () => session.profile?.role === 'owner';
@@ -110,6 +111,8 @@ export function canInvite(p = session.profile) {
   const mine = p === session.profile ? myStaff()?.position : null;
   return isMgmtTitle(mine || p.pos || 'Manager');
 }
+// RRA-162: this phone's person is the Admin, or has the Manager role in a management job.
+export const inMgmtJob = () => isHost() || (session.profile?.role === 'manager' && isMgmtTitle(myStaff()?.position || 'Manager'));
 // A staff record in a management job (for notices): a management title, or the Manager role with no title.
 export const inManagement = (st) => !!st && (isMgmtTitle(st.position) || (st.role === 'manager' && !st.position));
 
@@ -129,7 +132,6 @@ export const JOB_AREAS = {
   schedule: 'Schedule',
   board: 'Bulletin board',
   events: 'Events (BEOs)',
-  music: 'Music',
 };
 // Which job screens open each permission area (perms AREAS)
 const AREA_JOB = { recipes: ['recipes'], prep: ['prep'], stock: ['stock'], orders: ['stock'], schedule: ['schedule'], board: ['board'], events: ['events'], pos: ['seating', 'orders', 'tables', 'kitchen', 'bar'] };
@@ -140,8 +142,8 @@ export function defaultJobAreas(title = '') {
   if (/event/.test(t)) return ['events', 'recipes', 'board', 'schedule'];
   if (/driver/.test(t)) return ['kitchen', 'orders', 'board', 'schedule'];
   if (/barback/.test(t)) return ['bar', 'tables', 'stock', 'board', 'schedule'];
-  if (/bar/.test(t)) return ['seating', 'orders', 'tables', 'bar', 'board', 'schedule', 'music'];
-  if (/host/.test(t)) return ['seating', 'tables', 'board', 'schedule', 'music'];
+  if (/bar/.test(t)) return ['seating', 'orders', 'tables', 'bar', 'board', 'schedule'];
+  if (/host/.test(t)) return ['seating', 'tables', 'board', 'schedule'];
   if (/server|wait|front|cashier/.test(t)) return ['seating', 'orders', 'tables', 'board', 'schedule'];
   if (/runner|expo/.test(t)) return ['kitchen', 'tables', 'board', 'schedule'];
   if (/dish/.test(t)) return ['kitchen', 'prep', 'board', 'schedule'];

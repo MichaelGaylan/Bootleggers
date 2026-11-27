@@ -16,7 +16,8 @@ import * as data from './data.js';
 import { $, $$, esc, view, sheet, toast, setTitle, setChrome } from './ui.js';
 import { canSee, canChange } from './perms.js';
 import { BRAND } from './config.js';
-import { TYPES, DAYS, TAGS, tagOf, cleanCode, newSuffix, barPayload, qrLink, headline, finePrint, canApply, canApplyStanding, usesOf } from './coupons-core.js';
+import { TYPES, DAYS, TAGS, tagOf, cleanCode, newSuffix, barPayload, qrLink, headline, finePrint, canApply, canApplyStanding, usesOf, findCoupon, storeNo } from './coupons-core.js';
+import { storeCouponSheet } from './storecoupons.js';
 
 const C = () => ({ title: BRAND.shortName, tagline: '', ...(BRAND.coupon || {}) });
 const lock = (m) => `<div class="empty">🔒 ${esc(m)}<br><span class="small">The Admin sets this in Settings → Roles and permissions.</span></div>`;
@@ -148,11 +149,11 @@ export async function drawCoupon(cp, code, kind = 'qr') {
 }
 function spacedWidth(ctx, text, gap) { const c = [...text]; return c.reduce((t, ch) => t + ctx.measureText(ch).width, 0) + gap * (c.length - 1); }
 
-const toFile = (cv, name) => new Promise((ok) => cv.toBlob((b) => ok(new File([b], name, { type: 'image/png' })), 'image/png'));
+export const toFile = (cv, name) => new Promise((ok) => cv.toBlob((b) => ok(new File([b], name, { type: 'image/png' })), 'image/png'));
 
 // Send, save or print: the share sheet on iPhone has Messages, Mail, Print and
 // Save Image. Where sharing files isn't possible, the pictures download.
-async function sendPictures(files, title) {
+export async function sendPictures(files, title) {
   if (navigator.canShare?.({ files })) {
     try { await navigator.share({ files, title }); return; } catch (e) { if (e.name === 'AbortError') return; }
   }
@@ -377,6 +378,9 @@ export async function couponSheet(checkId) {
       const tryCode = async (text, scanned) => {
         if (busy) return; busy = true;
         const [coupons, checks, check] = await Promise.all([data.list('coupon'), data.list('check'), data.get('check', checkId)]);
+        // RRA-162: a store coupon number (FS-0001) goes to the store coupon register.
+        const sn = /^[A-Za-z]/.test(String(text).trim()) ? storeNo(text) : '';
+        if (sn && !findCoupon(coupons, cleanCode(text))) { api.close({ store: sn }); return; }
         const r = canApply({ coupons, checks, check, text });
         if (r.error) {
           $('#cerr', el).textContent = r.error;
@@ -394,6 +398,7 @@ export async function couponSheet(checkId) {
     },
   });
   stop();
+  if (result?.store) return storeCouponSheet(checkId, result.store);
   if (result?.needId) return standing(checkId, result.needCp);
   return !!result;
 }
@@ -514,7 +519,7 @@ function whiteGaps(ctx, w, h) {
 }
 
 // Camera → onCode(text). Returns a stop function.
-async function startScanner(video, onCode, msg) {
+export async function startScanner(video, onCode, msg) {
   let stream = null, timer = 0, stopped = false, busy = false;
   const stop = () => { stopped = true; clearInterval(timer); stream?.getTracks().forEach((t) => t.stop()); };
   if (!navigator.mediaDevices?.getUserMedia) { msg('No camera here. Type the code below.'); return stop; }

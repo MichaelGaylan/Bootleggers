@@ -1,7 +1,7 @@
 // Clear test data (RRA-106, RRA-130), Admin only: erase practice records for
 // the whole team before going live. Never deletes dishes, house recipes, the
 // menu, stock (inventory), vendors, prep items, staff, pay rates, roles,
-// coupons or settings. Two picks change a setting instead of erasing records:
+// coupons, the store coupon register (RRA-162) or settings. Two picks change a setting instead of erasing records:
 // restart check numbers at 1, and empty the 86 list (only turns dishes back on).
 
 import * as data from './data.js';
@@ -30,7 +30,7 @@ export const CLEAR_GROUPS = [
 export const PRESET_SALES = ['clock', 'payroll', 'pos', 'checkno'];
 
 // Inventory-type records. This screen may never erase any of these.
-export const PROTECTED = ['recipe', 'stock', 'vendor', 'prepitem', 'prepsaved', 'staff', 'payrate', 'coupon', 'settings'];
+export const PROTECTED = ['recipe', 'stock', 'vendor', 'prepitem', 'prepsaved', 'staff', 'payrate', 'coupon', BRAND.storeCoupon?.coll || 'storecoupon', 'settings'];
 for (const g of CLEAR_GROUPS) for (const c of g.colls || []) if (PROTECTED.includes(c)) throw new Error(`Clear records: ${c} is protected`);
 
 // Local ids plus ids only the shared data has (sealed to other phones).
@@ -99,7 +99,7 @@ export async function clearDataView() {
     <button class="btn tonal block" id="cd-sales" type="button" style="margin-bottom:8px">Pick sales and time logs</button>
     <div class="group cd-list">${CLEAR_GROUPS.map((g) => `<label class="row"><input type="checkbox" data-k="${g.k}"${pick.has(g.k) ? ' checked' : ''}${counts[g.k] ? '' : ' disabled'}>
       <span class="grow"><span class="title">${esc(g.label)}</span>${g.sub ? `<span class="sub" style="white-space:normal">${esc(g.sub)}</span>` : ''}</span><span class="meta">${esc(metaOf(g, counts[g.k]))}</span></label>`).join('')}</div>
-    <div class="hint small">Never erased: stock (inventory) and its counts, dishes, house recipes, the menu, vendors, prep items, staff, pay rates, roles, coupons, seating and settings.</div>
+    <div class="hint small">Never erased: stock (inventory) and its counts, dishes, house recipes, the menu, vendors, prep items, staff, pay rates, roles, coupons, the store coupon register, seating and settings.</div>
     <button class="btn tonal block" id="cd-backup" type="button" disabled>Save a backup file first</button>
     <button class="btn block" id="cd-go" type="button" style="margin-top:8px;background:var(--danger)" disabled>Clear</button>
     <p class="muted small">The backup file holds what this phone can read of the picked records, including pay. Keep it private.</p>`;

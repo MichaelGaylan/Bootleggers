@@ -4,8 +4,8 @@
 // Restaurant names, pictures and data names come from js/brand.js (BPAY-017).
 export const BRAND = globalThis.BRAND;
 export const APP_NAME = BRAND.appName;
-export const VERSION = '0.19.0';
-export const BUILD = '2026.11.27-34';
+export const VERSION = '0.20.0';
+export const BUILD = '2026.11.27-35';
 
 // Text that names the restaurant uses tokens, so it reads right after a
 // changeout (RRA-123): {name} = short name, {restaurant} = full name,
@@ -14,6 +14,16 @@ export const brandText = (s) => String(s ?? '')
   .replace(/\{name\}/g, BRAND.shortName).replace(/\{restaurant\}/g, BRAND.restaurant).replace(/\{app\}/g, BRAND.appName);
 
 const WHATS_NEW_RAW = [
+  {
+    version: '0.20.0', build: '2026.11.27-35', date: '2026-11-27',
+    lines: [
+      'Store coupons (More → Store coupons): management jobs and the Admin issue a coupon to one guest, with its own number (FS-0001, FS-0002…) that is never used twice, and send or print it with a barcode. The register shows each coupon as Outstanding, Redeemed or Void, and can be printed or copied as a spreadsheet.',
+      'Outstanding store coupons are only promises and are not on the books. At the table, tap Store coupon on the check and scan or type the number: it shows as its own line on the check and the receipt, and comes off before tax.',
+      'When the check is paid, the coupon is marked Redeemed with the date and time, check number, purchase, discount and who authorized it, and it can never be used again. The discount goes to Sales Discounts – Promotional Coupons, which takes gross sales down to net sales in Today\'s sales, its printout and Payroll. Redeemed and void coupons are never deleted.',
+      'Receipt: the Pay popup has a Receipt button to print, save or email the guest\'s receipt, with every coupon on its own line.',
+      'Music has been taken out of the app.',
+    ],
+  },
   {
     version: '0.19.0', build: '2026.11.27-34', date: '2026-11-27',
     lines: [
@@ -158,9 +168,7 @@ const WHATS_NEW_RAW = [
   {
     version: '0.8.1', build: '2026.11.24-16', date: '2026-11-24',
     lines: [
-      'Music: a Test sound button checks the speaker and volume, the player says when a station is connecting or why something isn\'t playing, and the built-in stations try backup servers on their own.',
       'Order-up alert: bumping a ticket on the kitchen or bar screen tells the server who took the order "Pick up" with a chime and a count on Orders (POS). If nobody taps Picked up in time, every server on the clock gets it in red. The Admin sets the time in POS settings (2 minutes to start).',
-      'Radio dial: tune like a real radio with an AM/FM switch, a tuning knob, seek buttons and preset buttons. The Admin and managers program presets by frequency (for example 104.3 FM), linked to that station\'s online stream, and every phone gets them.',
     ],
   },
   {
@@ -171,7 +179,6 @@ const WHATS_NEW_RAW = [
       'On an iPad or computer, work screens use the whole screen: Point of sale, a check and its Pay screen, the Kitchen and bar screen, Schedule, Time sheets, a Payroll run, Stock count and an open recipe. The back arrow at the top left brings the left menu back.',
       'Stock count: the All tab is gone. It opens on the first group with its first section open, and opening another section closes the one before.',
       "Today's prep: when the last task in a tab is done, that tab goes away (with Undo), so only tabs with work left show.",
-      'Music (More → Music): play MP3s from a USB drive or this computer with play, pause, skip, shuffle and volume, or internet radio. Find a station adds local AM/FM stations that stream online. Music keeps playing while you use the app.',
       'Gift cards (More → Gift cards): open the {name} gift card shop for a guest, or send them the link.',
       'Admin: Settings → App → Clear test data erases practice clock-ins, payroll, checks, messages, swaps, events, waste and schedules for the whole team, with a backup file first. Dishes, recipes, stock, staff, pay rates and settings are never touched.',
     ],

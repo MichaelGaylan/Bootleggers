@@ -32,7 +32,7 @@ import { giftCardsView } from './giftcards.js';
 import { startAlerts, setLoungeExtra, alertsView, badge } from './alerts.js'; // RRA-137
 import { timeOffPopups } from './timeoff.js'; // RRA-139
 import { couponsView, couponView } from './coupons.js';
-import { musicView } from './music.js';
+import { storeCouponsView, canRegister } from './storecoupons.js';
 import { clearDataView } from './cleardata.js';
 
 import { $, $$, esc, view, dlg, LS, isIOS, standalone, toast, copy, share, pasteInto, sheet, setTitle, setChrome, fmtDate, session, wideMQ, THEMES, getTheme } from './ui.js';
@@ -233,8 +233,8 @@ function renderSide() {
     canOrder() ? link('pos', 'Orders (POS)', badge('pos')).replace('<a ', '<a data-pospop ') : '',
     canKitchen() ? link('tickets', '<span class="sub-l">Kitchen and bar screen</span>', badge('tickets')) : '',
     canSee('coupons') ? link('coupons', 'Coupons') : '',
+    canRegister() ? link('storecoupons', 'Store coupons') : '', // RRA-162
     BRAND.giftCards?.url ? link('giftcards', 'Gift cards') : '',
-    jobAllows('music') ? link('music', 'Music') : '',
     canSee('events') ? link('events', 'Events (BEOs)', '<i id="ev-badge" class="sbadge" hidden></i>') : '',
     canSee('costs') ? link('costs', 'Costs and waste') : '',
     '<hr>',
@@ -268,9 +268,9 @@ function moreView() {
       ${canKitchen() ? '<a class="row" href="#/tickets"><span class="grow">Kitchen and bar screen</span>' + badge('tickets') + '</a>' : ''}
       ${canSales() ? '<a class="row" href="#/possales"><span class="grow">Today\'s sales</span></a>' : ''}
       ${canSee('coupons') ? '<a class="row" href="#/coupons"><span class="grow">Coupons</span></a>' : ''}
+      ${canRegister() ? '<a class="row" href="#/storecoupons"><span class="grow">Store coupons</span><span class="meta">Register</span></a>' : ''}
       ${BRAND.giftCards?.url ? '<a class="row" href="#/giftcards"><span class="grow">Gift cards</span></a>' : ''}
       ${canClear() ? '<a class="row" href="#/tables"><span class="grow">Tables to clear</span>' + badge('tables') + '</a>' : ''}
-      ${jobAllows('music') ? '<a class="row" href="#/music"><span class="grow">Music</span></a>' : ''}
       ${moreView.pay ? '<a class="row" href="#/payroll"><span class="grow">Payroll</span></a>' : ''}
       ${myStaff() ? '<a class="row" href="#/mypay"><span class="grow">My pay &amp; tips</span></a>' : ''}
       ${canSee('schedule') ? '<a class="row" href="#/schedule"><span class="grow">Schedule</span></a>' : ''}
@@ -410,6 +410,7 @@ function aboutView() {
       <p><b>Stock:</b> count with + and −, then Save count. Needed shows what's below par, and Order guides splits it by vendor.</p>
       <p><b>Board:</b> messages for everyone, the kitchen or managers, plus notices from management. A red dot means something new.</p>
       <p><b>Coupons:</b> managers make a coupon under More → Coupons and send it as a picture (QR code or barcode, with the offer printed under it) to text, email, print or post. Scanned with any phone camera, the QR code opens a page with the offer and the code to show the server. At the table, tap <b>Add a coupon</b> on the check and scan it with the camera, or type the code. The discount comes off before tax. Military / veteran, first responder and senior discounts need no coupon: tap <b>Discounts</b> on the check and confirm you saw the guest's ID.</p>
+      <p><b>Store coupons:</b> a manager issues a coupon to one guest under More → Store coupons. Each has its own number (for example FS-0001) that is never used twice. At the table, tap <b>Store coupon</b> on the check and scan its barcode or type the number. When the check is paid it is marked Redeemed, and the discount shows in Today's sales as Sales Discounts – Promotional Coupons.</p>
       <p><b>More:</b> schedule, events, costs and waste, Settings, and this page.</p>
       <p><b>Access:</b> the app opens only on the phone a manager approved. It locks itself after ${INACTIVITY_DAYS} days without use.</p>
       <p><b>Install it:</b> on iPhone, tap Share, then Add to Home Screen. On Android, tap the menu, then Install app.</p>
@@ -843,7 +844,7 @@ const routes = {
   giftcards: () => giftCardsView(), // RRA-111
   coupons: () => couponsView(), // RRA-122
   coupon: (id) => couponView(id),
-  music: () => musicView(), // RRA-109
+  storecoupons: () => storeCouponsView(), // RRA-162
   cleardata: () => clearDataView(), // RRA-106
   notices: () => boardView(),
   schedule: (arg) => scheduleView(arg),
@@ -920,6 +921,23 @@ async function adminPayKeyCheck() {
   if (dirty) await data.saveSettings(next);
 }
 
+// RRA-163: Music was taken out of the app. Clear what it left on this phone
+// (volume, shuffle, own stations), and the Admin clears the radio presets and
+// the Music screen from saved job views, once.
+let musicGone = false;
+async function dropMusic() {
+  if (musicGone) return;
+  musicGone = true;
+  for (const k of ['musicShuffle', 'musicVol', 'musicTab', 'radioMine', 'radioQ']) { try { localStorage.removeItem(BRAND.dataPrefix + k); } catch { /* private mode */ } }
+  if (!isHost()) return;
+  const s = await data.settings();
+  const jv = s.jobViews && Object.values(s.jobViews).some((a) => Array.isArray(a) && a.includes('music'));
+  if (!('radioPresets' in s) && !jv) return;
+  const { radioPresets, ...next } = s;
+  if (jv) next.jobViews = Object.fromEntries(Object.entries(s.jobViews).map(([k, a]) => [k, Array.isArray(a) ? a.filter((x) => x !== 'music') : a]));
+  await data.saveSettings(next);
+}
+
 // RRA-087: offer the one-tap duplicate clean-up when there is something to merge.
 async function offerDedupe() {
   if (dlg.open || !$('#splash').hidden) return setTimeout(offerDedupe, 4000);
@@ -933,7 +951,7 @@ async function offerDedupe() {
 
 // Job views (RRA-132): the bottom tabs, the first screen and which screens open
 // follow the person's job title. Chefs, managers and the Admin as before.
-const ROUTE_JOB = { recipes: 'recipes', recipe: 'recipes', print: 'recipes', prep: 'prep', stock: 'stock', 'stock-items': 'stock', needed: 'stock', orders: 'stock', vendors: 'stock', board: 'board', schedule: 'schedule', 'schedule-print': 'schedule', events: 'events', event: 'events', music: 'music' };
+const ROUTE_JOB = { recipes: 'recipes', recipe: 'recipes', print: 'recipes', prep: 'prep', stock: 'stock', 'stock-items': 'stock', needed: 'stock', orders: 'stock', vendors: 'stock', board: 'board', schedule: 'schedule', 'schedule-print': 'schedule', events: 'events', event: 'events' };
 function homeRoute() {
   if (!jobAreas()) return 'recipes';
   return canSeat() ? 'pos' : canClear() ? 'tables' : canKitchen() ? 'tickets' : canSee('prep') ? 'prep' : canSee('recipes') ? 'recipes' : 'lounge';
@@ -968,6 +986,7 @@ async function route() {
   }
   await checkRoleGrant();
   if (isHost()) await adminPayKeyCheck();
+  await dropMusic();
   await payFlags();
   renderSide();
   applyTabs();

@@ -15,7 +15,10 @@ import { $, $$, esc, view, dlg, sheet, toast, setTitle, setChrome, session, LS, 
 import { canSee, canChange, isHost, myStaff, jobAllows, jobAreas } from './perms.js';
 import { BRAND } from './config.js';
 import { dishPhoto } from './menu.js';
-import { discounts, headline, tagOf } from './coupons-core.js';
+import { discounts, headline, tagOf, storeLines } from './coupons-core.js';
+import { storeCouponSheet, releaseStore, releaseAll, redeemFromCheck, storeSales, accountName, outstanding, canRegister } from './storecoupons.js';
+import { t as tt } from './i18n.js';
+import { printButtons, wirePrint, sharePdf } from './pdf.js';
 import { couponSheet, discountsSheet } from './coupons.js';
 import { ackSeated, ack86 } from './alerts.js';
 import { toppingList, toppingsHtml, wireToppings, withChanges, changesHtml, changeWords, charge, modKey, canChangeLine } from './mods.js';
@@ -95,15 +98,19 @@ async function menu() {
 const lineTotal = (x) => (x.voided ? 0 : r2(x.price * (x.qty || 1)));
 // Coupons (RRA-122) come off before tax: sub = items, disc = coupons,
 // net = what was sold after coupons (net sales), tax on net.
+// RRA-162: store coupons (FS-0001…) come off after the other coupons, also
+// before tax: store = their discount, the "Sales Discounts – Promotional
+// Coupons" account. sub is gross sales; net = sub − disc − store.
 export function totals(c, tax) {
   const sub = r2(c.items.reduce((t, x) => t + lineTotal(x), 0));
   const disc = (c.coupons || []).length ? discounts(c).total : 0;
-  const net = r2(sub - disc);
+  const store = (c.store || []).length ? r2(storeLines(c, sub - disc).reduce((t, k) => t + k.amount, 0)) : 0;
+  const net = r2(sub - disc - store);
   const tx = r2(net * (c.tax ?? tax ?? 0));
   const total = r2(net + tx);
   const paid = r2((c.payments || []).reduce((t, p) => t + p.amount, 0));
   const tips = r2((c.payments || []).reduce((t, p) => t + (p.tip || 0), 0));
-  return { sub, disc, net, tax: tx, total, paid, tips, due: r2(Math.max(0, total - paid)) };
+  return { sub, disc, store, net, tax: tx, total, paid, tips, due: r2(Math.max(0, total - paid)) };
 }
 const openChecks = async () => (await data.list('check')).filter((c) => !c.closed);
 const staffName = (id, staff) => (id === 'admin' ? 'Admin' : staff.find((s) => s.id === id)?.name || 'Staff');
@@ -437,6 +444,7 @@ export async function posCheckView(id, opt = {}) {
   let seat = Math.min(posCheckView.seat || 1, c.guests);
   const t = totals(c, P.tax), unsent = c.items.filter((x) => !x.sent && !x.voided);
   const dl = discounts(c).list, locked = (c.payments || []).length > 0;
+  const sl = storeLines(c, t.sub - t.disc); // RRA-162
   const hasStanding = (await data.list('coupon')).some((cp) => tagOf(cp) && !cp.paused); // RRA-128 // RRA-122: no coupon changes once a payment is in
   const seats = [...new Set(c.items.map((x) => x.seat))].sort((a, b) => a - b);
   const items = M.find((m) => m.section === section)?.items || [];
@@ -460,10 +468,11 @@ export async function posCheckView(id, opt = {}) {
       : `<p class="muted center" style="margin:6px 0">No items yet. Tap a dish to add it.</p>${(c.payments || []).length ? '' : '<button class="btn plain block small" id="free" type="button">Seated by mistake? Free the table</button>'}`}
       <div class="pos-tot"><span>Subtotal</span><span>${money(t.sub)}</span></div>
       ${dl.map((k, i) => `<div class="pos-tot pos-cpn"><button type="button" data-cpn="${i}" ${locked ? 'disabled' : ''}><span>${tagOf(k) ? `${tagOf(k).icon} ${esc(tagOf(k).label)}${k.seat ? ` · Seat ${k.seat}` : ''}` : `🎟 ${esc(k.code)}`}</span><small>${esc(tagOf(k) ? headline(k).split(': ')[1].replace('your check', k.seat ? `seat ${k.seat}` : 'your check') : headline(k))}${k.note ? ` · <b style="color:var(--warn)">${esc(k.note)}</b>` : ''}</small></button><span>${k.amount ? '−' + money(k.amount) : money(0)}</span></div>`).join('')}
+      ${sl.map((k) => `<div class="pos-tot pos-cpn"><button type="button" data-sc="${esc(k.id)}" ${locked ? 'disabled' : ''}><span>🏷 ${esc(tt('Store coupon {0}', k.no))}</span><small class="notr">${esc(k.customer || '')}${k.amount < k.value ? ` · ${esc(tt('{0} coupon', money(k.value)))}` : ''}</small></button><span>−${money(k.amount)}</span></div>`).join('')}
       ${(() => { // RRA-152: seat discounts don't block another seat's discount
         const canCpn = dl.every((k) => k.stack), seatsFree = dl.filter((k) => tagOf(k) && k.seat).length < (c.guests || 1);
         const canDisc = hasStanding && seatsFree && dl.every((k) => k.stack || (tagOf(k) && k.seat));
-        return c.items.length && !locked && (canCpn || canDisc) ? `<div class="pos-addcpn">${canCpn ? `<button class="btn plain small" id="cpn" type="button">🎟 ${dl.length ? 'Add another coupon' : 'Add a coupon'}</button>` : ''}${canDisc ? '<button class="btn plain small" id="disc" type="button">🎖 Discounts</button>' : ''}</div>` : '';
+        return c.items.length && !locked ? `<div class="pos-addcpn">${canCpn ? `<button class="btn plain small" id="cpn" type="button">🎟 ${dl.length ? 'Add another coupon' : 'Add a coupon'}</button>` : ''}${canDisc ? '<button class="btn plain small" id="disc" type="button">🎖 Discounts</button>' : ''}${(c.store || []).length ? '' : '<button class="btn plain small" id="scpn" type="button">🏷 Store coupon</button>'}</div>` : '';
       })()}
       <div class="pos-tot"><span>Tax ${((c.tax ?? P.tax) * 100).toFixed(1)}%</span><span>${money(t.tax)}</span></div>
       <div class="pos-tot big"><span>Total</span><span>${money(t.total)}</span></div>
@@ -508,6 +517,15 @@ export async function posCheckView(id, opt = {}) {
   // RRA-122: scan or type a coupon; tap a coupon line to take it off.
   $('#cpn')?.addEventListener('click', async () => { if (await couponSheet(c.id)) posCheckView(id); });
   $('#disc')?.addEventListener('click', async () => { if (await discountsSheet(c.id)) posCheckView(id); });
+  // RRA-162: store coupons from the register; tap one to take it off.
+  $('#scpn')?.addEventListener('click', async () => { if (await storeCouponSheet(c.id)) posCheckView(id); });
+  $$('[data-sc]').forEach((b) => b.onclick = async () => {
+    const k = sl.find((x) => x.id === b.dataset.sc);
+    const ok = await sheet({ title: 'Take off store coupon?', right: 'Take off', body: `<p><b>${esc(tt('Store coupon {0}', k.no))}</b> · ${money(k.value)} · <span class="notr">${esc(k.customer || '')}</span></p><p class="muted small">It goes back to Outstanding and can be used again.</p>` });
+    if (!ok) return;
+    await releaseStore(c.id, k.id);
+    toast('Store coupon taken off'); posCheckView(id);
+  });
   $$('[data-cpn]').forEach((b) => b.onclick = async () => {
     const k = dl[+b.dataset.cpn];
     const ok = await sheet({ title: tagOf(k) ? 'Take off discount?' : 'Take off coupon?', right: 'Take off', body: `<p><b>${esc(tagOf(k) ? tagOf(k).label : k.code)}</b> · ${esc(headline(k))}</p><p class="muted small">It can be added again afterwards.</p>` });
@@ -517,7 +535,7 @@ export async function posCheckView(id, opt = {}) {
     toast('Coupon taken off'); posCheckView(id);
   });
   $('#fold')?.addEventListener('click', () => { LS.set('posFold', !LS.get('posFold', true)); posCheckView(id); });
-  $('#free')?.addEventListener('click', async () => { await data.remove('check', c.id); toast(c.name + ' is free again'); location.hash = '#/pos'; });
+  $('#free')?.addEventListener('click', async () => { await releaseAll(c); await data.remove('check', c.id); toast(c.name + ' is free again'); location.hash = '#/pos'; });
 }
 
 // RRA-108: − and + on a line. Lines not sent yet change their quantity; a sent
@@ -710,11 +728,44 @@ function parts(c, tax) {
     // own discount (RRA-152, military etc.) comes off that seat only.
     const dl = discounts(c).list;
     const own = (s) => dl.filter((k) => k.seat === s).reduce((a, k) => a + k.amount, 0);
-    const whole = dl.filter((k) => !k.seat).reduce((a, k) => a + k.amount, 0);
+    const whole = dl.filter((k) => !k.seat).reduce((a, k) => a + k.amount, 0) + t.store; // RRA-162: store coupons are for the whole check
     ps = seats.map((s) => { const items = c.items.filter((x) => x.seat === s).reduce((a, x) => a + lineTotal(x), 0); const sub = r2(items - own(s) - (t.sub ? whole * items / t.sub : 0)); return { key: 's' + s, label: `Seat ${s}`, amount: r2(sub + r2(sub * rate)) }; });
     const diff = r2(t.total - ps.reduce((s, p) => s + p.amount, 0)); if (ps.length && diff) ps[ps.length - 1].amount = r2(ps[ps.length - 1].amount + diff);
   } else ps = [{ key: 'w', label: 'Whole check', amount: t.total }];
   return ps.map((p) => ({ ...p, paid: paidFor(p.key), due: r2(Math.max(0, p.amount - paidFor(p.key))) }));
+}
+
+// ------------------------------------------------------------ receipt (RRA-162)
+// The guest's receipt: every item, each coupon and store coupon on its own
+// line (e.g. "Store coupon FS-0001 −$10.00"), tax, total and payments.
+export function receiptLines(c, P) {
+  const t = totals(c, P.tax), dl = discounts(c).list, sl = storeLines(c, t.sub - t.disc);
+  const row = (a, b) => `${a}${' '.repeat(Math.max(2, 46 - String(a).length - String(b).length))}${b}`;
+  const L = [tt('Check #{0} · {1}', c.no, c.name), `${new Date(c.closed || Date.now()).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}${c.serverName ? ' · ' + tt('Server: {0}', c.serverName.split(' ')[0]) : ''}`, ''];
+  for (const x of c.items.filter((y) => !y.voided)) L.push(row(`${(x.qty || 1) > 1 ? `${x.qty} x ` : ''}${nm(x.name)}`, money(lineTotal(x))));
+  L.push('', row(tt('Subtotal'), money(t.sub)));
+  for (const k of dl) if (k.amount) L.push(row(tagOf(k) ? tt('{0} discount', tagOf(k).label) : tt('Coupon {0}', k.code), '−' + money(k.amount)));
+  for (const k of sl) if (k.amount) L.push(row(tt('Store coupon {0}', k.no), '−' + money(k.amount)));
+  L.push(row(tt('Tax {0}%', ((c.tax ?? P.tax) * 100).toFixed(1)), money(t.tax)), row(tt('Total'), money(t.total)));
+  for (const p of c.payments || []) L.push(row(p.method === 'cash' ? tt('Cash') : (PAYMENT_SERVICES.find((x) => x.id === p.provider) || {}).name || tt('Card'), money(p.amount)), ...(p.tip ? [row(tt('Tip'), money(p.tip))] : []));
+  if (t.paid && t.due > 0.004) L.push(row(tt('Due'), money(t.due)));
+  L.push('', tt('Thank you for visiting {0}!', BRAND.restaurant));
+  return L;
+}
+async function receiptSheet(c, P) {
+  const lines = receiptLines(c, P), title = tt('Receipt · {0}', c.name);
+  await sheet({
+    title: 'Receipt', left: 'Done',
+    body: `<div class="card rcpt notr">${lines.map((l) => `<div>${esc(l) || '&nbsp;'}</div>`).join('')}</div>
+      <button class="btn block" id="rc-pdf" type="button">Print or save (PDF)</button>
+      <label class="field" style="margin-top:12px"><span>Email to the guest</span><input type="email" id="rc-to" placeholder="guest@example.com" autocomplete="off"></label>
+      <button class="btn block tonal" id="rc-mail" type="button">Email receipt</button>
+      <p class="muted small">Email opens this phone's mail app with the receipt filled in.</p>`,
+    onMount(api) {
+      $('#rc-pdf', api.el).onclick = () => sharePdf(title, lines, { mono: true });
+      $('#rc-mail', api.el).onclick = () => { const to = $('#rc-to', api.el).value.trim(); location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(lines.join('\n'))}`; };
+    },
+  });
 }
 
 // Old links to the Pay page open the check with the Pay popup.
@@ -738,18 +789,35 @@ async function payPopup(id) {
     ${mode === 'even' ? `<div class="row" style="padding:0 0 10px"><span class="grow">Ways</span><span class="stepper"><button type="button" id="nm" ${locked ? 'disabled' : ''}>−</button><b>${c.split.n}</b><button type="button" id="np" ${locked ? 'disabled' : ''}>+</button></span></div>` : ''}
     <div class="group">${ps.map((p) => `<button class="row ${p.due ? 'nav' : ''}" type="button" data-part="${p.key}" ${p.due ? '' : 'disabled'}><span class="grow"><span class="title">${esc(p.label)}</span><span class="sub">${p.due ? `${money(p.due)} due` : 'Paid'}</span></span><span class="meta">${p.due ? money(p.amount) : '<span class="pill okp">Paid</span>'}</span></button>`).join('')}</div>
     ${(c.payments || []).length ? `<div class="section-label">Payments</div><div class="group">${c.payments.map((p) => `<div class="row"><span class="grow"><span class="title">${p.method === 'cash' ? 'Cash' : esc((PAYMENT_SERVICES.find((s) => s.id === p.provider) || {}).name || 'Card')}${p.tip ? ` · tip ${money(p.tip)}` : ''}</span><span class="sub">${tm(p.at)} · ${esc(p.ref || '')}</span></span><span class="meta">${money(p.amount)}</span></div>`).join('')}</div>` : ''}
+    ${t.due <= 0.004 && !t.paid ? '<button class="btn block" id="zero" type="button">Close check · nothing due</button>' : ''}
+    <button class="btn block tonal" id="rcpt" type="button" style="margin-top:10px">🧾 Receipt</button>
     <p class="muted small center">Cards go through ${esc(svc.name)}${svc.device ? ' on the ' + esc(svc.device) : ''}. ${svc.id === 'practice' ? 'Practice: nothing is charged.' : 'Not connected yet: simulated, nothing is charged.'}</p>`,
       onMount(api) {
         $$('[data-mode]', api.el).forEach((b) => b.onclick = () => { if (!locked) api.close({ split: b.dataset.mode === 'whole' ? null : { mode: b.dataset.mode, n: c.split?.n || 2 } }); });
         $('#nm', api.el)?.addEventListener('click', () => api.close({ split: { ...c.split, n: Math.max(2, c.split.n - 1) } }));
         $('#np', api.el)?.addEventListener('click', () => api.close({ split: { ...c.split, n: Math.min(10, c.split.n + 1) } }));
         $$('[data-part]', api.el).forEach((b) => b.onclick = () => api.close({ part: b.dataset.part }));
+        $('#zero', api.el)?.addEventListener('click', () => api.close({ zero: true }));
+        $('#rcpt', api.el)?.addEventListener('click', () => api.close({ receipt: true }));
       },
     });
     if (!r) return false;
+    if (r.receipt) { await receiptSheet(c, P); continue; }
+    if (r.zero) { await closeCheck(c, P); toast(`${c.name} closed`); return true; }
     if ('split' in r) { await data.put('check', { ...c, split: r.split }); continue; }
     if (await payPart(c, ps.find((p) => p.key === r.part), P)) return true;
   }
+}
+
+// Paid in full: close the check, mark its store coupons Redeemed (RRA-162)
+// with what each one took off, and the table needs clearing.
+async function closeCheck(next, P) {
+  const t = totals(next, P.tax);
+  const store = (next.store || []).length ? { store: storeLines(next, t.sub - t.disc), storeSub: t.sub } : {};
+  const done = { ...next, ...store, closed: Date.now(), closedDate: data.today() };
+  await data.put('check', done);
+  if (done.store?.length) await redeemFromCheck(done);
+  if (next.tableId) await data.put('tablestate', { id: next.tableId, dirty: true, at: Date.now(), checkNo: next.no, name: next.name }); // RRA-132: needs clearing
 }
 
 async function payPart(c, part, P) {
@@ -765,11 +833,7 @@ async function payPart(c, part, P) {
   const cur = await data.get('check', c.id);
   const payments = [...(cur.payments || []), { id: lid(), part: part.key, amount: part.due, at: Date.now(), by: meId(), byName: meName(), ...pay }];
   const next = { ...cur, payments };
-  if (totals(next, P.tax).due <= 0.004) {
-    await data.put('check', { ...next, closed: Date.now(), closedDate: data.today() });
-    if (next.tableId) await data.put('tablestate', { id: next.tableId, dirty: true, at: Date.now(), checkNo: next.no, name: next.name }); // RRA-132: needs clearing
-    toast(`${c.name} paid and closed`); return true;
-  }
+  if (totals(next, P.tax).due <= 0.004) { await closeCheck(next, P); toast(`${c.name} paid and closed`); return true; }
   await data.put('check', next); toast('Payment recorded'); return false;
 }
 
@@ -985,10 +1049,10 @@ export async function posSalesView() {
   const checks = await data.list('check');
   const closed = checks.filter((c) => c.closed && (c.closedDate || data.isoDate(new Date(c.closed))) === today);
   const by = {}, items = {};
-  let net = 0, tax = 0, card = 0, cash = 0, cardTips = 0, cashTips = 0, disc = 0;
+  let net = 0, tax = 0, card = 0, cash = 0, cardTips = 0, cashTips = 0, disc = 0, gross = 0, sdisc = 0;
   const cps = {}; // RRA-122: coupons used today
   for (const c of closed) {
-    const t = totals(c, P.tax); net += t.net; tax += t.tax; disc += t.disc;
+    const t = totals(c, P.tax); net += t.net; tax += t.tax; disc += t.disc; gross += t.sub; sdisc += t.store;
     for (const k of discounts(c).list) { const key = tagOf(k) ? `${tagOf(k).icon} ${tagOf(k).label} discounts` : k.code.split('-')[0]; const e = (cps[key] ||= { n: 0, amt: 0, label: tagOf(k) ? headline(k).split(': ')[1] : headline(k) }); e.n++; e.amt += k.amount; }
     const s = (by[c.serverName || 'Staff'] ||= { net: 0, card: 0, cash: 0, checks: 0 }); s.net += t.net; s.checks++;
     for (const p of c.payments || []) { if (p.method === 'cash') { cash += p.amount; cashTips += p.tip || 0; s.cash += p.tip || 0; } else { card += p.amount; cardTips += p.tip || 0; s.card += p.tip || 0; } }
@@ -996,15 +1060,21 @@ export async function posSalesView() {
   }
   const top = Object.entries(items).sort((a, b) => b[1] - a[1]).slice(0, 6);
   const open = checks.filter((c) => !c.closed);
+  const sc = storeSales(closed), sOut = await outstanding(); // RRA-162
   view.innerHTML = `
     <div class="pr-kpis">
       <div class="card"><div class="pr-v">${money(net)}</div><div class="pr-lab">Net sales · ${closed.length} checks</div></div>
       <div class="card"><div class="pr-v">${money(cardTips + cashTips)}</div><div class="pr-lab">Tips</div></div>
     </div>
     <div class="group">
+      <div class="row"><span class="grow">Gross sales</span><span class="meta">${money(gross)}</span></div>
+      ${disc ? `<div class="row"><span class="grow">Coupons (taken off before tax)</span><span class="meta">−${money(disc)}</span></div>` : ''}
+      ${sdisc ? `<div class="row"><span class="grow">${esc(accountName())}</span><span class="meta">−${money(sdisc)}</span></div>` : ''}
+      <div class="row"><span class="grow"><b>Net sales</b></span><span class="meta"><b>${money(net)}</b></span></div>
+    </div>
+    <div class="group">
       <div class="row"><span class="grow">Card payments</span><span class="meta">${money(card)}</span></div>
       <div class="row"><span class="grow">Cash payments</span><span class="meta">${money(cash)}</span></div>
-      ${disc ? `<div class="row"><span class="grow">Coupons (taken off before tax)</span><span class="meta">−${money(disc)}</span></div>` : ''}
       <div class="row"><span class="grow">Sales tax collected</span><span class="meta">${money(tax)}</span></div>
       <div class="row"><span class="grow">Average check</span><span class="meta">${money(closed.length ? net / closed.length : 0)}</span></div>
       <div class="row"><span class="grow"><span class="title">Still open</span><span class="sub">${open.length} checks</span></span><span class="meta">${money(open.reduce((t, c) => t + totals(c, P.tax).net, 0))}</span></div>
@@ -1012,8 +1082,24 @@ export async function posSalesView() {
     <div class="section-label">By server</div>
     <div class="group">${Object.entries(by).map(([n, s]) => `<div class="row">${avatar(n)}<span class="grow"><span class="title">${esc(n)}</span><span class="sub">${s.checks} checks · card tips ${money(s.card)} · cash tips ${money(s.cash)}</span></span><span class="meta">${money(s.net)}</span></div>`).join('') || '<div class="row muted">No closed checks yet today.</div>'}</div>
     ${Object.keys(cps).length ? `<div class="section-label">Coupons and discounts used</div><div class="group">${Object.entries(cps).map(([code, e]) => `<div class="row"><span class="grow"><span class="title">${esc(code)}</span><span class="sub">${esc(e.label)} · used ${e.n}×</span></span><span class="meta">−${money(e.amt)}</span></div>`).join('')}</div>` : ''}
+    ${sc.list.length ? `<div class="section-label">${esc(tt('Store coupons redeemed · {0}', accountName()))}</div><div class="group">${sc.list.map((k) => `<div class="row"><span class="grow"><span class="title"><span class="notr">${esc(k.no)}</span> · <span class="notr">${esc(k.customer || '')}</span></span><span class="sub">${esc(tt('check #{0}', k.checkNo))} · ${esc(tt('authorized by {0}', k.byName || ''))}</span></span><span class="meta">−${money(k.amount)}</span></div>`).join('')}</div>` : ''}
+    ${sOut.n && canRegister() ? `<a class="row nav card" href="#/storecoupons" style="margin-top:10px"><span class="grow"><span class="title">Store coupon register</span><span class="sub">${esc(tt('{0} outstanding · {1} (not on the books)', sOut.n, money(sOut.amount)))}</span></span></a>` : ''}
     ${top.length ? `<div class="section-label">Top items</div><div class="group">${top.map(([n, q]) => `<div class="row"><span class="grow">${esc(n)}</span><span class="meta">${q}</span></div>`).join('')}</div>` : ''}
-    <p class="muted small">Tips go into each night's tip pool and net sales into labor % in Payroll on their own.</p>`;
+    <p class="muted small">Tips go into each night's tip pool and net sales into labor % in Payroll on their own.</p>
+    ${printButtons()}`;
+  // RRA-162: the day's sales paperwork, with the store coupons and the register summary.
+  wirePrint({ title: tt("Today's sales · {0}", new Date().toLocaleDateString()), mono: true, $, getLines: () => [
+    tt('Gross sales: {0}', money(gross)),
+    ...(disc ? [tt('Coupons (taken off before tax): −{0}', money(disc))] : []),
+    tt('{0}: −{1}', accountName(), money(sdisc)),
+    tt('Net sales: {0} · {1} checks', money(net), closed.length),
+    tt('Sales tax collected: {0}', money(tax)),
+    tt('Card payments: {0} · cash payments: {1}', money(card), money(cash)),
+    tt('Tips: {0}', money(cardTips + cashTips)),
+    '', '# ' + tt('Store coupons redeemed · {0}', accountName()),
+    ...(sc.list.length ? sc.list.map((k) => `${k.no}  ${k.customer || ''}  ·  ${tt('check #{0}', k.checkNo)}  ·  ${tt('authorized by {0}', k.byName || '')}  ·  −${money(k.amount)}`) : [tt('None')]),
+    '', tt('Store coupons outstanding: {0} · {1} (promotional commitments, not on the books)', sOut.n, money(sOut.amount)),
+  ] });
 }
 
 // ------------------------------------------------------------ POS settings (Admin)

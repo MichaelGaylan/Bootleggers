@@ -220,3 +220,23 @@ function rules({ coupon: cp, code, suffix, checks, check, now, seat }) {
 
 // How many times a coupon has been used (on any check, open or closed).
 export const usesOf = (cp, checks) => (checks || []).reduce((n, k) => n + (k.coupons || []).filter((x) => x.couponId === cp.id).length, 0);
+
+// ------------------------------------------------------------ store coupons (RRA-162)
+// A store coupon is a dollar amount a manager gave one guest (FS-0001…). On a
+// check it comes off after the other coupons and before tax, never more than
+// what is left, and nothing is given back in cash. The register itself lives
+// in js/storecoupons.js.
+export const SC = () => ({ coll: 'storecoupon', prefix: 'FS-', digits: 4, account: 'Sales Discounts – Promotional Coupons', ...(BRAND.storeCoupon || {}) });
+// "fs-1", "FS0001", "1" → "FS-0001"; anything else → ''.
+export function storeNo(text) {
+  const { prefix, digits } = SC();
+  const p = String(prefix).replace(/[^A-Za-z]/g, '').toUpperCase();
+  const t = String(text || '').trim().toUpperCase().replace(/\s+/g, '');
+  const m = t.match(new RegExp(`^(?:${p})?-?0*(\\d{1,9})$`));
+  return m && +m[1] > 0 ? prefix + m[1].padStart(digits, '0') : '';
+}
+// left = what the check comes to after the other coupons.
+export function storeLines(c, left) {
+  let rest = r2(Math.max(0, left));
+  return (c.store || []).map((k) => { const amount = r2(Math.min(rest, Math.max(0, +k.value || 0))); rest = r2(rest - amount); return { ...k, amount }; });
+}
